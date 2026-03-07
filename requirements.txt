@@ -1,0 +1,101 @@
+Memory Engine
+A zero-loss memory engine for AI agents. It ingests all interactions, decomposes them into atomic facts, and classifies each by behavior—Knowledge, Rules, or Preferences. 
+At retrieval time, it returns only the facts relevant to the current input. It can serve as the agent's single source of truth, replacing the need for local conversation history.
+
+Memory Sources:
+
+USER — Input from whoever is initiating the request to the agent. In a standard flow, this is the human. In an agent-to-agent flow, this is the calling agent.
+AGENT — The agent's own generated output. Responses, reasoning, decisions.
+TOOL — Output from any tool or sub-agent invoked by the agent. Web search, calculators, APIs, code executors, other specialized agents.
+DOCUMENT — Any non-code reference material. PDFs, text files, spreadsheets, manuals, specs, contracts.
+CODE — Source code, configuration files, schemas, and technical artifacts.
+SYSTEM — current date, session information, and environment variables.
+
+EventID - UUID atomic unit to bind togheter
+
+Metadata
+RelativePath - used for files..
+
+Fact: An indivisible, standalone statement representing a single piece of truth. (e.g., "The table is round").
+
+Query: a concise query, question or demand related to a single thing.
+
+Decomposition: Array of Facts and Queries extracted from input source.
+
+FactLink: connection between a fact and source which can be a text input, file etc.
+
+FactKind - classifies how a fact behaves during retrieval.
+Knowledge — factual information. "The database is PostgreSQL."
+Rule — always included. "Never use semicolons."
+Preference — soft weight for decisions. "I prefer Python over Java."
+
+Knowledge Retrieval Algorithm
+Single smart pipeline. All memory operations go through one endpoint. The engine decides what to do based on input.
+Input:
+{
+  SessionID: UUID (optional — null means global scope),
+  EventID: UUID,
+  IncludeSources: true/false,
+  MessageHistory: 0,
+  Inputs: [
+    {
+      Source: "USER | AGENT | TOOL | DOCUMENT | CODE | SYSTEM",
+      Content: text as string, files as base64,
+      ContentType: "text/plain | application/pdf | image/png | etc",
+      Metadata: any agent-useful context
+    }
+  ]
+}
+Step 1 — Decompose:
+
+If source is USER or AGENT: LLM prompt with current input + recent raw user and agent messages. Extracts self-contained facts and queries. Queries are written as fact-oriented statements for better vector search accuracy.
+If source is TOOL, DOCUMENT, CODE, or SYSTEM: LLM prompt with content only. Extracts facts. Stores them in database. Flow exits here — no search, no evaluate.
+
+Step 2 — Vector Search:
+
+Each fact and each query from Step 1 is used as a separate vector search.
+Only results above similarity threshold are returned.
+Results are merged and deduplicated.
+
+Step 3 — Evaluate:
+
+LLM prompt with: new facts + queries from Step 1, retrieved facts from Step 2.
+Source trust hierarchy enforced — a source can only alter facts from equal or lower trust level:
+
+USER (highest)
+AGENT
+TOOL
+DOCUMENT
+CODE (lowest)
+SYSTEM — immutable, set at session start, outside hierarchy
+
+Output:
+
+Facts to return to the agent (relevant existing + new)
+Facts to store (new facts)
+Facts to update (only if new fact's source is equal or higher trust than existing fact)
+Facts to delete (only if request's source is equal or higher trust than target fact)
+
+
+
+Step 4 — Database Update:
+
+Insert new facts.
+Update contradicted facts (trust hierarchy validated).
+Delete removed facts (trust hierarchy validated).
+
+Step 5 — Return:
+
+Return relevant facts to the agent.
+If IncludeSources is true, attach original source content to each fact.
+If MessageHistory > 0, append the last N raw user/agent message pairs.
+
+
+Fact Management — direct operations by fact ID for admin, debugging, and manual corrections.
+
+Get — retrieve fact by ID.
+Delete — remove fact by ID or array of IDs.
+Update — replace fact text by ID, regenerate embedding.
+
+The hierarchy would be something like:
+SYSTEM > USER > AGENT > TOOL > DOCUMENT > CODE
