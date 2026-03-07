@@ -99,3 +99,21 @@ Update — replace fact text by ID, regenerate embedding.
 
 The hierarchy would be something like:
 SYSTEM > USER > AGENT > TOOL > DOCUMENT > CODE
+
+
+API Endpoints:
+Smart Pipeline:
+
+POST /memory — main endpoint. Sends input, engine decomposes, searches, evaluates, stores, returns facts.
+
+Fact Management:
+
+GET /facts/:id — retrieve fact by ID.
+PUT /facts/:id — update fact by ID. Requires source level.
+DELETE /facts/:id — delete fact by ID or array. Requires source level.
+
+Session:
+
+POST /sessions — create a new session.
+GET /sessions/:id — retrieve session info.
+DELETE /sessions/:id — end/delete a session.
