@@ -4,15 +4,15 @@ import (
 	"context"
 	"net/http"
 
-	"agentmem/internal/database"
+	"agentmem/internal/memengine"
 )
 
 type Server struct {
 	httpServer *http.Server
-	db         *database.DB
+	engine     *memengine.MemoryEngine
 }
 
-func NewServer(db *database.DB) *Server {
+func NewServer(engine *memengine.MemoryEngine) *Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler)
 
@@ -20,7 +20,7 @@ func NewServer(db *database.DB) *Server {
 		httpServer: &http.Server{
 			Handler: mux,
 		},
-		db:    db,
+		engine: engine,
 	}
 }
 

@@ -13,6 +13,10 @@ import (
 	"agentmem/internal/api"
 	"agentmem/internal/config"
 	"agentmem/internal/database"
+	"agentmem/internal/memengine"
+
+	"github.com/costinul/bwai"
+	"github.com/costinul/bwai/bwaiclient"
 )
 
 func main() {
@@ -26,6 +30,16 @@ func main() {
 	}
 	log.Printf("Configuration loaded (port: %s, log_level: %s)", cfg.Port, cfg.LogLevel)
 
+	log.Println("Initializing BWAI client...")
+	// Note: In a production environment, you would load models and prompts from configuration
+	registry, err := bwai.NewModelRegistry("models.yaml", "prompts", nil)
+	if err != nil {
+		log.Printf("failed to initialize model registry: %v", err)
+		// For now, we'll continue with a nil registry if files are missing, 
+		// but in a real app this should probably be a fatal error.
+	}
+	bwaiClient := bwaiclient.NewBWAIClient(registry, nil, nil)
+
 	log.Println("Connecting to database...")
 	db, err := database.Connect(cfg.Database.PostgresDSN)
 	if err != nil {
@@ -35,8 +49,11 @@ func main() {
 	defer db.Close()
 	log.Println("Database connection established")
 
+	log.Println("Initializing MemoryEngine...")
+	engine := memengine.NewMemoryEngine(bwaiClient, db)
+
 	log.Println("Initializing API server...")
-	server := api.NewServer(db)
+	server := api.NewServer(engine)
 	go func() {
 		log.Printf("Starting HTTP server on port %s", cfg.Port)
 		if err := server.Start(cfg.Port); err != nil && !errors.Is(err, http.ErrServerClosed) {
