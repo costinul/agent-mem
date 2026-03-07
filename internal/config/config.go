@@ -12,17 +12,10 @@ type Config struct {
 	GinMode  string
 	LogLevel string
 	Database DatabaseConfig
-	Cache    CacheConfig
 }
 
 type DatabaseConfig struct {
 	PostgresDSN string
-}
-
-type CacheConfig struct {
-	RedisAddr     string
-	RedisPassword string
-	RedisDB       int
 }
 
 func Load() (*Config, error) {
@@ -32,11 +25,6 @@ func Load() (*Config, error) {
 		LogLevel: getEnvOrDefault("LOG_LEVEL", "debug"),
 		Database: DatabaseConfig{
 			PostgresDSN: strings.TrimSpace(os.Getenv("POSTGRES_DSN")),
-		},
-		Cache: CacheConfig{
-			RedisAddr:     strings.TrimSpace(os.Getenv("REDIS_ADDR")),
-			RedisPassword: os.Getenv("REDIS_PASSWORD"),
-			RedisDB:       getEnvIntOrDefault("REDIS_DB", 0),
 		},
 	}
 
@@ -52,10 +40,6 @@ func (c *Config) validate() error {
 
 	if c.Database.PostgresDSN == "" {
 		missing = append(missing, "POSTGRES_DSN")
-	}
-
-	if c.Cache.RedisAddr == "" {
-		missing = append(missing, "REDIS_ADDR")
 	}
 
 	if len(missing) > 0 {

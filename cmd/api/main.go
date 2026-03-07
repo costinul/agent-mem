@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"agentmem/internal/api"
-	"agentmem/internal/cache"
 	"agentmem/internal/config"
 	"agentmem/internal/database"
 )
@@ -30,14 +29,7 @@ func main() {
 	}
 	defer db.Close()
 
-	cacheClient, err := cache.NewRedisCacheFromConfig(cfg.Cache)
-	if err != nil {
-		log.Printf("failed to connect to cache: %v", err)
-		os.Exit(1)
-	}
-	defer cacheClient.Close()
-
-	server := api.NewServer(db, cacheClient)
+	server := api.NewServer(db)
 	go func() {
 		if err := server.Start(cfg.Port); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Printf("failed to start API server: %v", err)

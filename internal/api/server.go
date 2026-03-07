@@ -4,17 +4,15 @@ import (
 	"context"
 	"net/http"
 
-	"agentmem/internal/cache"
 	"agentmem/internal/database"
 )
 
 type Server struct {
 	httpServer *http.Server
 	db         *database.DB
-	cache      *cache.RedisCache
 }
 
-func NewServer(db *database.DB, cacheClient *cache.RedisCache) *Server {
+func NewServer(db *database.DB) *Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler)
 
@@ -23,7 +21,6 @@ func NewServer(db *database.DB, cacheClient *cache.RedisCache) *Server {
 			Handler: mux,
 		},
 		db:    db,
-		cache: cacheClient,
 	}
 }
 
