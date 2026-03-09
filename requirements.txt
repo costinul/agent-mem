@@ -1,40 +1,99 @@
-Memory Engine
-A zero-loss memory engine for AI agents. It ingests all interactions, decomposes them into atomic facts, and classifies each by behavior—Knowledge, Rules, or Preferences. 
-At retrieval time, it returns only the facts relevant to the current input. It can serve as the agent's single source of truth, replacing the need for local conversation history.
+# Memory Engine
 
-Memory Sources:
+A zero-loss memory engine for AI agents. It ingests all interactions, decomposes them into atomic facts, and classifies each by behavior — Knowledge, Rules, or Preferences. At retrieval time, it returns only the facts relevant to the current input. It can serve as the agent's single source of truth, replacing the need for local conversation history.
 
-USER — Input from whoever is initiating the request to the agent. In a standard flow, this is the human. In an agent-to-agent flow, this is the calling agent.
-AGENT — The agent's own generated output. Responses, reasoning, decisions.
-TOOL — Output from any tool or sub-agent invoked by the agent. Web search, calculators, APIs, code executors, other specialized agents.
-DOCUMENT — Any non-code reference material. PDFs, text files, spreadsheets, manuals, specs, contracts.
-CODE — Source code, configuration files, schemas, and technical artifacts.
-SYSTEM — current date, session information, and environment variables.
+---
 
-EventID - UUID atomic unit to bind togheter
+## Hierarchy
 
-Metadata
-RelativePath - used for files..
+Account → owns everything. Billing, API keys, global settings.
+Agent → a specific agent or application under the account. Each has its own memory pool.
+Session → a single run or conversation within an agent.
 
-Fact: An indivisible, standalone statement representing a single piece of truth. (e.g., "The table is round").
+---
 
-Query: a concise query, question or demand related to a single thing.
+## Memory Sources
 
-Decomposition: Array of Facts and Queries extracted from input source.
+SourceKind — classifies the origin of data entering the memory engine.
 
-FactLink: connection between a fact and source which can be a text input, file etc.
+- USER — Input from whoever is initiating the request to the agent. In a standard flow, this is the human. In an agent-to-agent flow, this is the calling agent.
+- AGENT — The agent's own generated output. Responses, reasoning, decisions.
+- TOOL — Output from any tool or sub-agent invoked by the agent. Web search, calculators, APIs, code executors, other specialized agents.
+- DOCUMENT — Any non-code reference material. PDFs, text files, spreadsheets, manuals, specs, contracts.
+- CODE — Source code, configuration files, schemas, and technical artifacts.
+- SYSTEM — Current date, session information, and environment variables. Immutable.
 
-FactKind - classifies how a fact behaves during retrieval.
-Knowledge — factual information. "The database is PostgreSQL."
-Rule — always included. "Never use semicolons."
-Preference — soft weight for decisions. "I prefer Python over Java."
+### Source Trust Hierarchy
 
-Knowledge Retrieval Algorithm
-Single smart pipeline. All memory operations go through one endpoint. The engine decides what to do based on input.
-Input:
+A source can only alter facts from equal or lower trust level.
+
+```
+SYSTEM (highest) — immutable, set at session start, outside hierarchy
+USER
+AGENT
+TOOL
+DOCUMENT
+CODE (lowest)
+```
+
+---
+
+## Core Concepts
+
+### EventID
+UUID generated internally by the engine. Groups all inputs submitted together in a single call. Not provided by the caller.
+
+### Fact
+A short, self-contained statement expressing a single piece of information. (e.g., "The table is round", "User prefers Python").
+
+### Query
+A concise query, question, or demand related to a single thing. Extracted during decomposition. Used for retrieval only, never stored.
+
+### Decomposition
+Array of Facts and Queries extracted from input source. The LLM resolves ambiguous input using conversation history (for USER/AGENT sources) and then extracts self-contained facts and queries.
+
+### FactLink
+Connection between a fact and the specific source item that produced it. Links to EventID and the specific input within that event.
+
+### FactKind
+Classifies how a fact behaves during retrieval.
+
+- Knowledge — factual information. Retrieved only when semantically relevant. "The database is PostgreSQL."
+- Rule — always included in retrieval. "Never use semicolons."
+- Preference — soft weight for decisions. Retrieved when relevant to choices. "I prefer Python over Java."
+
+### Fact Scoping
+Facts live at one of three levels:
+
+- Session — relevant only during this conversation.
+- Agent — persists across sessions for this agent.
+- Account — shared across all agents under the account.
+
+Contextual retrieval searches all three levels: session → agent → account.
+
+---
+
+## Two Interfaces
+
+### Contextual Interface
+Used by agents during a live conversation or sequence. Every call is a read-write operation. Conversation-aware. Requires a SessionID.
+
+### Factual Interface
+Used by background services, admin tools, or agents outside of a conversation to directly manage memory. No conversation awareness. SessionID optional — with SessionID it modifies session-level facts, without it modifies agent or account-level facts.
+
+Both interfaces operate on the same facts in the same database. A fact stored via factual is retrievable in contextual, and vice versa.
+
+---
+
+## Contextual Interface — Smart Pipeline
+
+### Input
+
+```
 {
-  SessionID: UUID (optional — null means global scope),
-  EventID: UUID,
+  AccountID: UUID (required),
+  AgentID: UUID (required),
+  SessionID: UUID (required),
   IncludeSources: true/false,
   MessageHistory: 0,
   Inputs: [
@@ -46,74 +105,139 @@ Input:
     }
   ]
 }
-Step 1 — Decompose:
+```
 
-If source is USER or AGENT: LLM prompt with current input + recent raw user and agent messages. Extracts self-contained facts and queries. Queries are written as fact-oriented statements for better vector search accuracy.
-If source is TOOL, DOCUMENT, CODE, or SYSTEM: LLM prompt with content only. Extracts facts. Stores them in database. Flow exits here — no search, no evaluate.
+### Step 1 — Decompose
 
-Step 2 — Vector Search:
+- If source is USER or AGENT: LLM prompt with current input + recent raw user and agent messages. Resolves ambiguous input into self-contained statements. Extracts facts and queries. Queries are written as fact-oriented statements for better vector search accuracy.
+- If source is TOOL, DOCUMENT, CODE, or SYSTEM: LLM prompt with content only. Extracts facts. Stores them in database. Flow exits here — no search, no evaluate.
 
-Each fact and each query from Step 1 is used as a separate vector search.
-Only results above similarity threshold are returned.
-Results are merged and deduplicated.
+### Step 2 — Vector Search
 
-Step 3 — Evaluate:
+- Each fact and each query from Step 1 is used as a separate vector search.
+- Searches across all three scopes: session, agent, and account.
+- Only results above similarity threshold are returned.
+- Results are merged and deduplicated.
 
-LLM prompt with: new facts + queries from Step 1, retrieved facts from Step 2.
-Source trust hierarchy enforced — a source can only alter facts from equal or lower trust level:
+### Step 3 — Evaluate
 
-USER (highest)
-AGENT
-TOOL
-DOCUMENT
-CODE (lowest)
-SYSTEM — immutable, set at session start, outside hierarchy
+- LLM prompt with: new facts + queries from Step 1, retrieved facts from Step 2.
+- Source trust hierarchy enforced — a source can only alter facts from equal or higher trust than existing fact.
+- Output:
+  - Facts to return to the agent (relevant existing + new)
+  - Facts to store (new facts)
+  - Facts to update (existing facts contradicted by new ones, trust hierarchy validated)
+  - Facts to delete (explicit removal requests, trust hierarchy validated)
 
-Output:
+### Step 4 — Database Update
 
-Facts to return to the agent (relevant existing + new)
-Facts to store (new facts)
-Facts to update (only if new fact's source is equal or higher trust than existing fact)
-Facts to delete (only if request's source is equal or higher trust than target fact)
+- Insert new facts.
+- Update contradicted facts (trust hierarchy validated).
+- Delete removed facts (trust hierarchy validated).
 
+### Step 5 — Return
 
+- Return relevant facts to the agent.
+- If IncludeSources is true, attach original source content to each fact.
+- If MessageHistory > 0, append the last N raw messages ordered by sequence.
 
-Step 4 — Database Update:
+---
 
-Insert new facts.
-Update contradicted facts (trust hierarchy validated).
-Delete removed facts (trust hierarchy validated).
+## Factual Interface
 
-Step 5 — Return:
+### Add Memory
 
-Return relevant facts to the agent.
-If IncludeSources is true, attach original source content to each fact.
-If MessageHistory > 0, append the last N raw user/agent message pairs.
+- Input: text + source type + metadata. AgentID required. SessionID optional.
+- Text is decomposed into facts via LLM and stored.
+- No conversation awareness, no resolve step.
+- Returns stored facts.
 
+### Fact Management — Direct operations by fact ID.
 
-Fact Management — direct operations by fact ID for admin, debugging, and manual corrections.
+- Get — retrieve fact by ID. No restrictions.
+- Delete — remove fact by ID or array of IDs. Requires source level equal or higher than the target fact's source.
+- Update — replace fact text by ID, regenerate embedding. Requires source level equal or higher than the target fact's source.
 
-Get — retrieve fact by ID.
-Delete — remove fact by ID or array of IDs.
-Update — replace fact text by ID, regenerate embedding.
+---
 
-The hierarchy would be something like:
-SYSTEM > USER > AGENT > TOOL > DOCUMENT > CODE
+## Storage
 
+- Postgres — facts, embeddings (pgvector), event metadata, fact links, raw messages, sessions, agents, accounts.
+- S3-compatible bucket — original files (documents, code files, anything binary). FactLink points to bucket path.
+- No Redis. Postgres handles everything.
+- Encryption at rest for all data.
 
-API Endpoints:
-Smart Pipeline:
+---
 
-POST /memory — main endpoint. Sends input, engine decomposes, searches, evaluates, stores, returns facts.
+## API Endpoints
 
-Fact Management:
+### Agents
 
-GET /facts/:id — retrieve fact by ID.
-PUT /facts/:id — update fact by ID. Requires source level.
-DELETE /facts/:id — delete fact by ID or array. Requires source level.
+```
+POST   /agents              — create agent under account
+GET    /agents/:id           — retrieve agent info
+DELETE /agents/:id           — delete agent and all its memory
+```
 
-Session:
+### Sessions
 
-POST /sessions — create a new session.
-GET /sessions/:id — retrieve session info.
-DELETE /sessions/:id — end/delete a session.
+```
+POST   /agents/:id/sessions          — create a new session
+GET    /agents/:id/sessions/:id      — retrieve session info
+DELETE /agents/:id/sessions/:id      — end/delete a session
+```
+
+### Contextual Interface
+
+```
+POST /memory/contextual     — main smart pipeline. Requires SessionID. Read-write.
+```
+
+### Factual Interface
+
+```
+POST   /memory/factual      — add memory. SessionID optional.
+GET    /facts/:id            — retrieve fact by ID.
+PUT    /facts/:id            — update fact by ID. Requires source level.
+DELETE /facts/:id            — delete fact by ID or array. Requires source level.
+```
+
+---
+
+## Security
+
+### Cloud Tier
+- SSL in transit.
+- Encryption at rest in database.
+- Clear data retention policies.
+- Delete all data on demand.
+- Customer-managed keys: customer provides encryption key, engine uses it to decrypt during processing, encrypted at rest with their key.
+
+### Enterprise Tier (Self-Hosted)
+- Single Docker image.
+- Customer provides their own database connection and LLM endpoint.
+- All data stays on customer infrastructure.
+- True zero-trust: no data leaves their network.
+
+---
+
+## Memory Poisoning Protection
+
+- Source trust hierarchy enforced at evaluate step. Lower-trust sources cannot override higher-trust facts.
+- SYSTEM facts are immutable.
+- Evaluate step flags suspicious inputs: instructions disguised as facts, mass contradictions.
+
+---
+
+## Project Structure
+
+Single Golang project with clean package boundaries.
+
+```
+/cmd/api          — HTTP server, routes
+/internal/engine  — core memory logic (decompose, search, evaluate)
+/internal/storage — database and bucket operations
+/internal/llm     — LLM client abstraction
+```
+
+Configuration via environment variables injected at runtime. One secret per variable in Azure Key Vault (or equivalent).

@@ -1,4 +1,4 @@
-package memengine
+package engine
 
 import (
 	"agentmem/internal/database"
