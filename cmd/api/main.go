@@ -16,7 +16,7 @@ import (
 	"agentmem/internal/api"
 	"agentmem/internal/config"
 	"agentmem/internal/database"
-	"agentmem/internal/memengine"
+	"agentmem/internal/engine"
 
 	"github.com/costinul/bwai"
 	"github.com/costinul/bwai/bwaiclient"
@@ -61,7 +61,7 @@ func main() {
 	bwaiClient := bwaiclient.NewBWAIClient(registry, nil, nil)
 
 	log.Println("Initializing MemoryEngine...")
-	engine := memengine.NewMemoryEngine(bwaiClient, db)
+	engine := engine.NewMemoryEngine(bwaiClient, db)
 
 	log.Println("Initializing API server...")
 	server := api.NewServer(engine)

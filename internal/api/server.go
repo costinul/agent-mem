@@ -1,18 +1,17 @@
 package api
 
 import (
+	"agentmem/internal/engine"
 	"context"
 	"net/http"
-
-	"agentmem/internal/memengine"
 )
 
 type Server struct {
 	httpServer *http.Server
-	engine     *memengine.MemoryEngine
+	engine     *engine.MemoryEngine
 }
 
-func NewServer(engine *memengine.MemoryEngine) *Server {
+func NewServer(engine *engine.MemoryEngine) *Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler)
 
