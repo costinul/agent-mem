@@ -20,17 +20,29 @@ CREATE TABLE api_keys (
 CREATE INDEX idx_api_keys_prefix ON api_keys(prefix);
 CREATE INDEX idx_api_keys_account_id ON api_keys(account_id);
 
+CREATE TABLE agents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_agents_account_id ON agents(account_id);
+
 CREATE TABLE sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     closed_at TIMESTAMPTZ
 );
 CREATE INDEX idx_sessions_account_id ON sessions(account_id);
+CREATE INDEX idx_sessions_agent_id ON sessions(agent_id);
 
 CREATE TABLE facts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    agent_id UUID REFERENCES agents(id) ON DELETE CASCADE,
     session_id UUID REFERENCES sessions(id) ON DELETE SET NULL,
     event_id UUID NOT NULL,
     source TEXT NOT NULL CHECK (source IN ('SYSTEM','USER','AGENT','TOOL','DOCUMENT','CODE')),
