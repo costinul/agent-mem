@@ -4,15 +4,14 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
-	"agentmem/internal/database"
 	models "agentmem/internal/models"
+	"agentmem/internal/repository/accountrepo"
 )
 
 const (
@@ -27,11 +26,11 @@ var (
 )
 
 type Service struct {
-	db *database.DB
+	repo accountrepo.Repository
 }
 
-func NewService(db *database.DB) *Service {
-	return &Service{db: db}
+func NewService(repo accountrepo.Repository) *Service {
+	return &Service{repo: repo}
 }
 
 func (s *Service) CreateAccount(ctx context.Context, name string) (*models.Account, error) {
@@ -40,17 +39,12 @@ func (s *Service) CreateAccount(ctx context.Context, name string) (*models.Accou
 		return nil, fmt.Errorf("account name is required")
 	}
 
-	var account models.Account
-	err := s.db.QueryRowContext(
-		ctx,
-		`INSERT INTO accounts (name) VALUES ($1) RETURNING id, name, created_at, updated_at`,
-		name,
-	).Scan(&account.ID, &account.Name, &account.CreatedAt, &account.UpdatedAt)
+	account, err := s.repo.CreateAccount(ctx, name)
 	if err != nil {
 		return nil, fmt.Errorf("create account: %w", err)
 	}
 
-	return &account, nil
+	return account, nil
 }
 
 func (s *Service) CreateAPIKey(ctx context.Context, accountID string, label *string, expiresAt *time.Time) (*models.APIKey, string, error) {
@@ -65,48 +59,18 @@ func (s *Service) CreateAPIKey(ctx context.Context, accountID string, label *str
 	}
 
 	keyHash := hashAPIKey(plaintextKey)
-	var normalizedLabel sql.NullString
-	if label != nil {
-		trimmed := strings.TrimSpace(*label)
-		if trimmed != "" {
-			normalizedLabel = sql.NullString{String: trimmed, Valid: true}
-		}
-	}
-
-	var (
-		stored      models.APIKey
-		dbLabel     sql.NullString
-		dbExpiresAt sql.NullTime
-	)
-
-	err = s.db.QueryRowContext(
-		ctx,
-		`INSERT INTO api_keys (account_id, prefix, key_hash, label, expires_at, valid)
-		 VALUES ($1, $2, $3, $4, $5, true)
-		 RETURNING id, account_id, prefix, key_hash, label, expires_at, valid, created_at`,
-		accountID,
-		prefix,
-		keyHash,
-		normalizedLabel,
-		expiresAt,
-	).Scan(
-		&stored.ID,
-		&stored.AccountID,
-		&stored.Prefix,
-		&stored.KeyHash,
-		&dbLabel,
-		&dbExpiresAt,
-		&stored.Valid,
-		&stored.CreatedAt,
-	)
+	stored, err := s.repo.CreateAPIKey(ctx, accountrepo.CreateAPIKeyParams{
+		AccountID: accountID,
+		Prefix:    prefix,
+		KeyHash:   keyHash,
+		Label:     label,
+		ExpiresAt: expiresAt,
+	})
 	if err != nil {
 		return nil, "", fmt.Errorf("create api key: %w", err)
 	}
 
-	stored.Label = nullStringPtr(dbLabel)
-	stored.ExpiresAt = nullTimePtr(dbExpiresAt)
-
-	return &stored, plaintextKey, nil
+	return stored, plaintextKey, nil
 }
 
 func (s *Service) InvalidateAPIKeyByID(ctx context.Context, apiKeyID string) error {
@@ -115,20 +79,11 @@ func (s *Service) InvalidateAPIKeyByID(ctx context.Context, apiKeyID string) err
 		return fmt.Errorf("api key id is required")
 	}
 
-	result, err := s.db.ExecContext(
-		ctx,
-		`UPDATE api_keys SET valid = false WHERE id = $1`,
-		apiKeyID,
-	)
+	updated, err := s.repo.InvalidateAPIKeyByID(ctx, apiKeyID)
 	if err != nil {
 		return fmt.Errorf("invalidate api key by id: %w", err)
 	}
-
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("invalidate api key by id rows affected: %w", err)
-	}
-	if affected == 0 {
+	if !updated {
 		return ErrAPIKeyNotFound
 	}
 
@@ -141,20 +96,11 @@ func (s *Service) InvalidateAPIKeyByPrefix(ctx context.Context, prefix string) e
 		return fmt.Errorf("api key prefix is required")
 	}
 
-	result, err := s.db.ExecContext(
-		ctx,
-		`UPDATE api_keys SET valid = false WHERE prefix = $1`,
-		prefix,
-	)
+	updated, err := s.repo.InvalidateAPIKeyByPrefix(ctx, prefix)
 	if err != nil {
 		return fmt.Errorf("invalidate api key by prefix: %w", err)
 	}
-
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("invalidate api key by prefix rows affected: %w", err)
-	}
-	if affected == 0 {
+	if !updated {
 		return ErrAPIKeyNotFound
 	}
 
@@ -167,25 +113,14 @@ func (s *Service) GetAndValidateKey(ctx context.Context, fullKey string) (*model
 		return nil, ErrInvalidAPIKey
 	}
 
-	rows, err := s.db.QueryContext(
-		ctx,
-		`SELECT id, account_id, prefix, key_hash, label, expires_at, valid, created_at
-		 FROM api_keys
-		 WHERE prefix = $1`,
-		prefix,
-	)
+	keys, err := s.repo.ListAPIKeysByPrefix(ctx, prefix)
 	if err != nil {
 		return nil, fmt.Errorf("get api key by prefix: %w", err)
 	}
-	defer rows.Close()
 
 	now := time.Now().UTC()
-	for rows.Next() {
-		key, scanErr := scanAPIKey(rows)
-		if scanErr != nil {
-			return nil, fmt.Errorf("scan api key: %w", scanErr)
-		}
-
+	for i := range keys {
+		key := &keys[i]
 		if !isAPIKeyUsable(key, now) {
 			continue
 		}
@@ -194,10 +129,6 @@ func (s *Service) GetAndValidateKey(ctx context.Context, fullKey string) (*model
 		}
 
 		return key, nil
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate api keys: %w", err)
 	}
 
 	return nil, ErrInvalidAPIKey
@@ -248,50 +179,4 @@ func isAPIKeyUsable(key *models.APIKey, now time.Time) bool {
 	}
 
 	return true
-}
-
-func scanAPIKey(scanner interface {
-	Scan(dest ...any) error
-}) (*models.APIKey, error) {
-	var (
-		key       models.APIKey
-		label     sql.NullString
-		expiresAt sql.NullTime
-	)
-
-	err := scanner.Scan(
-		&key.ID,
-		&key.AccountID,
-		&key.Prefix,
-		&key.KeyHash,
-		&label,
-		&expiresAt,
-		&key.Valid,
-		&key.CreatedAt,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	key.Label = nullStringPtr(label)
-	key.ExpiresAt = nullTimePtr(expiresAt)
-	return &key, nil
-}
-
-func nullStringPtr(value sql.NullString) *string {
-	if !value.Valid {
-		return nil
-	}
-
-	typed := value.String
-	return &typed
-}
-
-func nullTimePtr(value sql.NullTime) *time.Time {
-	if !value.Valid {
-		return nil
-	}
-
-	typed := value.Time
-	return &typed
 }

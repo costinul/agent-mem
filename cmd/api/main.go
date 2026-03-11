@@ -17,6 +17,8 @@ import (
 	"agentmem/internal/config"
 	"agentmem/internal/database"
 	"agentmem/internal/engine"
+	"agentmem/internal/repository/accountrepo"
+	"agentmem/internal/repository/memoryrepo"
 
 	"github.com/costinul/bwai"
 	"github.com/costinul/bwai/bwaiclient"
@@ -42,8 +44,12 @@ func main() {
 	defer db.Close()
 	log.Println("Database connection established")
 
+	accountRepo := accountrepo.NewPostgres(db)
+	accountSvc := account.NewService(accountRepo)
+	memoryRepo := memoryrepo.NewPostgres(db)
+
 	if len(os.Args) > 1 && os.Args[1] == "create-api-key" {
-		if err := runCreateAPIKeyCommand(context.Background(), db, os.Args[2:]); err != nil {
+		if err := runCreateAPIKeyCommand(context.Background(), accountSvc, os.Args[2:]); err != nil {
 			log.Printf("create-api-key failed: %v", err)
 			os.Exit(1)
 		}
@@ -61,7 +67,7 @@ func main() {
 	bwaiClient := bwaiclient.NewBWAIClient(registry, nil, nil)
 
 	log.Println("Initializing MemoryEngine...")
-	engine := engine.NewMemoryEngine(bwaiClient, db)
+	engine := engine.NewMemoryEngine(bwaiClient, memoryRepo)
 
 	log.Println("Initializing API server...")
 	server := api.NewServer(engine)
@@ -87,7 +93,7 @@ func main() {
 	log.Println("Server shutdown complete")
 }
 
-func runCreateAPIKeyCommand(ctx context.Context, db *database.DB, args []string) error {
+func runCreateAPIKeyCommand(ctx context.Context, accountSvc *account.Service, args []string) error {
 	fs := flag.NewFlagSet("create-api-key", flag.ContinueOnError)
 	accountID := fs.String("account-id", "", "existing account ID")
 	accountName := fs.String("account-name", "", "new account name when account-id is not provided")
@@ -98,7 +104,6 @@ func runCreateAPIKeyCommand(ctx context.Context, db *database.DB, args []string)
 		return err
 	}
 
-	accountSvc := account.NewService(db)
 	selectedAccountID := *accountID
 	if selectedAccountID == "" {
 		if *accountName == "" {

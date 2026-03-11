@@ -1,19 +1,19 @@
 package engine
 
 import (
-	"agentmem/internal/database"
+	"agentmem/internal/repository/memoryrepo"
 
 	"github.com/costinul/bwai/bwaiclient"
 )
 
 type MemoryEngine struct {
 	client *bwaiclient.BWAIClient
-	db     *database.DB
+	repo   memoryrepo.Repository
 }
 
-func NewMemoryEngine(client *bwaiclient.BWAIClient, db *database.DB) *MemoryEngine {
+func NewMemoryEngine(client *bwaiclient.BWAIClient, repo memoryrepo.Repository) *MemoryEngine {
 	return &MemoryEngine{
 		client: client,
-		db:     db,
+		repo:   repo,
 	}
 }

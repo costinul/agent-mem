@@ -3,14 +3,11 @@ package account
 import (
 	"context"
 	"errors"
-	"regexp"
 	"testing"
 	"time"
 
-	"agentmem/internal/database"
 	models "agentmem/internal/models"
-
-	"github.com/DATA-DOG/go-sqlmock"
+	"agentmem/internal/repository/accountrepo"
 )
 
 func TestPrefixFromAPIKey(t *testing.T) {
@@ -95,83 +92,67 @@ func TestIsAPIKeyUsable(t *testing.T) {
 
 func TestInvalidateAPIKeyByPrefix(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		svc, mock, closeFn := newMockService(t)
-		defer closeFn()
-
-		mock.ExpectExec(regexp.QuoteMeta(`UPDATE api_keys SET valid = false WHERE prefix = $1`)).
-			WithArgs("abc123").
-			WillReturnResult(sqlmock.NewResult(0, 1))
+		svc, repo := newMockService()
+		repo.invalidateByPrefixFn = func(_ context.Context, prefix string) (bool, error) {
+			if prefix != "abc123" {
+				t.Fatalf("prefix = %q, want %q", prefix, "abc123")
+			}
+			return true, nil
+		}
 
 		if err := svc.InvalidateAPIKeyByPrefix(context.Background(), "abc123"); err != nil {
 			t.Fatalf("InvalidateAPIKeyByPrefix() error = %v", err)
 		}
-
-		if err := mock.ExpectationsWereMet(); err != nil {
-			t.Fatalf("unmet sql expectations: %v", err)
-		}
 	})
 
 	t.Run("not found", func(t *testing.T) {
-		svc, mock, closeFn := newMockService(t)
-		defer closeFn()
-
-		mock.ExpectExec(regexp.QuoteMeta(`UPDATE api_keys SET valid = false WHERE prefix = $1`)).
-			WithArgs("missing").
-			WillReturnResult(sqlmock.NewResult(0, 0))
+		svc, repo := newMockService()
+		repo.invalidateByPrefixFn = func(_ context.Context, _ string) (bool, error) {
+			return false, nil
+		}
 
 		err := svc.InvalidateAPIKeyByPrefix(context.Background(), "missing")
 		if !errors.Is(err, ErrAPIKeyNotFound) {
 			t.Fatalf("InvalidateAPIKeyByPrefix() error = %v, want ErrAPIKeyNotFound", err)
-		}
-
-		if err := mock.ExpectationsWereMet(); err != nil {
-			t.Fatalf("unmet sql expectations: %v", err)
 		}
 	})
 }
 
 func TestGetAndValidateKey(t *testing.T) {
 	t.Run("invalid format no database hit", func(t *testing.T) {
-		svc, mock, closeFn := newMockService(t)
-		defer closeFn()
+		svc, repo := newMockService()
+		repo.listByPrefixFn = func(_ context.Context, _ string) ([]models.APIKey, error) {
+			t.Fatalf("ListAPIKeysByPrefix() should not be called for invalid format")
+			return nil, nil
+		}
 
 		_, err := svc.GetAndValidateKey(context.Background(), "invalid")
 		if !errors.Is(err, ErrInvalidAPIKey) {
 			t.Fatalf("GetAndValidateKey() error = %v, want ErrInvalidAPIKey", err)
 		}
-
-		if err := mock.ExpectationsWereMet(); err != nil {
-			t.Fatalf("expected no DB calls, got: %v", err)
-		}
 	})
 
 	t.Run("success", func(t *testing.T) {
-		svc, mock, closeFn := newMockService(t)
-		defer closeFn()
+		svc, repo := newMockService()
 
 		full, prefix, err := generateAPIKey()
 		if err != nil {
 			t.Fatalf("generateAPIKey() error = %v", err)
 		}
 
-		rows := sqlmock.NewRows([]string{
-			"id", "account_id", "prefix", "key_hash", "label", "expires_at", "valid", "created_at",
-		}).AddRow(
-			"key-1",
-			"acct-1",
-			prefix,
-			hashAPIKey(full),
-			nil,
-			nil,
-			true,
-			time.Now().UTC(),
-		)
-
-		mock.ExpectQuery(regexp.QuoteMeta(`SELECT id, account_id, prefix, key_hash, label, expires_at, valid, created_at
-		 FROM api_keys
-		 WHERE prefix = $1`)).
-			WithArgs(prefix).
-			WillReturnRows(rows)
+		repo.listByPrefixFn = func(_ context.Context, gotPrefix string) ([]models.APIKey, error) {
+			if gotPrefix != prefix {
+				t.Fatalf("prefix = %q, want %q", gotPrefix, prefix)
+			}
+			return []models.APIKey{{
+				ID:        "key-1",
+				AccountID: "acct-1",
+				Prefix:    prefix,
+				KeyHash:   hashAPIKey(full),
+				Valid:     true,
+				CreatedAt: time.Now().UTC(),
+			}}, nil
+		}
 
 		key, err := svc.GetAndValidateKey(context.Background(), full)
 		if err != nil {
@@ -180,15 +161,10 @@ func TestGetAndValidateKey(t *testing.T) {
 		if key.ID != "key-1" {
 			t.Fatalf("GetAndValidateKey() id = %q, want %q", key.ID, "key-1")
 		}
-
-		if err := mock.ExpectationsWereMet(); err != nil {
-			t.Fatalf("unmet sql expectations: %v", err)
-		}
 	})
 
 	t.Run("expired key", func(t *testing.T) {
-		svc, mock, closeFn := newMockService(t)
-		defer closeFn()
+		svc, repo := newMockService()
 
 		full, prefix, err := generateAPIKey()
 		if err != nil {
@@ -196,44 +172,72 @@ func TestGetAndValidateKey(t *testing.T) {
 		}
 
 		expiredAt := time.Now().UTC().Add(-time.Minute)
-		rows := sqlmock.NewRows([]string{
-			"id", "account_id", "prefix", "key_hash", "label", "expires_at", "valid", "created_at",
-		}).AddRow(
-			"key-1",
-			"acct-1",
-			prefix,
-			hashAPIKey(full),
-			nil,
-			expiredAt,
-			true,
-			time.Now().UTC(),
-		)
-
-		mock.ExpectQuery(regexp.QuoteMeta(`SELECT id, account_id, prefix, key_hash, label, expires_at, valid, created_at
-		 FROM api_keys
-		 WHERE prefix = $1`)).
-			WithArgs(prefix).
-			WillReturnRows(rows)
+		repo.listByPrefixFn = func(_ context.Context, gotPrefix string) ([]models.APIKey, error) {
+			if gotPrefix != prefix {
+				t.Fatalf("prefix = %q, want %q", gotPrefix, prefix)
+			}
+			return []models.APIKey{{
+				ID:        "key-1",
+				AccountID: "acct-1",
+				Prefix:    prefix,
+				KeyHash:   hashAPIKey(full),
+				ExpiresAt: &expiredAt,
+				Valid:     true,
+				CreatedAt: time.Now().UTC(),
+			}}, nil
+		}
 
 		_, err = svc.GetAndValidateKey(context.Background(), full)
 		if !errors.Is(err, ErrInvalidAPIKey) {
 			t.Fatalf("GetAndValidateKey() error = %v, want ErrInvalidAPIKey", err)
 		}
-
-		if err := mock.ExpectationsWereMet(); err != nil {
-			t.Fatalf("unmet sql expectations: %v", err)
-		}
 	})
 }
 
-func newMockService(t *testing.T) (*Service, sqlmock.Sqlmock, func()) {
-	t.Helper()
+type mockRepo struct {
+	createAccountFn      func(ctx context.Context, name string) (*models.Account, error)
+	createAPIKeyFn       func(ctx context.Context, params accountrepo.CreateAPIKeyParams) (*models.APIKey, error)
+	invalidateByIDFn     func(ctx context.Context, apiKeyID string) (bool, error)
+	invalidateByPrefixFn func(ctx context.Context, prefix string) (bool, error)
+	listByPrefixFn       func(ctx context.Context, prefix string) ([]models.APIKey, error)
+}
 
-	sqlDB, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatalf("sqlmock.New() error = %v", err)
+func (m *mockRepo) CreateAccount(ctx context.Context, name string) (*models.Account, error) {
+	if m.createAccountFn == nil {
+		return nil, errors.New("unexpected CreateAccount call")
 	}
+	return m.createAccountFn(ctx, name)
+}
 
-	svc := NewService(&database.DB{DB: sqlDB})
-	return svc, mock, func() { _ = sqlDB.Close() }
+func (m *mockRepo) CreateAPIKey(ctx context.Context, params accountrepo.CreateAPIKeyParams) (*models.APIKey, error) {
+	if m.createAPIKeyFn == nil {
+		return nil, errors.New("unexpected CreateAPIKey call")
+	}
+	return m.createAPIKeyFn(ctx, params)
+}
+
+func (m *mockRepo) InvalidateAPIKeyByID(ctx context.Context, apiKeyID string) (bool, error) {
+	if m.invalidateByIDFn == nil {
+		return false, errors.New("unexpected InvalidateAPIKeyByID call")
+	}
+	return m.invalidateByIDFn(ctx, apiKeyID)
+}
+
+func (m *mockRepo) InvalidateAPIKeyByPrefix(ctx context.Context, prefix string) (bool, error) {
+	if m.invalidateByPrefixFn == nil {
+		return false, errors.New("unexpected InvalidateAPIKeyByPrefix call")
+	}
+	return m.invalidateByPrefixFn(ctx, prefix)
+}
+
+func (m *mockRepo) ListAPIKeysByPrefix(ctx context.Context, prefix string) ([]models.APIKey, error) {
+	if m.listByPrefixFn == nil {
+		return nil, errors.New("unexpected ListAPIKeysByPrefix call")
+	}
+	return m.listByPrefixFn(ctx, prefix)
+}
+
+func newMockService() (*Service, *mockRepo) {
+	repo := &mockRepo{}
+	return NewService(repo), repo
 }
