@@ -3,6 +3,7 @@ package memoryrepo
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -18,25 +19,263 @@ func NewPostgres(db *database.DB) *PostgresRepository {
 	return &PostgresRepository{db: db}
 }
 
+func (r *PostgresRepository) InsertEvent(ctx context.Context, event models.Event) (*models.Event, error) {
+	var (
+		stored    models.Event
+		sessionID sql.NullString
+		createdAt time.Time
+	)
+
+	err := r.db.QueryRowContext(
+		ctx,
+		`INSERT INTO events (account_id, agent_id, session_id)
+		 VALUES ($1, $2, $3)
+		 RETURNING id, account_id, agent_id, session_id, created_at`,
+		event.AccountID,
+		event.AgentID,
+		event.SessionID,
+	).Scan(&stored.ID, &stored.AccountID, &stored.AgentID, &sessionID, &createdAt)
+	if err != nil {
+		return nil, err
+	}
+
+	stored.SessionID = nullStringPtr(sessionID)
+	stored.CreatedAt = createdAt
+	return &stored, nil
+}
+
+func (r *PostgresRepository) InsertSource(ctx context.Context, source models.Source) (*models.Source, error) {
+	var (
+		stored     models.Source
+		content    sql.NullString
+		bucketPath sql.NullString
+		sizeBytes  sql.NullInt64
+		metadata   []byte
+		createdAt  time.Time
+	)
+
+	metadataJSON, err := json.Marshal(source.Metadata)
+	if err != nil {
+		return nil, fmt.Errorf("marshal metadata: %w", err)
+	}
+
+	err = r.db.QueryRowContext(
+		ctx,
+		`INSERT INTO sources (event_id, kind, content, content_type, bucket_path, size_bytes, metadata)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+		 RETURNING id, event_id, kind, content, content_type, bucket_path, size_bytes, metadata, created_at`,
+		source.EventID,
+		source.Kind,
+		source.Content,
+		source.ContentType,
+		source.BucketPath,
+		source.SizeBytes,
+		metadataJSON,
+	).Scan(
+		&stored.ID,
+		&stored.EventID,
+		&stored.Kind,
+		&content,
+		&stored.ContentType,
+		&bucketPath,
+		&sizeBytes,
+		&metadata,
+		&createdAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	stored.Content = nullStringPtr(content)
+	stored.BucketPath = nullStringPtr(bucketPath)
+	stored.SizeBytes = nullInt64Ptr(sizeBytes)
+	stored.CreatedAt = createdAt
+
+	if len(metadata) > 0 {
+		if err := json.Unmarshal(metadata, &stored.Metadata); err != nil {
+			return nil, fmt.Errorf("unmarshal metadata: %w", err)
+		}
+	}
+
+	return &stored, nil
+}
+
+func (r *PostgresRepository) GetSourceByID(ctx context.Context, sourceID string) (*models.Source, error) {
+	var (
+		source     models.Source
+		content    sql.NullString
+		bucketPath sql.NullString
+		sizeBytes  sql.NullInt64
+		metadata   []byte
+	)
+
+	err := r.db.QueryRowContext(
+		ctx,
+		`SELECT id, event_id, kind, content, content_type, bucket_path, size_bytes, metadata, created_at
+		 FROM sources
+		 WHERE id = $1`,
+		sourceID,
+	).Scan(
+		&source.ID,
+		&source.EventID,
+		&source.Kind,
+		&content,
+		&source.ContentType,
+		&bucketPath,
+		&sizeBytes,
+		&metadata,
+		&source.CreatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	source.Content = nullStringPtr(content)
+	source.BucketPath = nullStringPtr(bucketPath)
+	source.SizeBytes = nullInt64Ptr(sizeBytes)
+
+	if len(metadata) > 0 {
+		if err := json.Unmarshal(metadata, &source.Metadata); err != nil {
+			return nil, fmt.Errorf("unmarshal metadata: %w", err)
+		}
+	}
+
+	return &source, nil
+}
+
+func (r *PostgresRepository) ListSourcesByEventID(ctx context.Context, eventID string) ([]models.Source, error) {
+	rows, err := r.db.QueryContext(
+		ctx,
+		`SELECT id, event_id, kind, content, content_type, bucket_path, size_bytes, metadata, created_at
+		 FROM sources
+		 WHERE event_id = $1
+		 ORDER BY created_at ASC`,
+		eventID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	sources := make([]models.Source, 0)
+	for rows.Next() {
+		var (
+			source     models.Source
+			content    sql.NullString
+			bucketPath sql.NullString
+			sizeBytes  sql.NullInt64
+			metadata   []byte
+		)
+		if err := rows.Scan(
+			&source.ID,
+			&source.EventID,
+			&source.Kind,
+			&content,
+			&source.ContentType,
+			&bucketPath,
+			&sizeBytes,
+			&metadata,
+			&source.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		source.Content = nullStringPtr(content)
+		source.BucketPath = nullStringPtr(bucketPath)
+		source.SizeBytes = nullInt64Ptr(sizeBytes)
+		if len(metadata) > 0 {
+			if err := json.Unmarshal(metadata, &source.Metadata); err != nil {
+				return nil, fmt.Errorf("unmarshal metadata: %w", err)
+			}
+		}
+		sources = append(sources, source)
+	}
+	return sources, rows.Err()
+}
+
+func (r *PostgresRepository) ListConversationSourcesBySessionID(ctx context.Context, sessionID string, limit int) ([]models.Source, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
+	rows, err := r.db.QueryContext(
+		ctx,
+		`SELECT s.id, s.event_id, s.kind, s.content, s.content_type, s.bucket_path, s.size_bytes, s.metadata, s.created_at
+		 FROM sources s
+		 JOIN events e ON e.id = s.event_id
+		 WHERE e.session_id = $1
+		   AND s.kind IN ('USER', 'AGENT')
+		 ORDER BY s.created_at DESC
+		 LIMIT $2`,
+		sessionID,
+		limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	sources := make([]models.Source, 0)
+	for rows.Next() {
+		var (
+			source     models.Source
+			content    sql.NullString
+			bucketPath sql.NullString
+			sizeBytes  sql.NullInt64
+			metadata   []byte
+		)
+		if err := rows.Scan(
+			&source.ID,
+			&source.EventID,
+			&source.Kind,
+			&content,
+			&source.ContentType,
+			&bucketPath,
+			&sizeBytes,
+			&metadata,
+			&source.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		source.Content = nullStringPtr(content)
+		source.BucketPath = nullStringPtr(bucketPath)
+		source.SizeBytes = nullInt64Ptr(sizeBytes)
+		if len(metadata) > 0 {
+			if err := json.Unmarshal(metadata, &source.Metadata); err != nil {
+				return nil, fmt.Errorf("unmarshal metadata: %w", err)
+			}
+		}
+		sources = append(sources, source)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	for i, j := 0, len(sources)-1; i < j; i, j = i+1, j-1 {
+		sources[i], sources[j] = sources[j], sources[i]
+	}
+
+	return sources, nil
+}
+
 func (r *PostgresRepository) InsertFact(ctx context.Context, fact models.Fact) (*models.Fact, error) {
 	var (
 		stored    models.Fact
 		agentID   sql.NullString
 		sessionID sql.NullString
-		createdAt time.Time
-		updatedAt time.Time
 	)
 
 	err := r.db.QueryRowContext(
 		ctx,
-		`INSERT INTO facts (account_id, agent_id, session_id, event_id, source, kind, text, embedding)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, NULL)
-		 RETURNING id, account_id, agent_id, session_id, event_id, source, kind, text, created_at, updated_at`,
+		`INSERT INTO facts (account_id, agent_id, session_id, source_id, kind, text, embedding)
+		 VALUES ($1, $2, $3, $4, $5, $6, NULL)
+		 RETURNING id, account_id, agent_id, session_id, source_id, kind, text, created_at, updated_at`,
 		fact.AccountID,
 		fact.AgentID,
 		fact.SessionID,
-		fact.EventID,
-		fact.Source,
+		fact.SourceID,
 		fact.Kind,
 		fact.Text,
 	).Scan(
@@ -44,12 +283,11 @@ func (r *PostgresRepository) InsertFact(ctx context.Context, fact models.Fact) (
 		&stored.AccountID,
 		&agentID,
 		&sessionID,
-		&stored.EventID,
-		&stored.Source,
+		&stored.SourceID,
 		&stored.Kind,
 		&stored.Text,
-		&createdAt,
-		&updatedAt,
+		&stored.CreatedAt,
+		&stored.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -57,8 +295,6 @@ func (r *PostgresRepository) InsertFact(ctx context.Context, fact models.Fact) (
 
 	stored.AgentID = nullStringPtr(agentID)
 	stored.SessionID = nullStringPtr(sessionID)
-	stored.CreatedAt = createdAt
-	stored.UpdatedAt = updatedAt
 	return &stored, nil
 }
 
@@ -71,7 +307,7 @@ func (r *PostgresRepository) GetFactByID(ctx context.Context, factID string) (*m
 
 	err := r.db.QueryRowContext(
 		ctx,
-		`SELECT id, account_id, agent_id, session_id, event_id, source, kind, text, created_at, updated_at
+		`SELECT id, account_id, agent_id, session_id, source_id, kind, text, created_at, updated_at
 		 FROM facts
 		 WHERE id = $1`,
 		factID,
@@ -80,8 +316,7 @@ func (r *PostgresRepository) GetFactByID(ctx context.Context, factID string) (*m
 		&fact.AccountID,
 		&agentID,
 		&sessionID,
-		&fact.EventID,
-		&fact.Source,
+		&fact.SourceID,
 		&fact.Kind,
 		&fact.Text,
 		&fact.CreatedAt,
@@ -103,11 +338,10 @@ func (r *PostgresRepository) UpdateFact(ctx context.Context, fact models.Fact) e
 	_, err := r.db.ExecContext(
 		ctx,
 		`UPDATE facts
-		 SET text = $2, source = $3, kind = $4, updated_at = now()
+		 SET text = $2, kind = $3, updated_at = now()
 		 WHERE id = $1`,
 		fact.ID,
 		fact.Text,
-		fact.Source,
 		fact.Kind,
 	)
 	return err
@@ -117,7 +351,6 @@ func (r *PostgresRepository) DeleteFacts(ctx context.Context, factIDs []string) 
 	if len(factIDs) == 0 {
 		return nil
 	}
-
 	for _, factID := range factIDs {
 		if _, err := r.db.ExecContext(ctx, `DELETE FROM facts WHERE id = $1`, factID); err != nil {
 			return fmt.Errorf("delete fact %s: %w", factID, err)
@@ -126,130 +359,18 @@ func (r *PostgresRepository) DeleteFacts(ctx context.Context, factIDs []string) 
 	return nil
 }
 
-func (r *PostgresRepository) InsertFactLink(ctx context.Context, link models.FactLink) (*models.FactLink, error) {
-	var (
-		stored     models.FactLink
-		bucketPath sql.NullString
-	)
-	err := r.db.QueryRowContext(
-		ctx,
-		`INSERT INTO fact_links (fact_id, event_id, input_hash, bucket_path)
-		 VALUES ($1, $2, $3, $4)
-		 RETURNING id, fact_id, event_id, input_hash, bucket_path`,
-		link.FactID,
-		link.EventID,
-		link.InputHash,
-		link.BucketPath,
-	).Scan(&stored.ID, &stored.FactID, &stored.EventID, &stored.InputHash, &bucketPath)
-	if err != nil {
-		return nil, err
-	}
-	stored.BucketPath = nullStringPtr(bucketPath)
-	return &stored, nil
-}
-
-func (r *PostgresRepository) ListFactLinksByFactID(ctx context.Context, factID string) ([]models.FactLink, error) {
-	rows, err := r.db.QueryContext(
-		ctx,
-		`SELECT id, fact_id, event_id, input_hash, bucket_path
-		 FROM fact_links
-		 WHERE fact_id = $1`,
-		factID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	links := make([]models.FactLink, 0)
-	for rows.Next() {
-		var (
-			link       models.FactLink
-			bucketPath sql.NullString
-		)
-		if err := rows.Scan(&link.ID, &link.FactID, &link.EventID, &link.InputHash, &bucketPath); err != nil {
-			return nil, err
-		}
-		link.BucketPath = nullStringPtr(bucketPath)
-		links = append(links, link)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return links, nil
-}
-
-func (r *PostgresRepository) InsertRawMessage(ctx context.Context, msg models.RawMessage) (*models.RawMessage, error) {
-	var stored models.RawMessage
-	err := r.db.QueryRowContext(
-		ctx,
-		`INSERT INTO raw_messages (session_id, event_id, source, content, sequence)
-		 VALUES ($1, $2, $3, $4, $5)
-		 RETURNING id, session_id, event_id, source, content, sequence, created_at`,
-		msg.SessionID,
-		msg.EventID,
-		msg.Source,
-		msg.Content,
-		msg.Sequence,
-	).Scan(
-		&stored.ID,
-		&stored.SessionID,
-		&stored.EventID,
-		&stored.Source,
-		&stored.Content,
-		&stored.Sequence,
-		&stored.CreatedAt,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &stored, nil
-}
-
-func (r *PostgresRepository) ListRawMessagesBySessionID(ctx context.Context, sessionID string, limit int) ([]models.RawMessage, error) {
-	if limit <= 0 {
-		limit = 100
-	}
-
-	rows, err := r.db.QueryContext(
-		ctx,
-		`SELECT id, session_id, event_id, source, content, sequence, created_at
-		 FROM raw_messages
-		 WHERE session_id = $1
-		 ORDER BY sequence DESC
-		 LIMIT $2`,
-		sessionID,
-		limit,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	messages := make([]models.RawMessage, 0)
-	for rows.Next() {
-		var msg models.RawMessage
-		if err := rows.Scan(&msg.ID, &msg.SessionID, &msg.EventID, &msg.Source, &msg.Content, &msg.Sequence, &msg.CreatedAt); err != nil {
-			return nil, err
-		}
-		messages = append(messages, msg)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	// Return in ascending sequence for caller convenience.
-	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
-		messages[i], messages[j] = messages[j], messages[i]
-	}
-	return messages, nil
-}
-
 func nullStringPtr(value sql.NullString) *string {
 	if !value.Valid {
 		return nil
 	}
 	typed := value.String
+	return &typed
+}
+
+func nullInt64Ptr(value sql.NullInt64) *int64 {
+	if !value.Valid {
+		return nil
+	}
+	typed := value.Int64
 	return &typed
 }

@@ -13,8 +13,7 @@ func TestInMemoryFactLifecycle(t *testing.T) {
 
 	inserted, err := repo.InsertFact(ctx, models.Fact{
 		AccountID: "acct-1",
-		EventID:   "event-1",
-		Source:    models.SOURCE_USER,
+		SourceID:  "source-1",
 		Kind:      models.FACT_KIND_KNOWLEDGE,
 		Text:      "hello",
 	})
@@ -58,63 +57,131 @@ func TestInMemoryFactLifecycle(t *testing.T) {
 	}
 }
 
-func TestInMemoryFactLinksAndMessages(t *testing.T) {
+func TestInMemoryEventAndSources(t *testing.T) {
 	repo := NewInMemory()
 	ctx := context.Background()
 
-	fact, err := repo.InsertFact(ctx, models.Fact{
+	sessionID := "sess-1"
+	event, err := repo.InsertEvent(ctx, models.Event{
 		AccountID: "acct-1",
-		EventID:   "event-1",
-		Source:    models.SOURCE_USER,
+		AgentID:   "agent-1",
+		SessionID: &sessionID,
+	})
+	if err != nil {
+		t.Fatalf("InsertEvent() error = %v", err)
+	}
+	if event.ID == "" {
+		t.Fatalf("InsertEvent() id is empty")
+	}
+
+	text := "Here is the schema for project X"
+	src1, err := repo.InsertSource(ctx, models.Source{
+		EventID:     event.ID,
+		Kind:        models.SOURCE_USER,
+		Content:     &text,
+		ContentType: "text/plain",
+	})
+	if err != nil {
+		t.Fatalf("InsertSource() error = %v", err)
+	}
+
+	bucketPath := "bucket/acct-1/schema.sql"
+	size := int64(2048)
+	src2, err := repo.InsertSource(ctx, models.Source{
+		EventID:     event.ID,
+		Kind:        models.SOURCE_CODE,
+		BucketPath:  &bucketPath,
+		ContentType: "text/plain",
+		SizeBytes:   &size,
+	})
+	if err != nil {
+		t.Fatalf("InsertSource() error = %v", err)
+	}
+
+	sources, err := repo.ListSourcesByEventID(ctx, event.ID)
+	if err != nil {
+		t.Fatalf("ListSourcesByEventID() error = %v", err)
+	}
+	if len(sources) != 2 {
+		t.Fatalf("ListSourcesByEventID() len = %d, want 2", len(sources))
+	}
+
+	got, err := repo.GetSourceByID(ctx, src1.ID)
+	if err != nil {
+		t.Fatalf("GetSourceByID() error = %v", err)
+	}
+	if got == nil || got.Content == nil || *got.Content != text {
+		t.Fatalf("GetSourceByID() content = %v, want %q", got, text)
+	}
+
+	_, err = repo.InsertFact(ctx, models.Fact{
+		AccountID: "acct-1",
+		SourceID:  src2.ID,
 		Kind:      models.FACT_KIND_KNOWLEDGE,
-		Text:      "fact",
+		Text:      "The schema uses UUID primary keys",
 	})
 	if err != nil {
-		t.Fatalf("InsertFact() error = %v", err)
+		t.Fatalf("InsertFact() from source error = %v", err)
+	}
+}
+
+func TestInMemoryConversationSourcesBySession(t *testing.T) {
+	repo := NewInMemory()
+	ctx := context.Background()
+
+	sessionID := "sess-1"
+	event, err := repo.InsertEvent(ctx, models.Event{
+		AccountID: "acct-1",
+		AgentID:   "agent-1",
+		SessionID: &sessionID,
+	})
+	if err != nil {
+		t.Fatalf("InsertEvent() error = %v", err)
 	}
 
-	_, err = repo.InsertFactLink(ctx, models.FactLink{
-		FactID:    fact.ID,
-		EventID:   "event-1",
-		InputHash: "hash-1",
+	userText := "first"
+	_, err = repo.InsertSource(ctx, models.Source{
+		EventID:     event.ID,
+		Kind:        models.SOURCE_USER,
+		Content:     &userText,
+		ContentType: "text/plain",
 	})
 	if err != nil {
-		t.Fatalf("InsertFactLink() error = %v", err)
-	}
-	links, err := repo.ListFactLinksByFactID(ctx, fact.ID)
-	if err != nil {
-		t.Fatalf("ListFactLinksByFactID() error = %v", err)
-	}
-	if len(links) != 1 {
-		t.Fatalf("ListFactLinksByFactID() len = %d, want 1", len(links))
+		t.Fatalf("InsertSource() error = %v", err)
 	}
 
-	_, err = repo.InsertRawMessage(ctx, models.RawMessage{
-		SessionID: "sess-1",
-		EventID:   "event-1",
-		Source:    models.SOURCE_USER,
-		Content:   "first",
-		Sequence:  1,
+	agentText := "second"
+	_, err = repo.InsertSource(ctx, models.Source{
+		EventID:     event.ID,
+		Kind:        models.SOURCE_AGENT,
+		Content:     &agentText,
+		ContentType: "text/plain",
 	})
 	if err != nil {
-		t.Fatalf("InsertRawMessage() error = %v", err)
-	}
-	_, err = repo.InsertRawMessage(ctx, models.RawMessage{
-		SessionID: "sess-1",
-		EventID:   "event-2",
-		Source:    models.SOURCE_AGENT,
-		Content:   "second",
-		Sequence:  2,
-	})
-	if err != nil {
-		t.Fatalf("InsertRawMessage() error = %v", err)
+		t.Fatalf("InsertSource() error = %v", err)
 	}
 
-	msgs, err := repo.ListRawMessagesBySessionID(ctx, "sess-1", 1)
+	docPath := "bucket/acct-1/file.pdf"
+	_, err = repo.InsertSource(ctx, models.Source{
+		EventID:     event.ID,
+		Kind:        models.SOURCE_DOCUMENT,
+		BucketPath:  &docPath,
+		ContentType: "application/pdf",
+	})
 	if err != nil {
-		t.Fatalf("ListRawMessagesBySessionID() error = %v", err)
+		t.Fatalf("InsertSource() error = %v", err)
 	}
-	if len(msgs) != 1 || msgs[0].Sequence != 2 {
-		t.Fatalf("ListRawMessagesBySessionID() = %+v, want latest sequence 2 only", msgs)
+
+	sources, err := repo.ListConversationSourcesBySessionID(ctx, sessionID, 10)
+	if err != nil {
+		t.Fatalf("ListConversationSourcesBySessionID() error = %v", err)
+	}
+	if len(sources) != 2 {
+		t.Fatalf("ListConversationSourcesBySessionID() len = %d, want 2", len(sources))
+	}
+	for _, source := range sources {
+		if source.Kind != models.SOURCE_USER && source.Kind != models.SOURCE_AGENT {
+			t.Fatalf("ListConversationSourcesBySessionID() returned non-conversation kind: %s", source.Kind)
+		}
 	}
 }

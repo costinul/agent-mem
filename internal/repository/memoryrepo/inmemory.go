@@ -13,18 +13,116 @@ import (
 
 type InMemoryRepository struct {
 	mu       sync.RWMutex
+	events   map[string]models.Event
+	sources  map[string]models.Source
 	facts    map[string]models.Fact
-	links    map[string]models.FactLink
-	messages map[string][]models.RawMessage
 }
 
 func NewInMemory() *InMemoryRepository {
 	return &InMemoryRepository{
+		events:   make(map[string]models.Event),
+		sources:  make(map[string]models.Source),
 		facts:    make(map[string]models.Fact),
-		links:    make(map[string]models.FactLink),
-		messages: make(map[string][]models.RawMessage),
 	}
 }
+
+// =====================
+// Events
+// =====================
+
+func (r *InMemoryRepository) InsertEvent(_ context.Context, event models.Event) (*models.Event, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if event.ID == "" {
+		event.ID = uuid.NewString()
+	}
+	if event.CreatedAt.IsZero() {
+		event.CreatedAt = time.Now().UTC()
+	}
+	r.events[event.ID] = event
+
+	stored := event
+	return &stored, nil
+}
+
+// =====================
+// Sources
+// =====================
+
+func (r *InMemoryRepository) InsertSource(_ context.Context, source models.Source) (*models.Source, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if source.ID == "" {
+		source.ID = uuid.NewString()
+	}
+	if source.CreatedAt.IsZero() {
+		source.CreatedAt = time.Now().UTC()
+	}
+	r.sources[source.ID] = source
+
+	stored := source
+	return &stored, nil
+}
+
+func (r *InMemoryRepository) GetSourceByID(_ context.Context, sourceID string) (*models.Source, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	source, ok := r.sources[sourceID]
+	if !ok {
+		return nil, nil
+	}
+	copy := source
+	return &copy, nil
+}
+
+func (r *InMemoryRepository) ListSourcesByEventID(_ context.Context, eventID string) ([]models.Source, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	sources := make([]models.Source, 0)
+	for _, s := range r.sources {
+		if s.EventID == eventID {
+			sources = append(sources, s)
+		}
+	}
+	sort.Slice(sources, func(i, j int) bool {
+		return sources[i].CreatedAt.Before(sources[j].CreatedAt)
+	})
+	return sources, nil
+}
+
+func (r *InMemoryRepository) ListConversationSourcesBySessionID(_ context.Context, sessionID string, limit int) ([]models.Source, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	sources := make([]models.Source, 0)
+	for _, source := range r.sources {
+		event, ok := r.events[source.EventID]
+		if !ok || event.SessionID == nil || *event.SessionID != sessionID {
+			continue
+		}
+		if source.Kind != models.SOURCE_USER && source.Kind != models.SOURCE_AGENT {
+			continue
+		}
+		sources = append(sources, source)
+	}
+
+	sort.Slice(sources, func(i, j int) bool {
+		return sources[i].CreatedAt.Before(sources[j].CreatedAt)
+	})
+
+	if limit > 0 && len(sources) > limit {
+		sources = sources[len(sources)-limit:]
+	}
+	return sources, nil
+}
+
+// =====================
+// Facts
+// =====================
 
 func (r *InMemoryRepository) InsertFact(_ context.Context, fact models.Fact) (*models.Fact, error) {
 	r.mu.Lock()
@@ -52,8 +150,8 @@ func (r *InMemoryRepository) GetFactByID(_ context.Context, factID string) (*mod
 	if !ok {
 		return nil, nil
 	}
-	copyFact := fact
-	return &copyFact, nil
+	copy := fact
+	return &copy, nil
 }
 
 func (r *InMemoryRepository) UpdateFact(_ context.Context, fact models.Fact) error {
@@ -80,59 +178,3 @@ func (r *InMemoryRepository) DeleteFacts(_ context.Context, factIDs []string) er
 	return nil
 }
 
-func (r *InMemoryRepository) InsertFactLink(_ context.Context, link models.FactLink) (*models.FactLink, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if link.ID == "" {
-		link.ID = uuid.NewString()
-	}
-	r.links[link.ID] = link
-
-	stored := link
-	return &stored, nil
-}
-
-func (r *InMemoryRepository) ListFactLinksByFactID(_ context.Context, factID string) ([]models.FactLink, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	links := make([]models.FactLink, 0)
-	for _, link := range r.links {
-		if link.FactID == factID {
-			links = append(links, link)
-		}
-	}
-	return links, nil
-}
-
-func (r *InMemoryRepository) InsertRawMessage(_ context.Context, msg models.RawMessage) (*models.RawMessage, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if msg.ID == "" {
-		msg.ID = uuid.NewString()
-	}
-	if msg.CreatedAt.IsZero() {
-		msg.CreatedAt = time.Now().UTC()
-	}
-
-	r.messages[msg.SessionID] = append(r.messages[msg.SessionID], msg)
-	stored := msg
-	return &stored, nil
-}
-
-func (r *InMemoryRepository) ListRawMessagesBySessionID(_ context.Context, sessionID string, limit int) ([]models.RawMessage, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	msgs := append([]models.RawMessage(nil), r.messages[sessionID]...)
-	sort.Slice(msgs, func(i, j int) bool {
-		return msgs[i].Sequence < msgs[j].Sequence
-	})
-
-	if limit > 0 && len(msgs) > limit {
-		msgs = msgs[len(msgs)-limit:]
-	}
-	return msgs, nil
-}

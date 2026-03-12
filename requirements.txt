@@ -53,7 +53,7 @@ A concise query, question, or demand related to a single thing. Extracted during
 Array of Facts and Queries extracted from input source. The LLM resolves ambiguous input using conversation history (for USER/AGENT sources) and then extracts self-contained facts and queries.
 
 ### FactLink
-Connection between a fact and the specific source item that produced it. Links to EventID and the specific input within that event.
+Each fact has a `source_id` foreign key pointing to the source that produced it.
 
 ### FactKind
 Classifies how a fact behaves during retrieval.
@@ -109,8 +109,12 @@ Both interfaces operate on the same facts in the same database. A fact stored vi
 
 ### Step 1 — Decompose
 
-- If source is USER or AGENT: LLM prompt with current input + recent raw user and agent messages. Resolves ambiguous input into self-contained statements. Extracts facts and queries. Queries are written as fact-oriented statements for better vector search accuracy.
-- If source is TOOL, DOCUMENT, CODE, or SYSTEM: LLM prompt with content only. Extracts facts. Stores them in database. Flow exits here — no search, no evaluate.
+USER and AGENT sources are context providers. They carry the intent behind other inputs in the same event.
+
+- If the event contains a USER or AGENT source: extract its text and use it as context header when decomposing every other source in the same event. Prompt pattern: "The user/agent said: [message]. Given this context, extract facts from the following [source type] content."
+- If no USER or AGENT source exists in the event, decompose each source independently.
+- USER/AGENT sources: LLM prompt with current input + recent raw messages from session. Resolves ambiguous input into self-contained statements. Extracts facts and queries. Queries are written as fact-oriented statements for better vector search accuracy.
+- TOOL, DOCUMENT, CODE, SYSTEM sources: LLM prompt with content only (plus USER/AGENT context if present in same event). Extracts facts. Stores them in database. Flow exits here — no search, no evaluate.
 
 ### Step 2 — Vector Search
 
@@ -162,10 +166,20 @@ Both interfaces operate on the same facts in the same database. A fact stored vi
 
 ## Storage
 
-- Postgres — facts, embeddings (pgvector), event metadata, fact links, raw messages, sessions, agents, accounts.
-- S3-compatible bucket — original files (documents, code files, anything binary). FactLink points to bucket path.
+- Postgres — facts, embeddings (pgvector), events, sources, sessions, agents, accounts.
+- S3-compatible bucket — original files (documents, code files, anything binary). Source row points to bucket path.
 - No Redis. Postgres handles everything.
 - Encryption at rest for all data.
+
+### Storage Hierarchy
+
+```
+events         — one row per API call. Scoped to account, agent, session.
+sources        — one row per input within an event. Has kind, content (text) or bucket_path (file), content_type, size_bytes, metadata.
+facts          — extracted from a source. References source_id. Scoped to account, agent, session.
+```
+
+Text inputs store content inline in the `sources` table. File inputs (DOCUMENT, CODE, or any binary) are uploaded to the bucket and the `sources` row stores `bucket_path`. Exactly one of `content` or `bucket_path` is populated per source row. `size_bytes` stores original payload size.
 
 ---
 

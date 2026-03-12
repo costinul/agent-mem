@@ -8,7 +8,7 @@ import (
 // Enums
 // =====================
 
-// SourceKind - classifies the origin of data entering the memory engine.
+// SourceKind classifies the origin of data entering the memory engine.
 type SourceKind string
 
 const (
@@ -21,10 +21,9 @@ const (
 )
 
 // SourceTrustHierarchy defines the trust level for each source.
-// Higher value = higher trust. Used to enforce alteration rules.
-// A source can only alter facts from equal or lower trust level.
+// Higher value = higher trust. A source can only alter facts from equal or lower trust level.
 var SourceTrustHierarchy = map[SourceKind]int{
-	SOURCE_SYSTEM:   100, // Immutable - cannot be altered by any source.
+	SOURCE_SYSTEM:   100, // Immutable — cannot be altered by any source.
 	SOURCE_USER:     80,
 	SOURCE_AGENT:    60,
 	SOURCE_TOOL:     40,
@@ -32,168 +31,91 @@ var SourceTrustHierarchy = map[SourceKind]int{
 	SOURCE_CODE:     10,
 }
 
-// FactKind - classifies how a fact behaves during retrieval.
+// FactKind classifies how a fact behaves during retrieval.
 type FactKind string
 
 const (
 	FACT_KIND_KNOWLEDGE  FactKind = "KNOWLEDGE"  // Factual information. Retrieved only when semantically relevant.
-	FACT_KIND_RULE       FactKind = "RULE"       // Always included in retrieval. User-defined rules.
-	FACT_KIND_PREFERENCE FactKind = "PREFERENCE" // Soft weight for decisions. Retrieved when relevant to choices.
+	FACT_KIND_RULE       FactKind = "RULE"        // Always included in retrieval. User-defined rules.
+	FACT_KIND_PREFERENCE FactKind = "PREFERENCE"  // Soft weight for decisions. Retrieved when relevant to choices.
 )
 
 // =====================
-// Smart Pipeline - Input
+// Stored — Events and Sources
 // =====================
 
-// MemoryInput represents the main input to the smart pipeline.
-// EventID is generated internally by the engine, not provided by the caller.
-type MemoryInput struct {
-	AccountID      string      `json:"account_id"`
-	AgentID        string      `json:"agent_id"`
-	SessionID      *string     `json:"session_id"`      // Optional. Null means global scope.
-	IncludeSources bool        `json:"include_sources"` // When true, return original source content with facts.
-	MessageHistory int         `json:"message_history"` // Number of recent raw messages to return. 0 = facts only.
-	Inputs         []InputItem `json:"inputs"`          // Array of input items to process.
+// Event represents a single API call. Groups all sources submitted together.
+type Event struct {
+	ID        string     `json:"id"`
+	AccountID string     `json:"account_id"`
+	AgentID   string     `json:"agent_id"`
+	SessionID *string    `json:"session_id"` // Null means global scope.
+	CreatedAt time.Time  `json:"created_at"`
 }
 
-// InputItem represents a single piece of data within an event.
-type InputItem struct {
-	Source      SourceKind        `json:"source"`       // Origin of this input.
-	Content     string            `json:"content"`      // Text as string, files as base64.
-	ContentType string            `json:"content_type"` // MIME type: text/plain, application/pdf, image/png, etc.
-	Metadata    map[string]string `json:"metadata"`     // Relative path, identifier, or any agent-useful context.
+// Source is a stored input within an event.
+// Exactly one of Content or BucketPath is populated.
+// Text inputs store content inline. File inputs are uploaded to the bucket.
+type Source struct {
+	ID          string            `json:"id"`
+	EventID     string            `json:"event_id"`
+	Kind        SourceKind        `json:"kind"`
+	Content     *string           `json:"content"`      // Populated for text inputs.
+	ContentType string            `json:"content_type"`
+	BucketPath  *string           `json:"bucket_path"`  // Populated for file inputs stored in S3-compatible bucket.
+	SizeBytes   *int64            `json:"size_bytes"`   // Size of the original payload in bytes.
+	Metadata    map[string]string `json:"metadata"`
+	CreatedAt   time.Time         `json:"created_at"`
 }
 
 // =====================
-// Decomposition
+// Stored — Facts
 // =====================
 
-// Decomposition - array of Facts and Queries extracted from input source.
+// Fact is an atomic piece of information extracted from a source.
+type Fact struct {
+	ID        string    `json:"id"`
+	AccountID string    `json:"account_id"`
+	AgentID   *string   `json:"agent_id"`
+	SessionID *string   `json:"session_id"` // Null means agent-level or account-level scope.
+	SourceID  string    `json:"source_id"`  // The source that produced this fact.
+	Kind      FactKind  `json:"kind"`
+	Text      string    `json:"text"`
+	Embedding []float64 `json:"embedding"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// =====================
+// Operational — Decomposition
+// =====================
+
+// Decomposition holds facts and queries extracted from a source by the LLM.
 type Decomposition struct {
 	Facts   []ExtractedFact  `json:"facts"`
 	Queries []ExtractedQuery `json:"queries"`
 }
 
-// ExtractedFact represents a fact extracted during decomposition.
+// ExtractedFact is a fact produced during decomposition, before it is stored.
 type ExtractedFact struct {
-	Text   string     `json:"text"`   // Self-contained factual statement.
-	Kind   FactKind   `json:"kind"`   // Knowledge, Rule, or Preference.
-	Source SourceKind `json:"source"` // Inherited from the input that produced it.
+	Text string   `json:"text"`
+	Kind FactKind `json:"kind"`
 }
 
-// ExtractedQuery represents a query extracted during decomposition.
+// ExtractedQuery is a query produced during decomposition, used for vector search only — never stored.
 type ExtractedQuery struct {
-	Text string `json:"text"` // Fact-oriented query statement for vector search accuracy.
+	Text string `json:"text"`
 }
 
 // =====================
-// Fact (stored entity)
+// Operational — Evaluate
 // =====================
 
-// Fact represents an atomic piece of information stored in the memory engine.
-type Fact struct {
-	ID        string     `json:"id"`
-	AccountID string     `json:"account_id"`
-	AgentID   *string    `json:"agent_id"`
-	SessionID *string    `json:"session_id"` // Null means global scope.
-	EventID   string     `json:"event_id"`   // The event that produced this fact. Generated by the engine.
-	Source    SourceKind `json:"source"`     // Origin source type.
-	Kind      FactKind   `json:"kind"`       // Knowledge, Rule, or Preference.
-	Text      string     `json:"text"`       // The fact statement.
-	Embedding []float64  `json:"embedding"`  // Vector embedding for similarity search.
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
-}
-
-// FactLink - connection between a fact and the specific source item that produced it.
-type FactLink struct {
-	ID         string  `json:"id"`
-	FactID     string  `json:"fact_id"`     // The fact this link belongs to.
-	EventID    string  `json:"event_id"`    // The event containing the source.
-	InputHash  string  `json:"input_hash"`  // Hash to identify the specific input item within the event.
-	BucketPath *string `json:"bucket_path"` // Path to original file in bucket storage. Null for text inputs.
-}
-
-// =====================
-// Raw Message (for conversational resolution)
-// =====================
-
-// RawMessage stores original messages for contextual resolution and message history.
-// Used in the resolve step and returned when MessageHistory > 0.
-type RawMessage struct {
-	ID        string     `json:"id"`
-	SessionID string     `json:"session_id"`
-	EventID   string     `json:"event_id"`
-	Source    SourceKind `json:"source"`   // The source that produced this message.
-	Content   string     `json:"content"`  // Original raw message text.
-	Sequence  int        `json:"sequence"` // Order within the session for chronological reconstruction.
-	CreatedAt time.Time  `json:"created_at"`
-}
-
-// =====================
-// Session
-// =====================
-
-// Session represents a single agent run. All events and facts are scoped to a session.
-type Session struct {
-	ID        string     `json:"id"`
-	AccountID string     `json:"account_id"` // Owner account for global memory scoping.
-	AgentID   string     `json:"agent_id"`
-	CreatedAt time.Time  `json:"created_at"`
-	ClosedAt  *time.Time `json:"closed_at"` // Null if session is still active.
-}
-
-// =====================
-// Smart Pipeline - Output
-// =====================
-
-// MemoryOutput represents the response from the smart pipeline.
-type MemoryOutput struct {
-	Facts    []ReturnedFact `json:"facts"`    // Relevant facts for the agent.
-	Messages []RawMessage   `json:"messages"` // Recent raw messages ordered by sequence. Empty if MessageHistory is 0.
-}
-
-// ReturnedFact represents a fact returned to the agent.
-type ReturnedFact struct {
-	ID             string     `json:"id"`
-	Text           string     `json:"text"`
-	Kind           FactKind   `json:"kind"`
-	Source         SourceKind `json:"source"`
-	OriginalSource *string    `json:"original_source"` // Original source content. Only populated if IncludeSources is true.
-}
-
-// =====================
-// Evaluate Step - Internal
-// =====================
-
-// EvaluateResult represents the output of the evaluate step.
+// EvaluateResult is the output of the evaluate step.
 // Trust hierarchy is enforced: a source can only alter facts from equal or lower trust level.
 type EvaluateResult struct {
-	FactsToReturn []Fact   `json:"facts_to_return"` // Relevant existing + new facts for the agent.
+	FactsToReturn []Fact   `json:"facts_to_return"` // Relevant existing + new facts to return to the agent.
 	FactsToStore  []Fact   `json:"facts_to_store"`  // New facts to insert.
 	FactsToUpdate []Fact   `json:"facts_to_update"` // Existing facts contradicted by higher/equal trust source.
-	FactsToDelete []string `json:"facts_to_delete"` // IDs of facts to remove, trust hierarchy validated.
-}
-
-// =====================
-// Fact Management - CRUD by ID
-// =====================
-
-// FactGetRequest represents a request to retrieve a fact by ID.
-type FactGetRequest struct {
-	FactID         string `json:"fact_id"`
-	IncludeSources bool   `json:"include_sources"` // When true, attach original source content.
-}
-
-// FactUpdateRequest represents a manual fact update request.
-type FactUpdateRequest struct {
-	FactID string     `json:"fact_id"`
-	Text   string     `json:"text"`   // New fact text. Embedding will be regenerated.
-	Source SourceKind `json:"source"` // Caller's source level. Must be equal or higher than target fact's source.
-}
-
-// FactDeleteRequest represents a manual fact delete request.
-type FactDeleteRequest struct {
-	FactIDs []string   `json:"fact_ids"`
-	Source  SourceKind `json:"source"` // Caller's source level. Must be equal or higher than target fact's source.
+	FactsToDelete []string `json:"facts_to_delete"` // IDs of facts to remove.
 }

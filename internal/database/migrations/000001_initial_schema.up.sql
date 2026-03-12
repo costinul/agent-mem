@@ -39,13 +39,40 @@ CREATE TABLE sessions (
 CREATE INDEX idx_sessions_account_id ON sessions(account_id);
 CREATE INDEX idx_sessions_agent_id ON sessions(agent_id);
 
+CREATE TABLE events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    session_id UUID REFERENCES sessions(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_events_account_id ON events(account_id);
+CREATE INDEX idx_events_session_id ON events(session_id);
+
+-- Exactly one of content or bucket_path must be non-null.
+CREATE TABLE sources (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL CHECK (kind IN ('SYSTEM','USER','AGENT','TOOL','DOCUMENT','CODE')),
+    content TEXT,
+    content_type TEXT NOT NULL DEFAULT 'text/plain',
+    bucket_path TEXT,
+    size_bytes BIGINT CHECK (size_bytes IS NULL OR size_bytes >= 0),
+    metadata JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CHECK (
+        (content IS NOT NULL AND bucket_path IS NULL) OR
+        (content IS NULL AND bucket_path IS NOT NULL)
+    )
+);
+CREATE INDEX idx_sources_event_id ON sources(event_id);
+
 CREATE TABLE facts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     agent_id UUID REFERENCES agents(id) ON DELETE CASCADE,
     session_id UUID REFERENCES sessions(id) ON DELETE SET NULL,
-    event_id UUID NOT NULL,
-    source TEXT NOT NULL CHECK (source IN ('SYSTEM','USER','AGENT','TOOL','DOCUMENT','CODE')),
+    source_id UUID NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
     kind TEXT NOT NULL CHECK (kind IN ('KNOWLEDGE','RULE','PREFERENCE')),
     text TEXT NOT NULL,
     embedding vector(1536),
@@ -54,25 +81,4 @@ CREATE TABLE facts (
 );
 CREATE INDEX idx_facts_account_id ON facts(account_id);
 CREATE INDEX idx_facts_session_id ON facts(session_id);
-CREATE INDEX idx_facts_event_id ON facts(event_id);
-
-CREATE TABLE fact_links (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    fact_id UUID NOT NULL REFERENCES facts(id) ON DELETE CASCADE,
-    event_id UUID NOT NULL,
-    input_hash TEXT NOT NULL,
-    bucket_path TEXT
-);
-CREATE INDEX idx_fact_links_fact_id ON fact_links(fact_id);
-
-CREATE TABLE raw_messages (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-    event_id UUID NOT NULL,
-    source TEXT NOT NULL CHECK (source IN ('SYSTEM','USER','AGENT','TOOL','DOCUMENT','CODE')),
-    content TEXT NOT NULL,
-    sequence INT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE INDEX idx_raw_messages_session_id ON raw_messages(session_id);
-CREATE INDEX idx_raw_messages_session_sequence ON raw_messages(session_id, sequence);
+CREATE INDEX idx_facts_source_id ON facts(source_id);
