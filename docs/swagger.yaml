@@ -1,0 +1,408 @@
+basePath: /
+definitions:
+  api.apiError:
+    properties:
+      error:
+        type: string
+    type: object
+  api.healthResponse:
+    properties:
+      status:
+        type: string
+    type: object
+  memory.ConversationMessage:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: string
+      event_id:
+        type: string
+      kind:
+        $ref: '#/definitions/memory.SourceKind'
+      session_id:
+        type: string
+      source_id:
+        type: string
+    type: object
+  memory.EvaluateResult:
+    properties:
+      facts_to_delete:
+        description: IDs of facts to remove.
+        items:
+          type: string
+        type: array
+      facts_to_return:
+        description: Relevant existing + new facts to return to the agent.
+        items:
+          $ref: '#/definitions/memory.Fact'
+        type: array
+      facts_to_store:
+        description: New facts to insert.
+        items:
+          $ref: '#/definitions/memory.Fact'
+        type: array
+      facts_to_update:
+        description: Existing facts contradicted by higher/equal trust source.
+        items:
+          $ref: '#/definitions/memory.Fact'
+        type: array
+    type: object
+  memory.Fact:
+    properties:
+      account_id:
+        type: string
+      agent_id:
+        type: string
+      created_at:
+        type: string
+      embedding:
+        items:
+          type: number
+        type: array
+      id:
+        type: string
+      kind:
+        $ref: '#/definitions/memory.FactKind'
+      session_id:
+        description: Null means agent-level or account-level scope.
+        type: string
+      source_id:
+        description: The source that produced this fact.
+        type: string
+      text:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  memory.FactDeleteBody:
+    properties:
+      fact_ids:
+        items:
+          type: string
+        type: array
+      source:
+        $ref: '#/definitions/memory.SourceKind'
+    type: object
+  memory.FactKind:
+    enum:
+    - KNOWLEDGE
+    - RULE
+    - PREFERENCE
+    type: string
+    x-enum-comments:
+      FACT_KIND_KNOWLEDGE: Factual information. Retrieved only when semantically relevant.
+      FACT_KIND_PREFERENCE: Soft weight for decisions. Retrieved when relevant to
+        choices.
+      FACT_KIND_RULE: Always included in retrieval. User-defined rules.
+    x-enum-descriptions:
+    - Factual information. Retrieved only when semantically relevant.
+    - Always included in retrieval. User-defined rules.
+    - Soft weight for decisions. Retrieved when relevant to choices.
+    x-enum-varnames:
+    - FACT_KIND_KNOWLEDGE
+    - FACT_KIND_RULE
+    - FACT_KIND_PREFERENCE
+  memory.FactUpdateBody:
+    properties:
+      source:
+        $ref: '#/definitions/memory.SourceKind'
+      text:
+        type: string
+    type: object
+  memory.FactualInput:
+    properties:
+      account_id:
+        type: string
+      agent_id:
+        type: string
+      inputs:
+        items:
+          $ref: '#/definitions/memory.InputItem'
+        type: array
+      session_id:
+        type: string
+    type: object
+  memory.InputItem:
+    properties:
+      content:
+        description: Text as string, files as base64.
+        type: string
+      content_type:
+        description: 'MIME type: text/plain, application/pdf, image/png, etc.'
+        type: string
+      kind:
+        $ref: '#/definitions/memory.SourceKind'
+      metadata:
+        additionalProperties:
+          type: string
+        type: object
+    type: object
+  memory.MemoryInput:
+    properties:
+      account_id:
+        type: string
+      agent_id:
+        type: string
+      include_sources:
+        description: When true, return original source content with facts.
+        type: boolean
+      inputs:
+        items:
+          $ref: '#/definitions/memory.InputItem'
+        type: array
+      message_history:
+        description: Number of recent raw messages to return. 0 = facts only.
+        type: integer
+      session_id:
+        type: string
+    type: object
+  memory.MemoryOutput:
+    properties:
+      facts:
+        description: Relevant facts for the agent.
+        items:
+          $ref: '#/definitions/memory.ReturnedFact'
+        type: array
+      messages:
+        description: Recent USER/AGENT messages from sources. Empty if MessageHistory
+          is 0.
+        items:
+          $ref: '#/definitions/memory.ConversationMessage'
+        type: array
+    type: object
+  memory.ReturnedFact:
+    properties:
+      id:
+        type: string
+      kind:
+        $ref: '#/definitions/memory.FactKind'
+      original_source:
+        description: Populated only if IncludeSources is true.
+        type: string
+      source_kind:
+        $ref: '#/definitions/memory.SourceKind'
+      text:
+        type: string
+    type: object
+  memory.SourceKind:
+    enum:
+    - SYSTEM
+    - USER
+    - AGENT
+    - TOOL
+    - DOCUMENT
+    - CODE
+    type: string
+    x-enum-comments:
+      SOURCE_AGENT: The agent's own generated output.
+      SOURCE_CODE: Source code, configuration files, schemas, technical artifacts.
+      SOURCE_DOCUMENT: Any non-code reference material. PDFs, text files, spreadsheets.
+      SOURCE_SYSTEM: Current date, session info, environment variables. Immutable.
+      SOURCE_TOOL: Output from any tool or sub-agent invoked by the agent.
+      SOURCE_USER: Input from whoever is initiating the request to the agent.
+    x-enum-descriptions:
+    - Current date, session info, environment variables. Immutable.
+    - Input from whoever is initiating the request to the agent.
+    - The agent's own generated output.
+    - Output from any tool or sub-agent invoked by the agent.
+    - Any non-code reference material. PDFs, text files, spreadsheets.
+    - Source code, configuration files, schemas, technical artifacts.
+    x-enum-varnames:
+    - SOURCE_SYSTEM
+    - SOURCE_USER
+    - SOURCE_AGENT
+    - SOURCE_TOOL
+    - SOURCE_DOCUMENT
+    - SOURCE_CODE
+host: localhost:8080
+info:
+  contact: {}
+  description: This is the API for the Agent Memory service.
+  title: Agent Memory API
+  version: "1.0"
+paths:
+  /facts/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete facts by ID or a list of IDs.
+      parameters:
+      - description: Fact ID (optional if provided in body)
+        in: path
+        name: id
+        type: string
+      - description: Delete Body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/memory.FactDeleteBody'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"status": "deleted"}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiError'
+      summary: Delete Facts
+      tags:
+      - facts
+    get:
+      description: Retrieve a specific fact by its ID, optionally including original
+        sources.
+      parameters:
+      - description: Fact ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Include original sources
+        in: query
+        name: include_sources
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/memory.Fact'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiError'
+      summary: Get Fact
+      tags:
+      - facts
+    put:
+      consumes:
+      - application/json
+      description: Update the text and source of an existing fact.
+      parameters:
+      - description: Fact ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update Body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/memory.FactUpdateBody'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/memory.Fact'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiError'
+      summary: Update Fact
+      tags:
+      - facts
+  /health:
+    get:
+      description: Get the health status of the API
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.healthResponse'
+      summary: Health Check
+      tags:
+      - health
+  /memory/contextual:
+    post:
+      consumes:
+      - application/json
+      description: Process input through the contextual smart pipeline to retrieve
+        relevant facts and messages.
+      parameters:
+      - description: Memory Input
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/memory.MemoryInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/memory.MemoryOutput'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiError'
+      summary: Process Contextual Memory
+      tags:
+      - memory
+  /memory/factual:
+    post:
+      consumes:
+      - application/json
+      description: Add new facts to the memory engine.
+      parameters:
+      - description: Factual Input
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/memory.FactualInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/memory.EvaluateResult'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiError'
+      summary: Add Factual Memory
+      tags:
+      - memory
+swagger: "2.0"

@@ -2,6 +2,7 @@ package memoryrepo
 
 import (
 	"context"
+	"math"
 	"sort"
 	"sync"
 	"time"
@@ -154,6 +155,33 @@ func (r *InMemoryRepository) GetFactByID(_ context.Context, factID string) (*mod
 	return &copy, nil
 }
 
+func (r *InMemoryRepository) ListFactsByScope(_ context.Context, accountID string, agentID, sessionID *string) ([]models.Fact, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	facts := make([]models.Fact, 0)
+	for _, fact := range r.facts {
+		if fact.AccountID != accountID {
+			continue
+		}
+		if agentID != nil {
+			if fact.AgentID == nil || *fact.AgentID != *agentID {
+				continue
+			}
+		}
+		if sessionID != nil {
+			if fact.SessionID == nil || *fact.SessionID != *sessionID {
+				continue
+			}
+		}
+		facts = append(facts, fact)
+	}
+	sort.Slice(facts, func(i, j int) bool {
+		return facts[i].CreatedAt.Before(facts[j].CreatedAt)
+	})
+	return facts, nil
+}
+
 func (r *InMemoryRepository) UpdateFact(_ context.Context, fact models.Fact) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -168,6 +196,63 @@ func (r *InMemoryRepository) UpdateFact(_ context.Context, fact models.Fact) err
 	return nil
 }
 
+func (r *InMemoryRepository) SearchFactsByEmbedding(_ context.Context, params SearchByEmbeddingParams) ([]models.Fact, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	if len(params.Embedding) == 0 {
+		return nil, nil
+	}
+	if params.Limit <= 0 {
+		params.Limit = 20
+	}
+	if params.MinSimilarity <= 0 {
+		params.MinSimilarity = 0.65
+	}
+
+	type candidate struct {
+		fact       models.Fact
+		similarity float64
+	}
+	candidates := make([]candidate, 0)
+	for _, fact := range r.facts {
+		if fact.AccountID != params.AccountID {
+			continue
+		}
+		if params.AgentID != nil {
+			if fact.AgentID == nil || *fact.AgentID != *params.AgentID {
+				continue
+			}
+		}
+		if params.SessionID != nil {
+			if fact.SessionID == nil || *fact.SessionID != *params.SessionID {
+				continue
+			}
+		}
+		similarity := cosineSimilarity(params.Embedding, fact.Embedding)
+		if similarity >= params.MinSimilarity {
+			candidates = append(candidates, candidate{fact: fact, similarity: similarity})
+		}
+	}
+
+	sort.Slice(candidates, func(i, j int) bool {
+		if candidates[i].similarity == candidates[j].similarity {
+			return candidates[i].fact.CreatedAt.Before(candidates[j].fact.CreatedAt)
+		}
+		return candidates[i].similarity > candidates[j].similarity
+	})
+
+	if len(candidates) > params.Limit {
+		candidates = candidates[:params.Limit]
+	}
+
+	result := make([]models.Fact, 0, len(candidates))
+	for _, item := range candidates {
+		result = append(result, item.fact)
+	}
+	return result, nil
+}
+
 func (r *InMemoryRepository) DeleteFacts(_ context.Context, factIDs []string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -176,5 +261,21 @@ func (r *InMemoryRepository) DeleteFacts(_ context.Context, factIDs []string) er
 		delete(r.facts, id)
 	}
 	return nil
+}
+
+func cosineSimilarity(a, b []float64) float64 {
+	if len(a) == 0 || len(a) != len(b) {
+		return 0
+	}
+	var dot, normA, normB float64
+	for i := range a {
+		dot += a[i] * b[i]
+		normA += a[i] * a[i]
+		normB += b[i] * b[i]
+	}
+	if normA == 0 || normB == 0 {
+		return 0
+	}
+	return dot / (math.Sqrt(normA) * math.Sqrt(normB))
 }
 

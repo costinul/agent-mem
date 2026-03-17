@@ -73,3 +73,22 @@ type FactDeleteRequest struct {
 	FactIDs []string   `json:"fact_ids"`
 	Source  SourceKind `json:"source"` // Must be equal or higher trust than the target fact's source.
 }
+
+// FactualInput is the request body for the factual interface.
+// SessionID is optional; when omitted, facts are agent/account scoped.
+type FactualInput struct {
+	AccountID string      `json:"account_id"`
+	AgentID   string      `json:"agent_id"`
+	SessionID string      `json:"session_id"`
+	Inputs    []InputItem `json:"inputs"`
+}
+
+type FactUpdateBody struct {
+	Text   string     `json:"text"`
+	Source SourceKind `json:"source"`
+}
+
+type FactDeleteBody struct {
+	FactIDs []string   `json:"fact_ids"`
+	Source  SourceKind `json:"source"`
+}

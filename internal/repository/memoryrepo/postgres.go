@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"agentmem/internal/database"
@@ -270,7 +271,7 @@ func (r *PostgresRepository) InsertFact(ctx context.Context, fact models.Fact) (
 	err := r.db.QueryRowContext(
 		ctx,
 		`INSERT INTO facts (account_id, agent_id, session_id, source_id, kind, text, embedding)
-		 VALUES ($1, $2, $3, $4, $5, $6, NULL)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7::vector)
 		 RETURNING id, account_id, agent_id, session_id, source_id, kind, text, created_at, updated_at`,
 		fact.AccountID,
 		fact.AgentID,
@@ -278,6 +279,7 @@ func (r *PostgresRepository) InsertFact(ctx context.Context, fact models.Fact) (
 		fact.SourceID,
 		fact.Kind,
 		fact.Text,
+		vectorLiteral(fact.Embedding),
 	).Scan(
 		&stored.ID,
 		&stored.AccountID,
@@ -296,6 +298,51 @@ func (r *PostgresRepository) InsertFact(ctx context.Context, fact models.Fact) (
 	stored.AgentID = nullStringPtr(agentID)
 	stored.SessionID = nullStringPtr(sessionID)
 	return &stored, nil
+}
+
+func (r *PostgresRepository) ListFactsByScope(ctx context.Context, accountID string, agentID, sessionID *string) ([]models.Fact, error) {
+	rows, err := r.db.QueryContext(
+		ctx,
+		`SELECT id, account_id, agent_id, session_id, source_id, kind, text, created_at, updated_at
+		 FROM facts
+		 WHERE account_id = $1
+		   AND ($2::uuid IS NULL OR agent_id = $2)
+		   AND ($3::uuid IS NULL OR session_id = $3)
+		 ORDER BY created_at ASC`,
+		accountID,
+		agentID,
+		sessionID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	facts := make([]models.Fact, 0)
+	for rows.Next() {
+		var (
+			fact      models.Fact
+			agent     sql.NullString
+			session   sql.NullString
+		)
+		if err := rows.Scan(
+			&fact.ID,
+			&fact.AccountID,
+			&agent,
+			&session,
+			&fact.SourceID,
+			&fact.Kind,
+			&fact.Text,
+			&fact.CreatedAt,
+			&fact.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		fact.AgentID = nullStringPtr(agent)
+		fact.SessionID = nullStringPtr(session)
+		facts = append(facts, fact)
+	}
+	return facts, rows.Err()
 }
 
 func (r *PostgresRepository) GetFactByID(ctx context.Context, factID string) (*models.Fact, error) {
@@ -338,13 +385,75 @@ func (r *PostgresRepository) UpdateFact(ctx context.Context, fact models.Fact) e
 	_, err := r.db.ExecContext(
 		ctx,
 		`UPDATE facts
-		 SET text = $2, kind = $3, updated_at = now()
+		 SET text = $2, kind = $3, embedding = $4::vector, updated_at = now()
 		 WHERE id = $1`,
 		fact.ID,
 		fact.Text,
 		fact.Kind,
+		vectorLiteral(fact.Embedding),
 	)
 	return err
+}
+
+func (r *PostgresRepository) SearchFactsByEmbedding(ctx context.Context, params SearchByEmbeddingParams) ([]models.Fact, error) {
+	if len(params.Embedding) == 0 {
+		return nil, nil
+	}
+	if params.Limit <= 0 {
+		params.Limit = 20
+	}
+	if params.MinSimilarity <= 0 {
+		params.MinSimilarity = 0.65
+	}
+
+	rows, err := r.db.QueryContext(
+		ctx,
+		`SELECT id, account_id, agent_id, session_id, source_id, kind, text, created_at, updated_at
+		 FROM facts
+		 WHERE account_id = $1
+		   AND ($2::uuid IS NULL OR agent_id = $2)
+		   AND ($3::uuid IS NULL OR session_id = $3)
+		   AND embedding IS NOT NULL
+		   AND (1 - (embedding <=> $4::vector)) >= $5
+		 ORDER BY embedding <=> $4::vector ASC
+		 LIMIT $6`,
+		params.AccountID,
+		params.AgentID,
+		params.SessionID,
+		vectorLiteral(params.Embedding),
+		params.MinSimilarity,
+		params.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	facts := make([]models.Fact, 0)
+	for rows.Next() {
+		var (
+			fact      models.Fact
+			agent     sql.NullString
+			session   sql.NullString
+		)
+		if err := rows.Scan(
+			&fact.ID,
+			&fact.AccountID,
+			&agent,
+			&session,
+			&fact.SourceID,
+			&fact.Kind,
+			&fact.Text,
+			&fact.CreatedAt,
+			&fact.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		fact.AgentID = nullStringPtr(agent)
+		fact.SessionID = nullStringPtr(session)
+		facts = append(facts, fact)
+	}
+	return facts, rows.Err()
 }
 
 func (r *PostgresRepository) DeleteFacts(ctx context.Context, factIDs []string) error {
@@ -373,4 +482,15 @@ func nullInt64Ptr(value sql.NullInt64) *int64 {
 	}
 	typed := value.Int64
 	return &typed
+}
+
+func vectorLiteral(values []float64) string {
+	if len(values) == 0 {
+		return "[]"
+	}
+	parts := make([]string, 0, len(values))
+	for _, value := range values {
+		parts = append(parts, fmt.Sprintf("%g", value))
+	}
+	return "[" + strings.Join(parts, ",") + "]"
 }

@@ -15,8 +15,19 @@ type Repository interface {
 	ListConversationSourcesBySessionID(ctx context.Context, sessionID string, limit int) ([]models.Source, error)
 
 	InsertFact(ctx context.Context, fact models.Fact) (*models.Fact, error)
+	ListFactsByScope(ctx context.Context, accountID string, agentID, sessionID *string) ([]models.Fact, error)
 	GetFactByID(ctx context.Context, factID string) (*models.Fact, error)
+	SearchFactsByEmbedding(ctx context.Context, params SearchByEmbeddingParams) ([]models.Fact, error)
 	UpdateFact(ctx context.Context, fact models.Fact) error
 	DeleteFacts(ctx context.Context, factIDs []string) error
 
+}
+
+type SearchByEmbeddingParams struct {
+	AccountID     string
+	AgentID       *string
+	SessionID     *string
+	Embedding     []float64
+	MinSimilarity float64
+	Limit         int
 }

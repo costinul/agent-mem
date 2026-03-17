@@ -185,3 +185,51 @@ func TestInMemoryConversationSourcesBySession(t *testing.T) {
 		}
 	}
 }
+
+func TestInMemorySearchFactsByEmbedding(t *testing.T) {
+	repo := NewInMemory()
+	ctx := context.Background()
+
+	agentID := "agent-1"
+	sessionID := "sess-1"
+	_, err := repo.InsertFact(ctx, models.Fact{
+		AccountID: "acct-1",
+		AgentID:   &agentID,
+		SessionID: &sessionID,
+		SourceID:  "source-1",
+		Kind:      models.FACT_KIND_KNOWLEDGE,
+		Text:      "postgres is primary db",
+		Embedding: []float64{1, 0, 0},
+	})
+	if err != nil {
+		t.Fatalf("InsertFact() error = %v", err)
+	}
+	_, err = repo.InsertFact(ctx, models.Fact{
+		AccountID: "acct-1",
+		SourceID:  "source-2",
+		Kind:      models.FACT_KIND_KNOWLEDGE,
+		Text:      "redis cache",
+		Embedding: []float64{0, 1, 0},
+	})
+	if err != nil {
+		t.Fatalf("InsertFact() error = %v", err)
+	}
+
+	results, err := repo.SearchFactsByEmbedding(ctx, SearchByEmbeddingParams{
+		AccountID:     "acct-1",
+		AgentID:       &agentID,
+		SessionID:     &sessionID,
+		Embedding:     []float64{1, 0, 0},
+		MinSimilarity: 0.7,
+		Limit:         5,
+	})
+	if err != nil {
+		t.Fatalf("SearchFactsByEmbedding() error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("SearchFactsByEmbedding() len = %d, want 1", len(results))
+	}
+	if results[0].Text != "postgres is primary db" {
+		t.Fatalf("SearchFactsByEmbedding() text = %q", results[0].Text)
+	}
+}

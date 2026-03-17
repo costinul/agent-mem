@@ -24,6 +24,11 @@ import (
 	"github.com/costinul/bwai/bwaiclient"
 )
 
+// @title Agent Memory API
+// @version 1.0
+// @description This is the API for the Agent Memory service.
+// @host localhost:8080
+// @BasePath /
 func main() {
 	log.Println("Starting agent-mem API...")
 
