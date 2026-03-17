@@ -14,16 +14,14 @@ import (
 )
 
 type MemoryEngine struct {
-	client *bwaiclient.BWAIClient
-	repo   memoryrepo.Repository
-	ai     Adapter
+	repo memoryrepo.Repository
+	ai   *LLMAdapter
 }
 
 func NewMemoryEngine(client *bwaiclient.BWAIClient, repo memoryrepo.Repository) *MemoryEngine {
 	return &MemoryEngine{
-		client: client,
-		repo:   repo,
-		ai:     NewDefaultAdapter(),
+		repo: repo,
+		ai:   NewLLMAdapter(client),
 	}
 }
 
