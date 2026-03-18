@@ -57,6 +57,6 @@ func TestGetFactNotFound(t *testing.T) {
 
 func newTestServer() *Server {
 	repo := memoryrepo.NewInMemory()
-	memEngine := engine.NewMemoryEngine(nil, repo)
+	memEngine := engine.NewMemoryEngine(nil, repo, "", "")
 	return NewServer(memEngine)
 }
