@@ -62,17 +62,15 @@ func main() {
 	}
 
 	log.Println("Initializing BWAI client...")
-	// Note: In a production environment, you would load models and prompts from configuration
-	registry, err := bwai.NewModelRegistry("models.yaml", "prompts", nil)
+	registry, err := bwai.NewModelRegistry("models.json", "prompts", &envSecretStorage{})
 	if err != nil {
 		log.Printf("failed to initialize model registry: %v", err)
-		// For now, we'll continue with a nil registry if files are missing,
-		// but in a real app this should probably be a fatal error.
+		os.Exit(1)
 	}
 	bwaiClient := bwaiclient.NewBWAIClient(registry, nil, nil)
 
 	log.Println("Initializing MemoryEngine...")
-	engine := engine.NewMemoryEngine(bwaiClient, memoryRepo)
+	engine := engine.NewMemoryEngine(bwaiClient, memoryRepo, cfg.AI.SchemaModel, cfg.AI.EmbeddingModel)
 
 	log.Println("Initializing API server...")
 	server := api.NewServer(engine)
@@ -96,6 +94,22 @@ func main() {
 		log.Printf("failed to shutdown API server: %v", err)
 	}
 	log.Println("Server shutdown complete")
+}
+
+// envSecretStorage resolves secrets from environment variables.
+// The secretName is treated as the env var name (e.g. "OPENAI_API_KEY").
+type envSecretStorage struct{}
+
+func (s *envSecretStorage) GetSecret(_ context.Context, name string) ([]byte, error) {
+	val := os.Getenv(name)
+	if val == "" {
+		return nil, fmt.Errorf("env var %s is not set", name)
+	}
+	return []byte(val), nil
+}
+
+func (s *envSecretStorage) SaveSecret(_ context.Context, _ string, _ []byte) error {
+	return fmt.Errorf("not supported")
 }
 
 func runCreateAPIKeyCommand(ctx context.Context, accountSvc *account.Service, args []string) error {

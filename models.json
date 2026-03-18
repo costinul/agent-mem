@@ -1,0 +1,24 @@
+[
+  {
+    "id": "schema",
+    "name": "GPT-4o Mini",
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "api_key": "OPENAI_API_KEY",
+    "context_window_size": 128000,
+    "max_output_tokens": 16384,
+    "function_calls": true,
+    "streaming_support": false,
+    "specializations": ["text", "schema"]
+  },
+  {
+    "id": "embedding",
+    "name": "text-embedding-3-small",
+    "provider": "openai",
+    "model": "text-embedding-3-small",
+    "api_key": "OPENAI_API_KEY",
+    "context_window_size": 8191,
+    "embedding_size": 1536,
+    "specializations": ["embedding"]
+  }
+]

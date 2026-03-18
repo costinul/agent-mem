@@ -12,10 +12,16 @@ type Config struct {
 	GinMode  string
 	LogLevel string
 	Database DatabaseConfig
+	AI       AIConfig
 }
 
 type DatabaseConfig struct {
 	PostgresDSN string
+}
+
+type AIConfig struct {
+	SchemaModel    string
+	EmbeddingModel string
 }
 
 func Load() (*Config, error) {
@@ -25,6 +31,10 @@ func Load() (*Config, error) {
 		LogLevel: getEnvOrDefault("LOG_LEVEL", "debug"),
 		Database: DatabaseConfig{
 			PostgresDSN: strings.TrimSpace(os.Getenv("POSTGRES_DSN")),
+		},
+		AI: AIConfig{
+			SchemaModel:    getEnvOrDefault("AI_SCHEMA_MODEL", "schema"),
+			EmbeddingModel: getEnvOrDefault("AI_EMBEDDING_MODEL", "embedding"),
 		},
 	}
 

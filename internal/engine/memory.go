@@ -18,10 +18,10 @@ type MemoryEngine struct {
 	ai   *LLMAdapter
 }
 
-func NewMemoryEngine(client *bwaiclient.BWAIClient, repo memoryrepo.Repository) *MemoryEngine {
+func NewMemoryEngine(client *bwaiclient.BWAIClient, repo memoryrepo.Repository, schemaModel, embeddingModel string) *MemoryEngine {
 	return &MemoryEngine{
 		repo: repo,
-		ai:   NewLLMAdapter(client),
+		ai:   NewLLMAdapter(client, schemaModel, embeddingModel),
 	}
 }
 
@@ -41,7 +41,7 @@ func (e *MemoryEngine) ProcessContextual(ctx context.Context, input models.Memor
 		return models.MemoryOutput{}, fmt.Errorf("insert event: %w", err)
 	}
 
-	storedSources, decompositions, err := e.persistAndDecomposeSources(ctx, event.ID, input.Inputs)
+	storedSources, decompositions, err := e.persistAndDecomposeSources(ctx, event.ID, input.SessionID, input.Inputs)
 	if err != nil {
 		return models.MemoryOutput{}, err
 	}
@@ -108,7 +108,7 @@ func (e *MemoryEngine) AddFactual(ctx context.Context, input models.FactualInput
 		return models.MemoryOutput{}, fmt.Errorf("insert event: %w", err)
 	}
 
-	storedSources, decompositions, err := e.persistAndDecomposeSources(ctx, event.ID, input.Inputs)
+	storedSources, decompositions, err := e.persistAndDecomposeSources(ctx, event.ID, strings.TrimSpace(input.SessionID), input.Inputs)
 	if err != nil {
 		return models.MemoryOutput{}, err
 	}
@@ -204,10 +204,24 @@ func (e *MemoryEngine) DeleteFacts(ctx context.Context, factIDs []string, source
 	return e.repo.DeleteFacts(ctx, factIDs)
 }
 
-func (e *MemoryEngine) persistAndDecomposeSources(ctx context.Context, eventID string, inputs []models.InputItem) ([]models.Source, []models.Decomposition, error) {
+func (e *MemoryEngine) persistAndDecomposeSources(ctx context.Context, eventID, sessionID string, inputs []models.InputItem) ([]models.Source, []models.Decomposition, error) {
 	storedSources := make([]models.Source, 0, len(inputs))
 	contextHeader := buildEventContextHeader(inputs)
 	decompositions := make([]models.Decomposition, 0, len(inputs))
+
+	// Load recent conversation history once for USER/AGENT sources.
+	var msgHistory []string
+	if sessionID != "" {
+		recent, err := e.repo.ListConversationSourcesBySessionID(ctx, sessionID, 10)
+		if err != nil {
+			return nil, nil, fmt.Errorf("load message history: %w", err)
+		}
+		for _, src := range recent {
+			if src.Content != nil {
+				msgHistory = append(msgHistory, fmt.Sprintf("[%s] %s", src.Kind, *src.Content))
+			}
+		}
+	}
 
 	for _, item := range inputs {
 		content := strings.TrimSpace(item.Content)
@@ -228,11 +242,16 @@ func (e *MemoryEngine) persistAndDecomposeSources(ctx context.Context, eventID s
 		}
 		storedSources = append(storedSources, *inserted)
 
-		decomposition, err := e.ai.Decompose(ctx, DecomposeRequest{
+		req := DecomposeRequest{
 			SourceKind:    item.Kind,
 			Content:       item.Content,
 			ContextHeader: contextHeader,
-		})
+		}
+		if item.Kind == models.SOURCE_USER || item.Kind == models.SOURCE_AGENT {
+			req.MessageHistory = msgHistory
+		}
+
+		decomposition, err := e.ai.Decompose(ctx, req)
 		if err != nil {
 			return nil, nil, fmt.Errorf("decompose source %s: %w", inserted.ID, err)
 		}

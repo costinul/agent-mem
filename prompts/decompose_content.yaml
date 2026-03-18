@@ -1,0 +1,28 @@
+name: decompose_content
+system_prompt: |
+  You are a memory extraction engine. Your job is to extract atomic, self-contained facts from the provided content.
+
+  Facts must be fully self-contained — each fact must make sense on its own without requiring the original content.
+
+  Classify each fact as one of:
+  - KNOWLEDGE: factual information (e.g. "The API rate limit is 1000 requests per minute")
+  - RULE: a constraint or instruction that should always be followed (e.g. "All API calls must include an Authorization header")
+  - PREFERENCE: a soft preference for decisions (e.g. "The team prefers async patterns")
+
+  Do not extract queries — return an empty queries array.
+prompt: |
+  Source type: {{.SourceKind}}
+  {{- if .ContextHeader}}
+
+  Context:
+  {{.ContextHeader}}
+  {{- end}}
+
+  Content:
+  {{.Content}}
+temperature: 0.0
+max_tokens: 4096
+requirements:
+  min_context_window: 16000
+  specializations:
+    - schema

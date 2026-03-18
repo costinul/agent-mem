@@ -2,13 +2,17 @@ package engine
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
+	"fmt"
 
 	models "agentmem/internal/models"
 
+	"github.com/costinul/bwai"
 	"github.com/costinul/bwai/bwaiclient"
+	"github.com/google/uuid"
 )
 
+// DecomposeRequest is the input for decomposing a single source.
 type DecomposeRequest struct {
 	SourceKind     models.SourceKind
 	Content        string
@@ -16,27 +20,171 @@ type DecomposeRequest struct {
 	MessageHistory []string
 }
 
+// EvaluateRequest is the input for the evaluate step.
 type EvaluateRequest struct {
 	NewFacts       []models.ExtractedFact
 	RetrievedFacts []models.Fact
 }
 
+// LLMAdapter wraps the bwai client and exposes the three LLM operations the engine needs.
 type LLMAdapter struct {
-	client *bwaiclient.BWAIClient
+	client         *bwaiclient.BWAIClient
+	schemaModel    string
+	embeddingModel string
 }
 
-func NewLLMAdapter(client *bwaiclient.BWAIClient) *LLMAdapter {
-	return &LLMAdapter{client: client}
+func NewLLMAdapter(client *bwaiclient.BWAIClient, schemaModel, embeddingModel string) *LLMAdapter {
+	return &LLMAdapter{
+		client:         client,
+		schemaModel:    schemaModel,
+		embeddingModel: embeddingModel,
+	}
 }
 
-func (a *LLMAdapter) Decompose(_ context.Context, _ DecomposeRequest) (models.Decomposition, error) {
-	return models.Decomposition{}, errors.New("not implemented")
+// Embed generates vector embeddings for the given texts.
+func (a *LLMAdapter) Embed(ctx context.Context, texts []string) ([][]float64, error) {
+	if len(texts) == 0 {
+		return nil, nil
+	}
+	raw, err := a.client.GetEmbeddings(ctx, uuid.New(), a.embeddingModel, texts)
+	if err != nil {
+		return nil, fmt.Errorf("get embeddings: %w", err)
+	}
+	result := make([][]float64, len(raw))
+	for i, vec := range raw {
+		f64 := make([]float64, len(vec))
+		for j, v := range vec {
+			f64[j] = float64(v)
+		}
+		result[i] = f64
+	}
+	return result, nil
 }
 
-func (a *LLMAdapter) Evaluate(_ context.Context, _ EvaluateRequest) (models.EvaluateResult, error) {
-	return models.EvaluateResult{}, errors.New("not implemented")
+// Decompose extracts facts (and queries for USER/AGENT sources) from a source using the LLM.
+func (a *LLMAdapter) Decompose(ctx context.Context, req DecomposeRequest) (models.Decomposition, error) {
+	promptName := "decompose_content"
+	if req.SourceKind == models.SOURCE_USER || req.SourceKind == models.SOURCE_AGENT {
+		promptName = "decompose_conversational"
+	}
+
+	out := &decompositionOutput{}
+	err := a.client.ExecuteAs(ctx, uuid.New(), promptName, a.schemaModel, &bwai.PromptData{
+		Data: req,
+	}, out)
+	if err != nil {
+		return models.Decomposition{}, fmt.Errorf("decompose %s source: %w", req.SourceKind, err)
+	}
+
+	return models.Decomposition{
+		Facts:   out.Facts,
+		Queries: out.Queries,
+	}, nil
 }
 
-func (a *LLMAdapter) Embed(_ context.Context, _ []string) ([][]float64, error) {
-	return nil, errors.New("not implemented")
+// Evaluate determines what to do with new and retrieved facts using the LLM.
+func (a *LLMAdapter) Evaluate(ctx context.Context, req EvaluateRequest) (models.EvaluateResult, error) {
+	if len(req.NewFacts) == 0 && len(req.RetrievedFacts) == 0 {
+		return models.EvaluateResult{}, nil
+	}
+
+	out := &evaluateOutput{}
+	err := a.client.ExecuteAs(ctx, uuid.New(), "evaluate", a.schemaModel, &bwai.PromptData{
+		Data: req,
+	}, out)
+	if err != nil {
+		return models.EvaluateResult{}, fmt.Errorf("evaluate facts: %w", err)
+	}
+
+	retrievedByID := make(map[string]models.Fact, len(req.RetrievedFacts))
+	for _, f := range req.RetrievedFacts {
+		retrievedByID[f.ID] = f
+	}
+
+	factsToReturn := make([]models.Fact, 0, len(out.FactsToReturn))
+	for _, id := range out.FactsToReturn {
+		if f, ok := retrievedByID[id]; ok {
+			factsToReturn = append(factsToReturn, f)
+		}
+	}
+
+	factsToStore := make([]models.Fact, 0, len(out.FactsToStore))
+	for _, ef := range out.FactsToStore {
+		factsToStore = append(factsToStore, models.Fact{Text: ef.Text, Kind: ef.Kind})
+	}
+
+	factsToUpdate := make([]models.Fact, 0, len(out.FactsToUpdate))
+	for _, u := range out.FactsToUpdate {
+		if f, ok := retrievedByID[u.ID]; ok {
+			f.Text = u.Text
+			factsToUpdate = append(factsToUpdate, f)
+		}
+	}
+
+	return models.EvaluateResult{
+		FactsToReturn: factsToReturn,
+		FactsToStore:  factsToStore,
+		FactsToUpdate: factsToUpdate,
+		FactsToDelete: out.FactsToDelete,
+	}, nil
+}
+
+// ──────────────────────────────────────────────
+// Structured output types
+// ──────────────────────────────────────────────
+
+type decompositionOutput struct {
+	Facts   []models.ExtractedFact  `json:"facts"`
+	Queries []models.ExtractedQuery `json:"queries"`
+}
+
+func (o *decompositionOutput) SchemaDescription() string {
+	return "Extracted facts and search queries from the source content."
+}
+
+func (o *decompositionOutput) Validate() error {
+	for i, f := range o.Facts {
+		if f.Text == "" {
+			return fmt.Errorf("facts[%d].text is empty", i)
+		}
+		if f.Kind != models.FACT_KIND_KNOWLEDGE && f.Kind != models.FACT_KIND_RULE && f.Kind != models.FACT_KIND_PREFERENCE {
+			return fmt.Errorf("facts[%d].kind %q is invalid", i, f.Kind)
+		}
+	}
+	return nil
+}
+
+func (o *decompositionOutput) Unmarshal(data []byte) error {
+	return json.Unmarshal(data, o)
+}
+
+// ──────────────────────────────────────────────
+
+type factUpdate struct {
+	ID   string `json:"id"`
+	Text string `json:"text"`
+}
+
+type evaluateOutput struct {
+	FactsToReturn []string               `json:"facts_to_return"`
+	FactsToStore  []models.ExtractedFact `json:"facts_to_store"`
+	FactsToUpdate []factUpdate           `json:"facts_to_update"`
+	FactsToDelete []string               `json:"facts_to_delete"`
+}
+
+func (o *evaluateOutput) SchemaDescription() string {
+	return "Evaluation result: which existing facts to return, which new facts to store, which existing facts to update, and which to delete."
+}
+
+func (o *evaluateOutput) Validate() error {
+	for i, f := range o.FactsToStore {
+		if f.Text == "" {
+			return fmt.Errorf("facts_to_store[%d].text is empty", i)
+		}
+	}
+	return nil
+}
+
+func (o *evaluateOutput) Unmarshal(data []byte) error {
+	return json.Unmarshal(data, o)
 }
