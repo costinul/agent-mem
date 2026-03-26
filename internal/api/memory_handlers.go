@@ -38,10 +38,6 @@ func contextualHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
 			writeJSON(w, http.StatusBadRequest, apiError{Error: "invalid JSON payload"})
 			return
 		}
-		if strings.TrimSpace(input.AccountID) != "" && strings.TrimSpace(input.AccountID) != accountID {
-			writeJSON(w, http.StatusBadRequest, apiError{Error: "account_id does not match API key account"})
-			return
-		}
 		input.AccountID = accountID
 		output, err := memEngine.ProcessContextual(r.Context(), input)
 		if err != nil {
@@ -75,10 +71,6 @@ func factualHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
 		var input models.FactualInput
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 			writeJSON(w, http.StatusBadRequest, apiError{Error: "invalid JSON payload"})
-			return
-		}
-		if strings.TrimSpace(input.AccountID) != "" && strings.TrimSpace(input.AccountID) != accountID {
-			writeJSON(w, http.StatusBadRequest, apiError{Error: "account_id does not match API key account"})
 			return
 		}
 		input.AccountID = accountID

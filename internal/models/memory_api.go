@@ -8,7 +8,7 @@ import "time"
 
 // MemoryInput is the request body for the contextual smart pipeline.
 type MemoryInput struct {
-	AccountID      string      `json:"account_id"`
+	AccountID      string      `json:"-" swaggerignore:"true"`
 	AgentID        string      `json:"agent_id"`
 	SessionID      string      `json:"session_id"`
 	IncludeSources bool        `json:"include_sources"` // When true, return original source content with facts.
@@ -76,7 +76,7 @@ type FactDeleteRequest struct {
 // FactualInput is the request body for the factual interface.
 // SessionID is optional; when omitted, facts are agent/account scoped.
 type FactualInput struct {
-	AccountID string      `json:"account_id"`
+	AccountID string      `json:"-" swaggerignore:"true"`
 	AgentID   string      `json:"agent_id"`
 	SessionID string      `json:"session_id"`
 	Inputs    []InputItem `json:"inputs"`

@@ -901,9 +901,6 @@ const docTemplate = `{
         "memory.FactualInput": {
             "type": "object",
             "properties": {
-                "account_id": {
-                    "type": "string"
-                },
                 "agent_id": {
                     "type": "string"
                 },
@@ -937,9 +934,6 @@ const docTemplate = `{
         "memory.MemoryInput": {
             "type": "object",
             "properties": {
-                "account_id": {
-                    "type": "string"
-                },
                 "agent_id": {
                     "type": "string"
                 },

@@ -895,9 +895,6 @@
         "memory.FactualInput": {
             "type": "object",
             "properties": {
-                "account_id": {
-                    "type": "string"
-                },
                 "agent_id": {
                     "type": "string"
                 },
@@ -931,9 +928,6 @@
         "memory.MemoryInput": {
             "type": "object",
             "properties": {
-                "account_id": {
-                    "type": "string"
-                },
                 "agent_id": {
                     "type": "string"
                 },

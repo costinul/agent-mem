@@ -130,8 +130,6 @@ definitions:
     type: object
   memory.FactualInput:
     properties:
-      account_id:
-        type: string
       agent_id:
         type: string
       inputs:
@@ -154,8 +152,6 @@ definitions:
     type: object
   memory.MemoryInput:
     properties:
-      account_id:
-        type: string
       agent_id:
         type: string
       include_sources:

@@ -23,7 +23,7 @@ import (
 
 func TestContextualHandlerValidation(t *testing.T) {
 	server := newTestServer()
-	req := httptest.NewRequest(http.MethodPost, "/memory/contextual", bytes.NewBufferString(`{"account_id":"a"}`))
+	req := httptest.NewRequest(http.MethodPost, "/memory/contextual", bytes.NewBufferString(`{}`))
 	req.Header.Set("Authorization", "Bearer "+testAPIKey)
 	rec := httptest.NewRecorder()
 
@@ -36,8 +36,7 @@ func TestContextualHandlerValidation(t *testing.T) {
 func TestFactualHandlerSuccess(t *testing.T) {
 	server := newTestServer()
 	body := models.FactualInput{
-		AccountID: "acct-1",
-		AgentID:   "agent-1",
+		AgentID:   "",
 		SessionID: "sess-1",
 		Inputs: []models.InputItem{
 			{Kind: models.SOURCE_USER, Content: "Always include tests", ContentType: "text/plain"},
