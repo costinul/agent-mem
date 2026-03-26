@@ -269,7 +269,6 @@ func (e *MemoryEngine) persistAndDecomposeSources(ctx context.Context, eventID, 
 			Kind:        item.Kind,
 			Content:     contentPtr,
 			ContentType: defaultContentType(item.ContentType),
-			Metadata:    item.Metadata,
 		}
 		inserted, err := e.repo.InsertSource(ctx, source)
 		if err != nil {

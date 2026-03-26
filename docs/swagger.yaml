@@ -151,10 +151,6 @@ definitions:
         type: string
       kind:
         $ref: '#/definitions/memory.SourceKind'
-      metadata:
-        additionalProperties:
-          type: string
-        type: object
     type: object
   memory.MemoryInput:
     properties:

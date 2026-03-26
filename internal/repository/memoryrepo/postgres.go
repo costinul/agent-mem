@@ -3,7 +3,6 @@ package memoryrepo
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -51,27 +50,20 @@ func (r *PostgresRepository) InsertSource(ctx context.Context, source models.Sou
 		content    sql.NullString
 		bucketPath sql.NullString
 		sizeBytes  sql.NullInt64
-		metadata   []byte
 		createdAt  time.Time
 	)
 
-	metadataJSON, err := json.Marshal(source.Metadata)
-	if err != nil {
-		return nil, fmt.Errorf("marshal metadata: %w", err)
-	}
-
-	err = r.db.QueryRowContext(
+	err := r.db.QueryRowContext(
 		ctx,
-		`INSERT INTO sources (event_id, kind, content, content_type, bucket_path, size_bytes, metadata)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)
-		 RETURNING id, event_id, kind, content, content_type, bucket_path, size_bytes, metadata, created_at`,
+		`INSERT INTO sources (event_id, kind, content, content_type, bucket_path, size_bytes)
+		 VALUES ($1, $2, $3, $4, $5, $6)
+		 RETURNING id, event_id, kind, content, content_type, bucket_path, size_bytes, created_at`,
 		source.EventID,
 		source.Kind,
 		source.Content,
 		source.ContentType,
 		source.BucketPath,
 		source.SizeBytes,
-		metadataJSON,
 	).Scan(
 		&stored.ID,
 		&stored.EventID,
@@ -80,7 +72,6 @@ func (r *PostgresRepository) InsertSource(ctx context.Context, source models.Sou
 		&stored.ContentType,
 		&bucketPath,
 		&sizeBytes,
-		&metadata,
 		&createdAt,
 	)
 	if err != nil {
@@ -91,13 +82,6 @@ func (r *PostgresRepository) InsertSource(ctx context.Context, source models.Sou
 	stored.BucketPath = nullStringPtr(bucketPath)
 	stored.SizeBytes = nullInt64Ptr(sizeBytes)
 	stored.CreatedAt = createdAt
-
-	if len(metadata) > 0 {
-		if err := json.Unmarshal(metadata, &stored.Metadata); err != nil {
-			return nil, fmt.Errorf("unmarshal metadata: %w", err)
-		}
-	}
-
 	return &stored, nil
 }
 
@@ -107,12 +91,11 @@ func (r *PostgresRepository) GetSourceByID(ctx context.Context, sourceID string)
 		content    sql.NullString
 		bucketPath sql.NullString
 		sizeBytes  sql.NullInt64
-		metadata   []byte
 	)
 
 	err := r.db.QueryRowContext(
 		ctx,
-		`SELECT id, event_id, kind, content, content_type, bucket_path, size_bytes, metadata, created_at
+		`SELECT id, event_id, kind, content, content_type, bucket_path, size_bytes, created_at
 		 FROM sources
 		 WHERE id = $1`,
 		sourceID,
@@ -124,7 +107,6 @@ func (r *PostgresRepository) GetSourceByID(ctx context.Context, sourceID string)
 		&source.ContentType,
 		&bucketPath,
 		&sizeBytes,
-		&metadata,
 		&source.CreatedAt,
 	)
 	if err != nil {
@@ -137,20 +119,13 @@ func (r *PostgresRepository) GetSourceByID(ctx context.Context, sourceID string)
 	source.Content = nullStringPtr(content)
 	source.BucketPath = nullStringPtr(bucketPath)
 	source.SizeBytes = nullInt64Ptr(sizeBytes)
-
-	if len(metadata) > 0 {
-		if err := json.Unmarshal(metadata, &source.Metadata); err != nil {
-			return nil, fmt.Errorf("unmarshal metadata: %w", err)
-		}
-	}
-
 	return &source, nil
 }
 
 func (r *PostgresRepository) ListSourcesByEventID(ctx context.Context, eventID string) ([]models.Source, error) {
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT id, event_id, kind, content, content_type, bucket_path, size_bytes, metadata, created_at
+		`SELECT id, event_id, kind, content, content_type, bucket_path, size_bytes, created_at
 		 FROM sources
 		 WHERE event_id = $1
 		 ORDER BY created_at ASC`,
@@ -168,7 +143,6 @@ func (r *PostgresRepository) ListSourcesByEventID(ctx context.Context, eventID s
 			content    sql.NullString
 			bucketPath sql.NullString
 			sizeBytes  sql.NullInt64
-			metadata   []byte
 		)
 		if err := rows.Scan(
 			&source.ID,
@@ -178,7 +152,6 @@ func (r *PostgresRepository) ListSourcesByEventID(ctx context.Context, eventID s
 			&source.ContentType,
 			&bucketPath,
 			&sizeBytes,
-			&metadata,
 			&source.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -186,11 +159,6 @@ func (r *PostgresRepository) ListSourcesByEventID(ctx context.Context, eventID s
 		source.Content = nullStringPtr(content)
 		source.BucketPath = nullStringPtr(bucketPath)
 		source.SizeBytes = nullInt64Ptr(sizeBytes)
-		if len(metadata) > 0 {
-			if err := json.Unmarshal(metadata, &source.Metadata); err != nil {
-				return nil, fmt.Errorf("unmarshal metadata: %w", err)
-			}
-		}
 		sources = append(sources, source)
 	}
 	return sources, rows.Err()
@@ -203,7 +171,7 @@ func (r *PostgresRepository) ListConversationSourcesBySessionID(ctx context.Cont
 
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT s.id, s.event_id, s.kind, s.content, s.content_type, s.bucket_path, s.size_bytes, s.metadata, s.created_at
+		`SELECT s.id, s.event_id, s.kind, s.content, s.content_type, s.bucket_path, s.size_bytes, s.created_at
 		 FROM sources s
 		 JOIN events e ON e.id = s.event_id
 		 WHERE e.session_id = $1
@@ -225,7 +193,6 @@ func (r *PostgresRepository) ListConversationSourcesBySessionID(ctx context.Cont
 			content    sql.NullString
 			bucketPath sql.NullString
 			sizeBytes  sql.NullInt64
-			metadata   []byte
 		)
 		if err := rows.Scan(
 			&source.ID,
@@ -235,7 +202,6 @@ func (r *PostgresRepository) ListConversationSourcesBySessionID(ctx context.Cont
 			&source.ContentType,
 			&bucketPath,
 			&sizeBytes,
-			&metadata,
 			&source.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -243,11 +209,6 @@ func (r *PostgresRepository) ListConversationSourcesBySessionID(ctx context.Cont
 		source.Content = nullStringPtr(content)
 		source.BucketPath = nullStringPtr(bucketPath)
 		source.SizeBytes = nullInt64Ptr(sizeBytes)
-		if len(metadata) > 0 {
-			if err := json.Unmarshal(metadata, &source.Metadata); err != nil {
-				return nil, fmt.Errorf("unmarshal metadata: %w", err)
-			}
-		}
 		sources = append(sources, source)
 	}
 	if err := rows.Err(); err != nil {

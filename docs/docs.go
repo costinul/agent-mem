@@ -931,12 +931,6 @@ const docTemplate = `{
                 },
                 "kind": {
                     "$ref": "#/definitions/memory.SourceKind"
-                },
-                "metadata": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
                 }
             }
         },

@@ -19,10 +19,9 @@ type MemoryInput struct {
 // InputItem is a single piece of content within one API call.
 // Text inputs set Content. File inputs set Content as base64 and ContentType accordingly.
 type InputItem struct {
-	Kind        SourceKind        `json:"kind"`
-	Content     string            `json:"content"`      // Text as string, files as base64.
-	ContentType string            `json:"content_type"` // MIME type: text/plain, application/pdf, image/png, etc.
-	Metadata    map[string]string `json:"metadata"`
+	Kind        SourceKind `json:"kind"`
+	Content     string     `json:"content"`      // Text as string, files as base64.
+	ContentType string     `json:"content_type"` // MIME type: text/plain, application/pdf, image/png, etc.
 }
 
 // =====================

@@ -57,15 +57,14 @@ type Event struct {
 // Exactly one of Content or BucketPath is populated.
 // Text inputs store content inline. File inputs are uploaded to the bucket.
 type Source struct {
-	ID          string            `json:"id"`
-	EventID     string            `json:"event_id"`
-	Kind        SourceKind        `json:"kind"`
-	Content     *string           `json:"content"`      // Populated for text inputs.
-	ContentType string            `json:"content_type"`
-	BucketPath  *string           `json:"bucket_path"`  // Populated for file inputs stored in S3-compatible bucket.
-	SizeBytes   *int64            `json:"size_bytes"`   // Size of the original payload in bytes.
-	Metadata    map[string]string `json:"metadata"`
-	CreatedAt   time.Time         `json:"created_at"`
+	ID          string    `json:"id"`
+	EventID     string    `json:"event_id"`
+	Kind        SourceKind `json:"kind"`
+	Content     *string   `json:"content"`     // Populated for text inputs.
+	ContentType string    `json:"content_type"`
+	BucketPath  *string   `json:"bucket_path"` // Populated for file inputs stored in S3-compatible bucket.
+	SizeBytes   *int64    `json:"size_bytes"`  // Size of the original payload in bytes.
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // =====================
