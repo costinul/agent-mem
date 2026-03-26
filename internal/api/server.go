@@ -32,7 +32,7 @@ func NewServer(engine *engine.MemoryEngine, accountSvc *account.Service, agentSv
 	mux.HandleFunc("POST /agents/{agentId}/sessions", requireAPIKey(accountSvc, createSessionHandler(agentSvc)))
 	mux.HandleFunc("GET /agents/{agentId}/sessions/{id}", requireAPIKey(accountSvc, getSessionHandler(agentSvc)))
 	mux.HandleFunc("DELETE /agents/{agentId}/sessions/{id}", requireAPIKey(accountSvc, deleteSessionHandler(agentSvc)))
-	mux.Handle("GET /swagger/", httpSwagger.WrapHandler)
+	mux.Handle("GET /swagger/", httpSwagger.Handler(httpSwagger.PersistAuthorization(true)))
 
 	return &Server{
 		httpServer: &http.Server{
