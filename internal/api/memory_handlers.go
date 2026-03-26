@@ -22,15 +22,27 @@ type apiError struct {
 // @Param input body memory.MemoryInput true "Memory Input"
 // @Success 200 {object} memory.MemoryOutput
 // @Failure 400 {object} apiError
+// @Failure 401 {object} apiError
 // @Failure 500 {object} apiError
+// @Security ApiKeyAuth
 // @Router /memory/contextual [post]
 func contextualHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		accountID := accountIDFromContext(r.Context())
+		if accountID == "" {
+			writeJSON(w, http.StatusUnauthorized, apiError{Error: "missing account context"})
+			return
+		}
 		var input models.MemoryInput
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 			writeJSON(w, http.StatusBadRequest, apiError{Error: "invalid JSON payload"})
 			return
 		}
+		if strings.TrimSpace(input.AccountID) != "" && strings.TrimSpace(input.AccountID) != accountID {
+			writeJSON(w, http.StatusBadRequest, apiError{Error: "account_id does not match API key account"})
+			return
+		}
+		input.AccountID = accountID
 		output, err := memEngine.ProcessContextual(r.Context(), input)
 		if err != nil {
 			writeEngineError(w, err)
@@ -49,15 +61,27 @@ func contextualHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
 // @Param input body memory.FactualInput true "Factual Input"
 // @Success 200 {object} memory.EvaluateResult
 // @Failure 400 {object} apiError
+// @Failure 401 {object} apiError
 // @Failure 500 {object} apiError
+// @Security ApiKeyAuth
 // @Router /memory/factual [post]
 func factualHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		accountID := accountIDFromContext(r.Context())
+		if accountID == "" {
+			writeJSON(w, http.StatusUnauthorized, apiError{Error: "missing account context"})
+			return
+		}
 		var input models.FactualInput
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 			writeJSON(w, http.StatusBadRequest, apiError{Error: "invalid JSON payload"})
 			return
 		}
+		if strings.TrimSpace(input.AccountID) != "" && strings.TrimSpace(input.AccountID) != accountID {
+			writeJSON(w, http.StatusBadRequest, apiError{Error: "account_id does not match API key account"})
+			return
+		}
+		input.AccountID = accountID
 		output, err := memEngine.AddFactual(r.Context(), input)
 		if err != nil {
 			writeEngineError(w, err)
@@ -76,11 +100,18 @@ func factualHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
 // @Param include_sources query bool false "Include original sources"
 // @Success 200 {object} memory.Fact
 // @Failure 400 {object} apiError
+// @Failure 401 {object} apiError
 // @Failure 404 {object} apiError
 // @Failure 500 {object} apiError
+// @Security ApiKeyAuth
 // @Router /facts/{id} [get]
 func getFactHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		accountID := accountIDFromContext(r.Context())
+		if accountID == "" {
+			writeJSON(w, http.StatusUnauthorized, apiError{Error: "missing account context"})
+			return
+		}
 		factID := strings.TrimSpace(r.PathValue("id"))
 		if factID == "" {
 			writeJSON(w, http.StatusBadRequest, apiError{Error: "fact id is required"})
@@ -88,7 +119,7 @@ func getFactHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
 		}
 
 		includeSources := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("include_sources")), "true")
-		fact, err := memEngine.GetFact(r.Context(), factID, includeSources)
+		fact, err := memEngine.GetFactForAccount(r.Context(), accountID, factID, includeSources)
 		if err != nil {
 			writeEngineError(w, err)
 			return
@@ -107,11 +138,18 @@ func getFactHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
 // @Param body body memory.FactUpdateBody true "Update Body"
 // @Success 200 {object} memory.Fact
 // @Failure 400 {object} apiError
+// @Failure 401 {object} apiError
 // @Failure 404 {object} apiError
 // @Failure 500 {object} apiError
+// @Security ApiKeyAuth
 // @Router /facts/{id} [put]
 func updateFactHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		accountID := accountIDFromContext(r.Context())
+		if accountID == "" {
+			writeJSON(w, http.StatusUnauthorized, apiError{Error: "missing account context"})
+			return
+		}
 		factID := strings.TrimSpace(r.PathValue("id"))
 		if factID == "" {
 			writeJSON(w, http.StatusBadRequest, apiError{Error: "fact id is required"})
@@ -132,7 +170,7 @@ func updateFactHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
 			return
 		}
 
-		fact, err := memEngine.UpdateFact(r.Context(), factID, body.Text, body.Source)
+		fact, err := memEngine.UpdateFactForAccount(r.Context(), accountID, factID, body.Text, body.Source)
 		if err != nil {
 			writeEngineError(w, err)
 			return
@@ -151,10 +189,17 @@ func updateFactHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
 // @Param body body memory.FactDeleteBody true "Delete Body"
 // @Success 200 {object} map[string]string "{"status": "deleted"}"
 // @Failure 400 {object} apiError
+// @Failure 401 {object} apiError
 // @Failure 500 {object} apiError
+// @Security ApiKeyAuth
 // @Router /facts/{id} [delete]
 func deleteFactHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		accountID := accountIDFromContext(r.Context())
+		if accountID == "" {
+			writeJSON(w, http.StatusUnauthorized, apiError{Error: "missing account context"})
+			return
+		}
 		factID := strings.TrimSpace(r.PathValue("id"))
 		var body models.FactDeleteBody
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -172,7 +217,7 @@ func deleteFactHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
 			writeJSON(w, http.StatusBadRequest, apiError{Error: "fact_ids are required"})
 			return
 		}
-		if err := memEngine.DeleteFacts(r.Context(), dedupeStrings(body.FactIDs), body.Source); err != nil {
+		if err := memEngine.DeleteFactsForAccount(r.Context(), accountID, dedupeStrings(body.FactIDs), body.Source); err != nil {
 			writeEngineError(w, err)
 			return
 		}

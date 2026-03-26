@@ -1,6 +1,8 @@
 package api
 
 import (
+	"agentmem/internal/account"
+	"agentmem/internal/agent"
 	"agentmem/internal/engine"
 	"context"
 	"net/http"
@@ -15,14 +17,21 @@ type Server struct {
 	engine     *engine.MemoryEngine
 }
 
-func NewServer(engine *engine.MemoryEngine) *Server {
+func NewServer(engine *engine.MemoryEngine, accountSvc *account.Service, agentSvc *agent.Service) *Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler)
-	mux.HandleFunc("POST /memory/contextual", contextualHandler(engine))
-	mux.HandleFunc("POST /memory/factual", factualHandler(engine))
-	mux.HandleFunc("GET /facts/{id}", getFactHandler(engine))
-	mux.HandleFunc("PUT /facts/{id}", updateFactHandler(engine))
-	mux.HandleFunc("DELETE /facts/{id}", deleteFactHandler(engine))
+	mux.HandleFunc("POST /memory/contextual", requireAPIKey(accountSvc, contextualHandler(engine)))
+	mux.HandleFunc("POST /memory/factual", requireAPIKey(accountSvc, factualHandler(engine)))
+	mux.HandleFunc("GET /facts/{id}", requireAPIKey(accountSvc, getFactHandler(engine)))
+	mux.HandleFunc("PUT /facts/{id}", requireAPIKey(accountSvc, updateFactHandler(engine)))
+	mux.HandleFunc("DELETE /facts/{id}", requireAPIKey(accountSvc, deleteFactHandler(engine)))
+
+	mux.HandleFunc("POST /agents", requireAPIKey(accountSvc, createAgentHandler(agentSvc)))
+	mux.HandleFunc("GET /agents/{id}", requireAPIKey(accountSvc, getAgentHandler(agentSvc)))
+	mux.HandleFunc("DELETE /agents/{id}", requireAPIKey(accountSvc, deleteAgentHandler(agentSvc)))
+	mux.HandleFunc("POST /agents/{agentId}/sessions", requireAPIKey(accountSvc, createSessionHandler(agentSvc)))
+	mux.HandleFunc("GET /agents/{agentId}/sessions/{id}", requireAPIKey(accountSvc, getSessionHandler(agentSvc)))
+	mux.HandleFunc("DELETE /agents/{agentId}/sessions/{id}", requireAPIKey(accountSvc, deleteSessionHandler(agentSvc)))
 	mux.Handle("GET /swagger/", httpSwagger.WrapHandler)
 
 	return &Server{

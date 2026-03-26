@@ -13,11 +13,13 @@ import (
 	"time"
 
 	"agentmem/internal/account"
+	agentsvc "agentmem/internal/agent"
 	"agentmem/internal/api"
 	"agentmem/internal/config"
 	"agentmem/internal/database"
 	"agentmem/internal/engine"
 	"agentmem/internal/repository/accountrepo"
+	"agentmem/internal/repository/agentrepo"
 	"agentmem/internal/repository/memoryrepo"
 
 	"github.com/costinul/bwai"
@@ -29,6 +31,9 @@ import (
 // @description This is the API for the Agent Memory service.
 // @host localhost:8080
 // @BasePath /
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name Authorization
 func main() {
 	log.Println("Starting agent-mem API...")
 
@@ -51,6 +56,8 @@ func main() {
 
 	accountRepo := accountrepo.NewPostgres(db)
 	accountSvc := account.NewService(accountRepo)
+	agentRepo := agentrepo.NewPostgres(db)
+	agentService := agentsvc.NewService(agentRepo)
 	memoryRepo := memoryrepo.NewPostgres(db)
 
 	if len(os.Args) > 1 && os.Args[1] == "create-api-key" {
@@ -73,7 +80,7 @@ func main() {
 	engine := engine.NewMemoryEngine(bwaiClient, memoryRepo, cfg.AI.SchemaModel, cfg.AI.EmbeddingModel)
 
 	log.Println("Initializing API server...")
-	server := api.NewServer(engine)
+	server := api.NewServer(engine, accountSvc, agentService)
 	go func() {
 		log.Printf("Starting HTTP server on port %s", cfg.Port)
 		if err := server.Start(cfg.Port); err != nil && !errors.Is(err, http.ErrServerClosed) {

@@ -10,6 +10,24 @@ definitions:
       status:
         type: string
     type: object
+  memory.Agent:
+    properties:
+      account_id:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  memory.AgentCreateBody:
+    properties:
+      name:
+        type: string
+    type: object
   memory.ConversationMessage:
     properties:
       content:
@@ -185,6 +203,19 @@ definitions:
       text:
         type: string
     type: object
+  memory.Session:
+    properties:
+      account_id:
+        type: string
+      agent_id:
+        type: string
+      closed_at:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+    type: object
   memory.SourceKind:
     enum:
     - SYSTEM
@@ -222,6 +253,240 @@ info:
   title: Agent Memory API
   version: "1.0"
 paths:
+  /agents:
+    post:
+      consumes:
+      - application/json
+      description: Create a new agent under the authenticated account.
+      parameters:
+      - description: Create Agent Body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/memory.AgentCreateBody'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/memory.Agent'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiError'
+      security:
+      - ApiKeyAuth: []
+      summary: Create Agent
+      tags:
+      - agents
+  /agents/{agentId}/sessions:
+    post:
+      description: Create a new session for an agent under the authenticated account.
+      parameters:
+      - description: Agent ID
+        in: path
+        name: agentId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/memory.Session'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiError'
+      security:
+      - ApiKeyAuth: []
+      summary: Create Session
+      tags:
+      - sessions
+  /agents/{agentId}/sessions/{id}:
+    delete:
+      description: Close one session for an agent under the authenticated account.
+      parameters:
+      - description: Agent ID
+        in: path
+        name: agentId
+        required: true
+        type: string
+      - description: Session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"status":"deleted"}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiError'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete Session
+      tags:
+      - sessions
+    get:
+      description: Retrieve one session for an agent under the authenticated account.
+      parameters:
+      - description: Agent ID
+        in: path
+        name: agentId
+        required: true
+        type: string
+      - description: Session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/memory.Session'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get Session
+      tags:
+      - sessions
+  /agents/{id}:
+    delete:
+      description: Delete one agent and all related records under the authenticated
+        account.
+      parameters:
+      - description: Agent ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"status":"deleted"}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiError'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete Agent
+      tags:
+      - agents
+    get:
+      description: Retrieve one agent by ID under the authenticated account.
+      parameters:
+      - description: Agent ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/memory.Agent'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get Agent
+      tags:
+      - agents
   /facts/{id}:
     delete:
       consumes:
@@ -251,10 +516,16 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/api.apiError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.apiError'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/api.apiError'
+      security:
+      - ApiKeyAuth: []
       summary: Delete Facts
       tags:
       - facts
@@ -282,6 +553,10 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/api.apiError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.apiError'
         "404":
           description: Not Found
           schema:
@@ -290,6 +565,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/api.apiError'
+      security:
+      - ApiKeyAuth: []
       summary: Get Fact
       tags:
       - facts
@@ -320,6 +597,10 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/api.apiError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.apiError'
         "404":
           description: Not Found
           schema:
@@ -328,6 +609,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/api.apiError'
+      security:
+      - ApiKeyAuth: []
       summary: Update Fact
       tags:
       - facts
@@ -368,10 +651,16 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/api.apiError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.apiError'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/api.apiError'
+      security:
+      - ApiKeyAuth: []
       summary: Process Contextual Memory
       tags:
       - memory
@@ -398,11 +687,22 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/api.apiError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.apiError'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/api.apiError'
+      security:
+      - ApiKeyAuth: []
       summary: Add Factual Memory
       tags:
       - memory
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

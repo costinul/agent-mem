@@ -148,6 +148,10 @@ func (e *MemoryEngine) AddFactual(ctx context.Context, input models.FactualInput
 }
 
 func (e *MemoryEngine) GetFact(ctx context.Context, factID string, includeSources bool) (models.ReturnedFact, error) {
+	return e.GetFactForAccount(ctx, "", factID, includeSources)
+}
+
+func (e *MemoryEngine) GetFactForAccount(ctx context.Context, accountID, factID string, includeSources bool) (models.ReturnedFact, error) {
 	fact, err := e.repo.GetFactByID(ctx, factID)
 	if err != nil {
 		return models.ReturnedFact{}, fmt.Errorf("get fact: %w", err)
@@ -155,10 +159,17 @@ func (e *MemoryEngine) GetFact(ctx context.Context, factID string, includeSource
 	if fact == nil {
 		return models.ReturnedFact{}, errors.New("fact not found")
 	}
+	if strings.TrimSpace(accountID) != "" && fact.AccountID != strings.TrimSpace(accountID) {
+		return models.ReturnedFact{}, errors.New("fact not found")
+	}
 	return e.mapFactForOutput(ctx, *fact, includeSources)
 }
 
 func (e *MemoryEngine) UpdateFact(ctx context.Context, factID string, text string, source models.SourceKind) (models.ReturnedFact, error) {
+	return e.UpdateFactForAccount(ctx, "", factID, text, source)
+}
+
+func (e *MemoryEngine) UpdateFactForAccount(ctx context.Context, accountID, factID string, text string, source models.SourceKind) (models.ReturnedFact, error) {
 	if strings.TrimSpace(text) == "" {
 		return models.ReturnedFact{}, errors.New("text is required")
 	}
@@ -167,6 +178,9 @@ func (e *MemoryEngine) UpdateFact(ctx context.Context, factID string, text strin
 		return models.ReturnedFact{}, fmt.Errorf("get fact: %w", err)
 	}
 	if fact == nil {
+		return models.ReturnedFact{}, errors.New("fact not found")
+	}
+	if strings.TrimSpace(accountID) != "" && fact.AccountID != strings.TrimSpace(accountID) {
 		return models.ReturnedFact{}, errors.New("fact not found")
 	}
 
@@ -186,6 +200,10 @@ func (e *MemoryEngine) UpdateFact(ctx context.Context, factID string, text strin
 }
 
 func (e *MemoryEngine) DeleteFacts(ctx context.Context, factIDs []string, source models.SourceKind) error {
+	return e.DeleteFactsForAccount(ctx, "", factIDs, source)
+}
+
+func (e *MemoryEngine) DeleteFactsForAccount(ctx context.Context, accountID string, factIDs []string, source models.SourceKind) error {
 	if len(factIDs) == 0 {
 		return errors.New("fact_ids are required")
 	}
@@ -197,11 +215,28 @@ func (e *MemoryEngine) DeleteFacts(ctx context.Context, factIDs []string, source
 		if fact == nil {
 			continue
 		}
+		if strings.TrimSpace(accountID) != "" && fact.AccountID != strings.TrimSpace(accountID) {
+			continue
+		}
 		if err := e.ensureSourceCanMutateFact(ctx, source, *fact); err != nil {
 			return err
 		}
 	}
-	return e.repo.DeleteFacts(ctx, factIDs)
+	authorizedIDs := make([]string, 0, len(factIDs))
+	for _, factID := range factIDs {
+		fact, err := e.repo.GetFactByID(ctx, factID)
+		if err != nil {
+			return fmt.Errorf("get fact %s: %w", factID, err)
+		}
+		if fact == nil {
+			continue
+		}
+		if strings.TrimSpace(accountID) != "" && fact.AccountID != strings.TrimSpace(accountID) {
+			continue
+		}
+		authorizedIDs = append(authorizedIDs, factID)
+	}
+	return e.repo.DeleteFacts(ctx, authorizedIDs)
 }
 
 func (e *MemoryEngine) persistAndDecomposeSources(ctx context.Context, eventID, sessionID string, inputs []models.InputItem) ([]models.Source, []models.Decomposition, error) {

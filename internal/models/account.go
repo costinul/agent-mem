@@ -17,6 +17,14 @@ type Agent struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type Session struct {
+	ID        string     `json:"id"`
+	AccountID string     `json:"account_id"`
+	AgentID   string     `json:"agent_id"`
+	CreatedAt time.Time  `json:"created_at"`
+	ClosedAt  *time.Time `json:"closed_at"`
+}
+
 type APIKey struct {
 	ID        string     `json:"id"`
 	AccountID string     `json:"account_id"`

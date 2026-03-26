@@ -1,4 +1,0 @@
-name: health_check
-description: Starter prompt placeholder for agent-mem.
-template: |
-  You are the memory engine.
