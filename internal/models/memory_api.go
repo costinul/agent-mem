@@ -9,8 +9,8 @@ import "time"
 // MemoryInput is the request body for the contextual smart pipeline.
 type MemoryInput struct {
 	AccountID      string      `json:"-" swaggerignore:"true"`
-	AgentID        string      `json:"agent_id"`
-	SessionID      string      `json:"session_id"`
+	AgentID        string      `json:"-" swaggerignore:"true"`
+	ThreadID       string      `json:"thread_id"`
 	IncludeSources bool        `json:"include_sources"` // When true, return original source content with facts.
 	MessageHistory int         `json:"message_history"` // Number of recent raw messages to return. 0 = facts only.
 	Inputs         []InputItem `json:"inputs"`
@@ -47,7 +47,7 @@ type ReturnedFact struct {
 type ConversationMessage struct {
 	SourceID  string     `json:"source_id"`
 	EventID   string     `json:"event_id"`
-	SessionID string     `json:"session_id"`
+	ThreadID  string     `json:"thread_id"`
 	Kind      SourceKind `json:"kind"`
 	Content   string     `json:"content"`
 	CreatedAt time.Time  `json:"created_at"`
@@ -74,11 +74,10 @@ type FactDeleteRequest struct {
 }
 
 // FactualInput is the request body for the factual interface.
-// SessionID is optional; when omitted, facts are agent/account scoped.
 type FactualInput struct {
 	AccountID string      `json:"-" swaggerignore:"true"`
-	AgentID   string      `json:"agent_id"`
-	SessionID string      `json:"session_id"`
+	AgentID   string      `json:"-" swaggerignore:"true"`
+	ThreadID  string      `json:"thread_id"`
 	Inputs    []InputItem `json:"inputs"`
 }
 
@@ -90,4 +89,8 @@ type FactUpdateBody struct {
 type FactDeleteBody struct {
 	FactIDs []string   `json:"fact_ids"`
 	Source  SourceKind `json:"source"`
+}
+
+type ThreadCreateBody struct {
+	AgentID string `json:"agent_id"`
 }

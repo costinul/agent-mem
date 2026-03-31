@@ -13,17 +13,17 @@ import (
 )
 
 type InMemoryRepository struct {
-	mu       sync.RWMutex
-	events   map[string]models.Event
-	sources  map[string]models.Source
-	facts    map[string]models.Fact
+	mu      sync.RWMutex
+	events  map[string]models.Event
+	sources map[string]models.Source
+	facts   map[string]models.Fact
 }
 
 func NewInMemory() *InMemoryRepository {
 	return &InMemoryRepository{
-		events:   make(map[string]models.Event),
-		sources:  make(map[string]models.Source),
-		facts:    make(map[string]models.Fact),
+		events:  make(map[string]models.Event),
+		sources: make(map[string]models.Source),
+		facts:   make(map[string]models.Fact),
 	}
 }
 
@@ -95,14 +95,14 @@ func (r *InMemoryRepository) ListSourcesByEventID(_ context.Context, eventID str
 	return sources, nil
 }
 
-func (r *InMemoryRepository) ListConversationSourcesBySessionID(_ context.Context, sessionID string, limit int) ([]models.Source, error) {
+func (r *InMemoryRepository) ListConversationSourcesByThreadID(_ context.Context, threadID string, limit int) ([]models.Source, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
 	sources := make([]models.Source, 0)
 	for _, source := range r.sources {
 		event, ok := r.events[source.EventID]
-		if !ok || event.SessionID == nil || *event.SessionID != sessionID {
+		if !ok || event.ThreadID == nil || *event.ThreadID != threadID {
 			continue
 		}
 		if source.Kind != models.SOURCE_USER && source.Kind != models.SOURCE_AGENT {
@@ -155,7 +155,7 @@ func (r *InMemoryRepository) GetFactByID(_ context.Context, factID string) (*mod
 	return &copy, nil
 }
 
-func (r *InMemoryRepository) ListFactsByScope(_ context.Context, accountID string, agentID, sessionID *string) ([]models.Fact, error) {
+func (r *InMemoryRepository) ListFactsByScope(_ context.Context, accountID string, agentID, threadID *string) ([]models.Fact, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -169,8 +169,8 @@ func (r *InMemoryRepository) ListFactsByScope(_ context.Context, accountID strin
 				continue
 			}
 		}
-		if sessionID != nil {
-			if fact.SessionID == nil || *fact.SessionID != *sessionID {
+		if threadID != nil {
+			if fact.ThreadID == nil || *fact.ThreadID != *threadID {
 				continue
 			}
 		}
@@ -224,8 +224,8 @@ func (r *InMemoryRepository) SearchFactsByEmbedding(_ context.Context, params Se
 				continue
 			}
 		}
-		if params.SessionID != nil {
-			if fact.SessionID == nil || *fact.SessionID != *params.SessionID {
+		if params.ThreadID != nil {
+			if fact.ThreadID == nil || *fact.ThreadID != *params.ThreadID {
 				continue
 			}
 		}
@@ -278,4 +278,3 @@ func cosineSimilarity(a, b []float64) float64 {
 	}
 	return dot / (math.Sqrt(normA) * math.Sqrt(normB))
 }
-

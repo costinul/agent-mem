@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -36,8 +36,6 @@ func TestContextualHandlerValidation(t *testing.T) {
 func TestFactualHandlerSuccess(t *testing.T) {
 	server := newTestServer()
 	body := models.FactualInput{
-		AgentID:   "",
-		SessionID: "sess-1",
 		Inputs: []models.InputItem{
 			{Kind: models.SOURCE_USER, Content: "Always include tests", ContentType: "text/plain"},
 		},
@@ -139,15 +137,23 @@ func (m *mockAgentRepo) DeleteAgentByID(context.Context, string, string) (bool, 
 	return false, nil
 }
 
-func (m *mockAgentRepo) CreateSession(context.Context, string, string) (*models.Session, error) {
+func (m *mockAgentRepo) CreateThread(context.Context, string, string) (*models.Thread, error) {
 	return nil, errors.New("unexpected call")
 }
 
-func (m *mockAgentRepo) GetSessionByID(context.Context, string, string, string) (*models.Session, error) {
-	return nil, nil
+func (m *mockAgentRepo) GetThreadByID(_ context.Context, accountID, threadID string) (*models.Thread, error) {
+	if accountID != testAccountID || threadID == "" {
+		return nil, nil
+	}
+	return &models.Thread{
+		ID:        threadID,
+		AccountID: accountID,
+		AgentID:   "33333333-3333-3333-3333-333333333333",
+		CreatedAt: time.Now().UTC(),
+	}, nil
 }
 
-func (m *mockAgentRepo) CloseSessionByID(context.Context, string, string, string) (bool, error) {
+func (m *mockAgentRepo) DeleteThreadByID(context.Context, string, string) (bool, error) {
 	return false, nil
 }
 

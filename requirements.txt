@@ -8,7 +8,7 @@ A zero-loss memory engine for AI agents. It ingests all interactions, decomposes
 
 Account → owns everything. Billing, API keys, global settings.
 Agent → a specific agent or application under the account. Each has its own memory pool.
-Session → a single run or conversation within an agent.
+Thread → an isolated conversation memory within an agent.
 
 ---
 
@@ -21,14 +21,14 @@ SourceKind — classifies the origin of data entering the memory engine.
 - TOOL — Output from any tool or sub-agent invoked by the agent. Web search, calculators, APIs, code executors, other specialized agents.
 - DOCUMENT — Any non-code reference material. PDFs, text files, spreadsheets, manuals, specs, contracts.
 - CODE — Source code, configuration files, schemas, and technical artifacts.
-- SYSTEM — Current date, session information, and environment variables. Immutable.
+- SYSTEM — Current date, thread information, and environment variables. Immutable.
 
 ### Source Trust Hierarchy
 
 A source can only alter facts from equal or lower trust level.
 
 ```
-SYSTEM (highest) — immutable, set at session start, outside hierarchy
+SYSTEM (highest) — immutable, set at thread start, outside hierarchy
 USER
 AGENT
 TOOL
@@ -65,21 +65,21 @@ Classifies how a fact behaves during retrieval.
 ### Fact Scoping
 Facts live at one of three levels:
 
-- Session — relevant only during this conversation.
-- Agent — persists across sessions for this agent.
+- Thread — relevant only during this conversation.
+- Agent — persists across threads for this agent.
 - Account — shared across all agents under the account.
 
-Contextual retrieval searches all three levels: session → agent → account.
+Contextual retrieval searches all three levels: thread → agent → account.
 
 ---
 
 ## Two Interfaces
 
 ### Contextual Interface
-Used by agents during a live conversation or sequence. Every call is a read-write operation. Conversation-aware. Requires a SessionID.
+Used by agents during a live conversation or sequence. Every call is a read-write operation. Conversation-aware. Requires a ThreadID.
 
 ### Factual Interface
-Used by background services, admin tools, or agents outside of a conversation to directly manage memory. No conversation awareness. SessionID optional — with SessionID it modifies session-level facts, without it modifies agent or account-level facts.
+Used by background services or agents to directly manage memory inside an existing thread. No conversation-aware retrieval step. Requires a ThreadID.
 
 Both interfaces operate on the same facts in the same database. A fact stored via factual is retrievable in contextual, and vice versa.
 
@@ -92,8 +92,7 @@ Both interfaces operate on the same facts in the same database. A fact stored vi
 ```
 {
   AccountID: UUID (required),
-  AgentID: UUID (required),
-  SessionID: UUID (required),
+  ThreadID: UUID (required),
   IncludeSources: true/false,
   MessageHistory: 0,
   Inputs: [
@@ -113,13 +112,13 @@ USER and AGENT sources are context providers. They carry the intent behind other
 
 - If the event contains a USER or AGENT source: extract its text and use it as context header when decomposing every other source in the same event. Prompt pattern: "The user/agent said: [message]. Given this context, extract facts from the following [source type] content."
 - If no USER or AGENT source exists in the event, decompose each source independently.
-- USER/AGENT sources: LLM prompt with current input + recent raw messages from session. Resolves ambiguous input into self-contained statements. Extracts facts and queries. Queries are written as fact-oriented statements for better vector search accuracy.
+- USER/AGENT sources: LLM prompt with current input + recent raw messages from the thread. Resolves ambiguous input into self-contained statements. Extracts facts and queries. Queries are written as fact-oriented statements for better vector search accuracy.
 - TOOL, DOCUMENT, CODE, SYSTEM sources: LLM prompt with content only (plus USER/AGENT context if present in same event). Extracts facts. Stores them in database. Flow exits here — no search, no evaluate.
 
 ### Step 2 — Vector Search
 
 - Each fact and each query from Step 1 is used as a separate vector search.
-- Searches across all three scopes: session, agent, and account.
+- Searches across all three scopes: thread, agent, and account.
 - Only results above similarity threshold are returned.
 - Results are merged and deduplicated.
 
@@ -151,7 +150,7 @@ USER and AGENT sources are context providers. They carry the intent behind other
 
 ### Add Memory
 
-- Input: text + source type + metadata. AgentID required. SessionID optional.
+- Input: text + source type + metadata. ThreadID required.
 - Text is decomposed into facts via LLM and stored.
 - No conversation awareness, no resolve step.
 - Returns stored facts.
@@ -166,7 +165,7 @@ USER and AGENT sources are context providers. They carry the intent behind other
 
 ## Storage
 
-- Postgres — facts, embeddings (pgvector), events, sources, sessions, agents, accounts.
+- Postgres — facts, embeddings (pgvector), events, sources, threads, agents, accounts.
 - S3-compatible bucket — original files (documents, code files, anything binary). Source row points to bucket path.
 - No Redis. Postgres handles everything.
 - Encryption at rest for all data.
@@ -174,9 +173,9 @@ USER and AGENT sources are context providers. They carry the intent behind other
 ### Storage Hierarchy
 
 ```
-events         — one row per API call. Scoped to account, agent, session.
+events         — one row per API call. Scoped to account, agent, thread.
 sources        — one row per input within an event. Has kind, content (text) or bucket_path (file), content_type, size_bytes, metadata.
-facts          — extracted from a source. References source_id. Scoped to account, agent, session.
+facts          — extracted from a source. References source_id. Scoped to account, agent, thread.
 ```
 
 Text inputs store content inline in the `sources` table. File inputs (DOCUMENT, CODE, or any binary) are uploaded to the bucket and the `sources` row stores `bucket_path`. Exactly one of `content` or `bucket_path` is populated per source row. `size_bytes` stores original payload size.
@@ -193,24 +192,24 @@ GET    /agents/:id           — retrieve agent info
 DELETE /agents/:id           — delete agent and all its memory
 ```
 
-### Sessions
+### Threads
 
 ```
-POST   /agents/:id/sessions          — create a new session
-GET    /agents/:id/sessions/:id      — retrieve session info
-DELETE /agents/:id/sessions/:id      — end/delete a session
+POST   /threads            — create a new thread for an agent
+GET    /threads/:id        — retrieve thread info
+DELETE /threads/:id        — delete a thread and its thread-scoped data
 ```
 
 ### Contextual Interface
 
 ```
-POST /memory/contextual     — main smart pipeline. Requires SessionID. Read-write.
+POST /memory/contextual     — main smart pipeline. Requires ThreadID. Read-write.
 ```
 
 ### Factual Interface
 
 ```
-POST   /memory/factual      — add memory. SessionID optional.
+POST   /memory/factual      — add memory to an existing thread.
 GET    /facts/:id            — retrieve fact by ID.
 PUT    /facts/:id            — update fact by ID. Requires source level.
 DELETE /facts/:id            — delete fact by ID or array. Requires source level.

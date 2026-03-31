@@ -61,11 +61,11 @@ func TestInMemoryEventAndSources(t *testing.T) {
 	repo := NewInMemory()
 	ctx := context.Background()
 
-	sessionID := "sess-1"
+	threadID := "thread-1"
 	event, err := repo.InsertEvent(ctx, models.Event{
 		AccountID: "acct-1",
 		AgentID:   "agent-1",
-		SessionID: &sessionID,
+		ThreadID:  &threadID,
 	})
 	if err != nil {
 		t.Fatalf("InsertEvent() error = %v", err)
@@ -125,15 +125,15 @@ func TestInMemoryEventAndSources(t *testing.T) {
 	}
 }
 
-func TestInMemoryConversationSourcesBySession(t *testing.T) {
+func TestInMemoryConversationSourcesByThread(t *testing.T) {
 	repo := NewInMemory()
 	ctx := context.Background()
 
-	sessionID := "sess-1"
+	threadID := "thread-1"
 	event, err := repo.InsertEvent(ctx, models.Event{
 		AccountID: "acct-1",
 		AgentID:   "agent-1",
-		SessionID: &sessionID,
+		ThreadID:  &threadID,
 	})
 	if err != nil {
 		t.Fatalf("InsertEvent() error = %v", err)
@@ -172,16 +172,16 @@ func TestInMemoryConversationSourcesBySession(t *testing.T) {
 		t.Fatalf("InsertSource() error = %v", err)
 	}
 
-	sources, err := repo.ListConversationSourcesBySessionID(ctx, sessionID, 10)
+	sources, err := repo.ListConversationSourcesByThreadID(ctx, threadID, 10)
 	if err != nil {
-		t.Fatalf("ListConversationSourcesBySessionID() error = %v", err)
+		t.Fatalf("ListConversationSourcesByThreadID() error = %v", err)
 	}
 	if len(sources) != 2 {
-		t.Fatalf("ListConversationSourcesBySessionID() len = %d, want 2", len(sources))
+		t.Fatalf("ListConversationSourcesByThreadID() len = %d, want 2", len(sources))
 	}
 	for _, source := range sources {
 		if source.Kind != models.SOURCE_USER && source.Kind != models.SOURCE_AGENT {
-			t.Fatalf("ListConversationSourcesBySessionID() returned non-conversation kind: %s", source.Kind)
+			t.Fatalf("ListConversationSourcesByThreadID() returned non-conversation kind: %s", source.Kind)
 		}
 	}
 }
@@ -191,11 +191,11 @@ func TestInMemorySearchFactsByEmbedding(t *testing.T) {
 	ctx := context.Background()
 
 	agentID := "agent-1"
-	sessionID := "sess-1"
+	threadID := "thread-1"
 	_, err := repo.InsertFact(ctx, models.Fact{
 		AccountID: "acct-1",
 		AgentID:   &agentID,
-		SessionID: &sessionID,
+		ThreadID:  &threadID,
 		SourceID:  "source-1",
 		Kind:      models.FACT_KIND_KNOWLEDGE,
 		Text:      "postgres is primary db",
@@ -218,7 +218,7 @@ func TestInMemorySearchFactsByEmbedding(t *testing.T) {
 	results, err := repo.SearchFactsByEmbedding(ctx, SearchByEmbeddingParams{
 		AccountID:     "acct-1",
 		AgentID:       &agentID,
-		SessionID:     &sessionID,
+		ThreadID:      &threadID,
 		Embedding:     []float64{1, 0, 0},
 		MinSimilarity: 0.7,
 		Limit:         5,

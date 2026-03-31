@@ -114,107 +114,110 @@ func deleteAgentHandler(agentSvc *agent.Service) http.HandlerFunc {
 	}
 }
 
-// createSessionHandler creates a session for an agent in the authenticated account.
-// @Summary Create Session
-// @Description Create a new session for an agent under the authenticated account.
-// @Tags sessions
+// createThreadHandler creates a thread for an agent in the authenticated account.
+// @Summary Create Thread
+// @Description Create a new thread for an agent under the authenticated account.
+// @Tags threads
+// @Accept json
 // @Produce json
-// @Param agentId path string true "Agent ID"
-// @Success 201 {object} memory.Session
+// @Param body body memory.ThreadCreateBody true "Create Thread Body"
+// @Success 201 {object} memory.Thread
 // @Failure 400 {object} apiError
 // @Failure 401 {object} apiError
 // @Failure 404 {object} apiError
 // @Failure 500 {object} apiError
 // @Security ApiKeyAuth
-// @Router /agents/{agentId}/sessions [post]
-func createSessionHandler(agentSvc *agent.Service) http.HandlerFunc {
+// @Router /threads [post]
+func createThreadHandler(agentSvc *agent.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		accountID := accountIDFromContext(r.Context())
 		if accountID == "" {
 			writeJSON(w, http.StatusUnauthorized, apiError{Error: "missing account context"})
 			return
 		}
-		agentID := strings.TrimSpace(r.PathValue("agentId"))
+
+		var body models.ThreadCreateBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, apiError{Error: "invalid JSON payload"})
+			return
+		}
+		agentID := strings.TrimSpace(body.AgentID)
 		if agentID == "" {
 			writeJSON(w, http.StatusBadRequest, apiError{Error: "agent id is required"})
 			return
 		}
 
-		session, err := agentSvc.CreateSession(r.Context(), accountID, agentID)
+		thread, err := agentSvc.CreateThread(r.Context(), accountID, agentID)
 		if err != nil {
 			writeEngineError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusCreated, session)
+		writeJSON(w, http.StatusCreated, thread)
 	}
 }
 
-// getSessionHandler gets a session for an agent in the authenticated account.
-// @Summary Get Session
-// @Description Retrieve one session for an agent under the authenticated account.
-// @Tags sessions
+// getThreadHandler gets a thread in the authenticated account.
+// @Summary Get Thread
+// @Description Retrieve one thread under the authenticated account.
+// @Tags threads
 // @Produce json
-// @Param agentId path string true "Agent ID"
-// @Param id path string true "Session ID"
-// @Success 200 {object} memory.Session
+// @Param id path string true "Thread ID"
+// @Success 200 {object} memory.Thread
 // @Failure 400 {object} apiError
 // @Failure 401 {object} apiError
 // @Failure 404 {object} apiError
 // @Failure 500 {object} apiError
 // @Security ApiKeyAuth
-// @Router /agents/{agentId}/sessions/{id} [get]
-func getSessionHandler(agentSvc *agent.Service) http.HandlerFunc {
+// @Router /threads/{id} [get]
+func getThreadHandler(agentSvc *agent.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		accountID := accountIDFromContext(r.Context())
 		if accountID == "" {
 			writeJSON(w, http.StatusUnauthorized, apiError{Error: "missing account context"})
 			return
 		}
-		agentID := strings.TrimSpace(r.PathValue("agentId"))
-		sessionID := strings.TrimSpace(r.PathValue("id"))
-		if agentID == "" || sessionID == "" {
-			writeJSON(w, http.StatusBadRequest, apiError{Error: "agent id and session id are required"})
+		threadID := strings.TrimSpace(r.PathValue("id"))
+		if threadID == "" {
+			writeJSON(w, http.StatusBadRequest, apiError{Error: "thread id is required"})
 			return
 		}
 
-		session, err := agentSvc.GetSession(r.Context(), accountID, agentID, sessionID)
+		thread, err := agentSvc.GetThread(r.Context(), accountID, threadID)
 		if err != nil {
 			writeEngineError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, session)
+		writeJSON(w, http.StatusOK, thread)
 	}
 }
 
-// deleteSessionHandler closes a session for an agent in the authenticated account.
-// @Summary Delete Session
-// @Description Close one session for an agent under the authenticated account.
-// @Tags sessions
+// deleteThreadHandler deletes a thread from the authenticated account.
+// @Summary Delete Thread
+// @Description Delete one thread and all related thread-scoped records under the authenticated account.
+// @Tags threads
 // @Produce json
-// @Param agentId path string true "Agent ID"
-// @Param id path string true "Session ID"
+// @Param id path string true "Thread ID"
 // @Success 200 {object} map[string]string "{"status":"deleted"}"
 // @Failure 400 {object} apiError
 // @Failure 401 {object} apiError
 // @Failure 404 {object} apiError
 // @Failure 500 {object} apiError
 // @Security ApiKeyAuth
-// @Router /agents/{agentId}/sessions/{id} [delete]
-func deleteSessionHandler(agentSvc *agent.Service) http.HandlerFunc {
+// @Router /threads/{id} [delete]
+func deleteThreadHandler(agentSvc *agent.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		accountID := accountIDFromContext(r.Context())
 		if accountID == "" {
 			writeJSON(w, http.StatusUnauthorized, apiError{Error: "missing account context"})
 			return
 		}
-		agentID := strings.TrimSpace(r.PathValue("agentId"))
-		sessionID := strings.TrimSpace(r.PathValue("id"))
-		if agentID == "" || sessionID == "" {
-			writeJSON(w, http.StatusBadRequest, apiError{Error: "agent id and session id are required"})
+		threadID := strings.TrimSpace(r.PathValue("id"))
+		if threadID == "" {
+			writeJSON(w, http.StatusBadRequest, apiError{Error: "thread id is required"})
 			return
 		}
 
-		if err := agentSvc.CloseSession(r.Context(), accountID, agentID, sessionID); err != nil {
+		if err := agentSvc.DeleteThread(r.Context(), accountID, threadID); err != nil {
 			writeEngineError(w, err)
 			return
 		}

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"agentmem/internal/agent"
 	"agentmem/internal/engine"
 	models "agentmem/internal/models"
 )
@@ -26,7 +27,7 @@ type apiError struct {
 // @Failure 500 {object} apiError
 // @Security ApiKeyAuth
 // @Router /memory/contextual [post]
-func contextualHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
+func contextualHandler(memEngine *engine.MemoryEngine, agentSvc *agent.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		accountID := accountIDFromContext(r.Context())
 		if accountID == "" {
@@ -39,6 +40,10 @@ func contextualHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
 			return
 		}
 		input.AccountID = accountID
+		if err := populateAgentFromThread(r, agentSvc, &input.AgentID, input.ThreadID); err != nil {
+			writeEngineError(w, err)
+			return
+		}
 		output, err := memEngine.ProcessContextual(r.Context(), input)
 		if err != nil {
 			writeEngineError(w, err)
@@ -61,7 +66,7 @@ func contextualHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
 // @Failure 500 {object} apiError
 // @Security ApiKeyAuth
 // @Router /memory/factual [post]
-func factualHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
+func factualHandler(memEngine *engine.MemoryEngine, agentSvc *agent.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		accountID := accountIDFromContext(r.Context())
 		if accountID == "" {
@@ -74,6 +79,10 @@ func factualHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
 			return
 		}
 		input.AccountID = accountID
+		if err := populateAgentFromThread(r, agentSvc, &input.AgentID, input.ThreadID); err != nil {
+			writeEngineError(w, err)
+			return
+		}
 		output, err := memEngine.AddFactual(r.Context(), input)
 		if err != nil {
 			writeEngineError(w, err)
@@ -253,4 +262,17 @@ func dedupeStrings(values []string) []string {
 		result = append(result, value)
 	}
 	return result
+}
+
+func populateAgentFromThread(r *http.Request, agentSvc *agent.Service, agentID *string, threadID string) error {
+	threadID = strings.TrimSpace(threadID)
+	if threadID == "" {
+		return nil
+	}
+	thread, err := agentSvc.GetThread(r.Context(), accountIDFromContext(r.Context()), threadID)
+	if err != nil {
+		return err
+	}
+	*agentID = thread.AgentID
+	return nil
 }

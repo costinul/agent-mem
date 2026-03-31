@@ -29,25 +29,24 @@ CREATE TABLE agents (
 );
 CREATE INDEX idx_agents_account_id ON agents(account_id);
 
-CREATE TABLE sessions (
+CREATE TABLE threads (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    closed_at TIMESTAMPTZ
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_sessions_account_id ON sessions(account_id);
-CREATE INDEX idx_sessions_agent_id ON sessions(agent_id);
+CREATE INDEX idx_threads_account_id ON threads(account_id);
+CREATE INDEX idx_threads_agent_id ON threads(agent_id);
 
 CREATE TABLE events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
-    session_id UUID REFERENCES sessions(id) ON DELETE SET NULL,
+    thread_id UUID REFERENCES threads(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_events_account_id ON events(account_id);
-CREATE INDEX idx_events_session_id ON events(session_id);
+CREATE INDEX idx_events_thread_id ON events(thread_id);
 
 -- Exactly one of content or bucket_path must be non-null.
 CREATE TABLE sources (
@@ -71,7 +70,7 @@ CREATE TABLE facts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     agent_id UUID REFERENCES agents(id) ON DELETE CASCADE,
-    session_id UUID REFERENCES sessions(id) ON DELETE SET NULL,
+    thread_id UUID REFERENCES threads(id) ON DELETE CASCADE,
     source_id UUID NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
     kind TEXT NOT NULL CHECK (kind IN ('KNOWLEDGE','RULE','PREFERENCE')),
     text TEXT NOT NULL,
@@ -80,5 +79,9 @@ CREATE TABLE facts (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_facts_account_id ON facts(account_id);
-CREATE INDEX idx_facts_session_id ON facts(session_id);
+CREATE INDEX idx_facts_thread_id ON facts(thread_id);
 CREATE INDEX idx_facts_source_id ON facts(source_id);
+CREATE INDEX idx_facts_embedding_cosine
+ON facts
+USING ivfflat (embedding vector_cosine_ops)
+WITH (lists = 100);

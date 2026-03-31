@@ -16,18 +16,18 @@ func (e *MemoryEngine) ProcessContextual(ctx context.Context, input models.Memor
 		return models.MemoryOutput{}, err
 	}
 
-	log.Printf("contextual pipeline start account=%s agent=%s session=%s inputs=%d", input.AccountID, input.AgentID, input.SessionID, len(input.Inputs))
-	sessionID := input.SessionID
+	log.Printf("contextual pipeline start account=%s agent=%s thread=%s inputs=%d", input.AccountID, input.AgentID, input.ThreadID, len(input.Inputs))
+	threadID := input.ThreadID
 	event, err := e.repo.InsertEvent(ctx, models.Event{
 		AccountID: input.AccountID,
 		AgentID:   input.AgentID,
-		SessionID: &sessionID,
+		ThreadID:  &threadID,
 	})
 	if err != nil {
 		return models.MemoryOutput{}, fmt.Errorf("insert event: %w", err)
 	}
 
-	storedSources, decompositions, err := e.persistAndDecomposeSources(ctx, event.ID, input.SessionID, input.Inputs)
+	storedSources, decompositions, err := e.persistAndDecomposeSources(ctx, event.ID, input.ThreadID, input.Inputs)
 	if err != nil {
 		return models.MemoryOutput{}, err
 	}
@@ -37,7 +37,7 @@ func (e *MemoryEngine) ProcessContextual(ctx context.Context, input models.Memor
 		return models.MemoryOutput{}, err
 	}
 
-	retrieved, err := e.retrieveFacts(ctx, input.AccountID, input.AgentID, input.SessionID, queryEmbeddings)
+	retrieved, err := e.retrieveFacts(ctx, input.AccountID, input.AgentID, input.ThreadID, queryEmbeddings)
 	if err != nil {
 		return models.MemoryOutput{}, err
 	}
@@ -68,11 +68,11 @@ func validateContextualInput(input models.MemoryInput) error {
 	if strings.TrimSpace(input.AccountID) == "" {
 		return errors.New("account_id is required")
 	}
-	if strings.TrimSpace(input.AgentID) == "" {
-		return errors.New("agent_id is required")
+	if strings.TrimSpace(input.ThreadID) == "" {
+		return errors.New("thread_id is required")
 	}
-	if strings.TrimSpace(input.SessionID) == "" {
-		return errors.New("session_id is required")
+	if strings.TrimSpace(input.AgentID) == "" {
+		return errors.New("thread agent is required")
 	}
 	if len(input.Inputs) == 0 {
 		return errors.New("inputs are required")
@@ -108,22 +108,22 @@ func (e *MemoryEngine) buildSearchEmbeddings(ctx context.Context, decompositions
 	return embeddings, nil
 }
 
-func (e *MemoryEngine) retrieveFacts(ctx context.Context, accountID, agentID, sessionID string, embeddings [][]float64) ([]models.Fact, error) {
+func (e *MemoryEngine) retrieveFacts(ctx context.Context, accountID, agentID, threadID string, embeddings [][]float64) ([]models.Fact, error) {
 	aid := ptrString(agentID)
-	sid := ptrString(sessionID)
+	tid := ptrString(threadID)
 	seen := map[string]struct{}{}
 	facts := make([]models.Fact, 0)
 
 	for _, emb := range embeddings {
-		sessionFacts, err := e.repo.SearchFactsByEmbedding(ctx, memoryrepo.SearchByEmbeddingParams{
+		threadFacts, err := e.repo.SearchFactsByEmbedding(ctx, memoryrepo.SearchByEmbeddingParams{
 			AccountID: accountID,
 			AgentID:   aid,
-			SessionID: sid,
+			ThreadID:  tid,
 			Embedding: emb,
 			Limit:     10,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("search session facts: %w", err)
+			return nil, fmt.Errorf("search thread facts: %w", err)
 		}
 		agentFacts, err := e.repo.SearchFactsByEmbedding(ctx, memoryrepo.SearchByEmbeddingParams{
 			AccountID: accountID,
@@ -142,7 +142,7 @@ func (e *MemoryEngine) retrieveFacts(ctx context.Context, accountID, agentID, se
 		if err != nil {
 			return nil, fmt.Errorf("search account facts: %w", err)
 		}
-		facts = appendUniqueFacts(facts, seen, sessionFacts...)
+		facts = appendUniqueFacts(facts, seen, threadFacts...)
 		facts = appendUniqueFacts(facts, seen, agentFacts...)
 		facts = appendUniqueFacts(facts, seen, accountFacts...)
 	}
@@ -171,7 +171,7 @@ func (e *MemoryEngine) applyEvaluateResult(
 		newFact := models.Fact{
 			AccountID: input.AccountID,
 			AgentID:   ptrString(input.AgentID),
-			SessionID: ptrString(input.SessionID),
+			ThreadID:  ptrString(input.ThreadID),
 			SourceID:  sourceID,
 			Kind:      fact.Kind,
 			Text:      fact.Text,

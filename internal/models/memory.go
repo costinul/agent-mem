@@ -12,7 +12,7 @@ import (
 type SourceKind string
 
 const (
-	SOURCE_SYSTEM   SourceKind = "SYSTEM"   // Current date, session info, environment variables. Immutable.
+	SOURCE_SYSTEM   SourceKind = "SYSTEM"   // Current date, thread info, environment variables. Immutable.
 	SOURCE_USER     SourceKind = "USER"     // Input from whoever is initiating the request to the agent.
 	SOURCE_AGENT    SourceKind = "AGENT"    // The agent's own generated output.
 	SOURCE_TOOL     SourceKind = "TOOL"     // Output from any tool or sub-agent invoked by the agent.
@@ -36,8 +36,8 @@ type FactKind string
 
 const (
 	FACT_KIND_KNOWLEDGE  FactKind = "KNOWLEDGE"  // Factual information. Retrieved only when semantically relevant.
-	FACT_KIND_RULE       FactKind = "RULE"        // Always included in retrieval. User-defined rules.
-	FACT_KIND_PREFERENCE FactKind = "PREFERENCE"  // Soft weight for decisions. Retrieved when relevant to choices.
+	FACT_KIND_RULE       FactKind = "RULE"       // Always included in retrieval. User-defined rules.
+	FACT_KIND_PREFERENCE FactKind = "PREFERENCE" // Soft weight for decisions. Retrieved when relevant to choices.
 )
 
 // =====================
@@ -46,25 +46,25 @@ const (
 
 // Event represents a single API call. Groups all sources submitted together.
 type Event struct {
-	ID        string     `json:"id"`
-	AccountID string     `json:"account_id"`
-	AgentID   string     `json:"agent_id"`
-	SessionID *string    `json:"session_id"` // Null means global scope.
-	CreatedAt time.Time  `json:"created_at"`
+	ID        string    `json:"id"`
+	AccountID string    `json:"account_id"`
+	AgentID   string    `json:"agent_id"`
+	ThreadID  *string   `json:"thread_id"` // Null means global scope.
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // Source is a stored input within an event.
 // Exactly one of Content or BucketPath is populated.
 // Text inputs store content inline. File inputs are uploaded to the bucket.
 type Source struct {
-	ID          string    `json:"id"`
-	EventID     string    `json:"event_id"`
+	ID          string     `json:"id"`
+	EventID     string     `json:"event_id"`
 	Kind        SourceKind `json:"kind"`
-	Content     *string   `json:"content"`     // Populated for text inputs.
-	ContentType string    `json:"content_type"`
-	BucketPath  *string   `json:"bucket_path"` // Populated for file inputs stored in S3-compatible bucket.
-	SizeBytes   *int64    `json:"size_bytes"`  // Size of the original payload in bytes.
-	CreatedAt   time.Time `json:"created_at"`
+	Content     *string    `json:"content"` // Populated for text inputs.
+	ContentType string     `json:"content_type"`
+	BucketPath  *string    `json:"bucket_path"` // Populated for file inputs stored in S3-compatible bucket.
+	SizeBytes   *int64     `json:"size_bytes"`  // Size of the original payload in bytes.
+	CreatedAt   time.Time  `json:"created_at"`
 }
 
 // =====================
@@ -76,8 +76,8 @@ type Fact struct {
 	ID        string    `json:"id"`
 	AccountID string    `json:"account_id"`
 	AgentID   *string   `json:"agent_id"`
-	SessionID *string   `json:"session_id"` // Null means agent-level or account-level scope.
-	SourceID  string    `json:"source_id"`  // The source that produced this fact.
+	ThreadID  *string   `json:"thread_id"` // Null means agent-level or account-level scope.
+	SourceID  string    `json:"source_id"` // The source that produced this fact.
 	Kind      FactKind  `json:"kind"`
 	Text      string    `json:"text"`
 	Embedding []float64 `json:"embedding"`

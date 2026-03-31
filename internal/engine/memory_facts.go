@@ -122,8 +122,8 @@ func (e *MemoryEngine) buildOutput(ctx context.Context, input models.MemoryInput
 		output.Facts = append(output.Facts, mapped)
 	}
 
-	if input.MessageHistory > 0 && strings.TrimSpace(input.SessionID) != "" {
-		sources, err := e.repo.ListConversationSourcesBySessionID(ctx, input.SessionID, input.MessageHistory)
+	if input.MessageHistory > 0 && strings.TrimSpace(input.ThreadID) != "" {
+		sources, err := e.repo.ListConversationSourcesByThreadID(ctx, input.ThreadID, input.MessageHistory)
 		if err != nil {
 			return models.MemoryOutput{}, fmt.Errorf("list conversation sources: %w", err)
 		}
@@ -136,7 +136,7 @@ func (e *MemoryEngine) buildOutput(ctx context.Context, input models.MemoryInput
 			output.Messages = append(output.Messages, models.ConversationMessage{
 				SourceID:  source.ID,
 				EventID:   source.EventID,
-				SessionID: input.SessionID,
+				ThreadID:  input.ThreadID,
 				Kind:      source.Kind,
 				Content:   content,
 				CreatedAt: source.CreatedAt,

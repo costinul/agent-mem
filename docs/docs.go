@@ -72,195 +72,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/agents/{agentId}/sessions": {
-            "post": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Create a new session for an agent under the authenticated account.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "sessions"
-                ],
-                "summary": "Create Session",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Agent ID",
-                        "name": "agentId",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/memory.Session"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiError"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiError"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiError"
-                        }
-                    }
-                }
-            }
-        },
-        "/agents/{agentId}/sessions/{id}": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Retrieve one session for an agent under the authenticated account.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "sessions"
-                ],
-                "summary": "Get Session",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Agent ID",
-                        "name": "agentId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Session ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/memory.Session"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiError"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiError"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiError"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Close one session for an agent under the authenticated account.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "sessions"
-                ],
-                "summary": "Delete Session",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Agent ID",
-                        "name": "agentId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Session ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "{\"status\":\"deleted\"}",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiError"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiError"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiError"
-                        }
-                    }
-                }
-            }
-        },
         "/agents/{id}": {
             "get": {
                 "security": [
@@ -707,6 +518,186 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/threads": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Create a new thread for an agent under the authenticated account.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "threads"
+                ],
+                "summary": "Create Thread",
+                "parameters": [
+                    {
+                        "description": "Create Thread Body",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/memory.ThreadCreateBody"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/memory.Thread"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.apiError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.apiError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.apiError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.apiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/threads/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve one thread under the authenticated account.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "threads"
+                ],
+                "summary": "Get Thread",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Thread ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/memory.Thread"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.apiError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.apiError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.apiError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.apiError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Delete one thread and all related thread-scoped records under the authenticated account.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "threads"
+                ],
+                "summary": "Delete Thread",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Thread ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{\"status\":\"deleted\"}",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.apiError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.apiError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.apiError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.apiError"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -769,10 +760,10 @@ const docTemplate = `{
                 "kind": {
                     "$ref": "#/definitions/memory.SourceKind"
                 },
-                "session_id": {
+                "source_id": {
                     "type": "string"
                 },
-                "source_id": {
+                "thread_id": {
                     "type": "string"
                 }
             }
@@ -834,15 +825,15 @@ const docTemplate = `{
                 "kind": {
                     "$ref": "#/definitions/memory.FactKind"
                 },
-                "session_id": {
-                    "description": "Null means agent-level or account-level scope.",
-                    "type": "string"
-                },
                 "source_id": {
                     "description": "The source that produced this fact.",
                     "type": "string"
                 },
                 "text": {
+                    "type": "string"
+                },
+                "thread_id": {
+                    "description": "Null means agent-level or account-level scope.",
                     "type": "string"
                 },
                 "updated_at": {
@@ -901,16 +892,13 @@ const docTemplate = `{
         "memory.FactualInput": {
             "type": "object",
             "properties": {
-                "agent_id": {
-                    "type": "string"
-                },
                 "inputs": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/memory.InputItem"
                     }
                 },
-                "session_id": {
+                "thread_id": {
                     "type": "string"
                 }
             }
@@ -934,9 +922,6 @@ const docTemplate = `{
         "memory.MemoryInput": {
             "type": "object",
             "properties": {
-                "agent_id": {
-                    "type": "string"
-                },
                 "include_sources": {
                     "description": "When true, return original source content with facts.",
                     "type": "boolean"
@@ -951,7 +936,7 @@ const docTemplate = `{
                     "description": "Number of recent raw messages to return. 0 = facts only.",
                     "type": "integer"
                 },
-                "session_id": {
+                "thread_id": {
                     "type": "string"
                 }
             }
@@ -996,26 +981,6 @@ const docTemplate = `{
                 }
             }
         },
-        "memory.Session": {
-            "type": "object",
-            "properties": {
-                "account_id": {
-                    "type": "string"
-                },
-                "agent_id": {
-                    "type": "string"
-                },
-                "closed_at": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                }
-            }
-        },
         "memory.SourceKind": {
             "type": "string",
             "enum": [
@@ -1030,12 +995,12 @@ const docTemplate = `{
                 "SOURCE_AGENT": "The agent's own generated output.",
                 "SOURCE_CODE": "Source code, configuration files, schemas, technical artifacts.",
                 "SOURCE_DOCUMENT": "Any non-code reference material. PDFs, text files, spreadsheets.",
-                "SOURCE_SYSTEM": "Current date, session info, environment variables. Immutable.",
+                "SOURCE_SYSTEM": "Current date, thread info, environment variables. Immutable.",
                 "SOURCE_TOOL": "Output from any tool or sub-agent invoked by the agent.",
                 "SOURCE_USER": "Input from whoever is initiating the request to the agent."
             },
             "x-enum-descriptions": [
-                "Current date, session info, environment variables. Immutable.",
+                "Current date, thread info, environment variables. Immutable.",
                 "Input from whoever is initiating the request to the agent.",
                 "The agent's own generated output.",
                 "Output from any tool or sub-agent invoked by the agent.",
@@ -1050,6 +1015,31 @@ const docTemplate = `{
                 "SOURCE_DOCUMENT",
                 "SOURCE_CODE"
             ]
+        },
+        "memory.Thread": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "agent_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                }
+            }
+        },
+        "memory.ThreadCreateBody": {
+            "type": "object",
+            "properties": {
+                "agent_id": {
+                    "type": "string"
+                }
+            }
         }
     },
     "securityDefinitions": {

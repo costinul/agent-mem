@@ -69,7 +69,7 @@ func (s *Service) DeleteAgent(ctx context.Context, accountID, agentID string) er
 	return nil
 }
 
-func (s *Service) CreateSession(ctx context.Context, accountID, agentID string) (*models.Session, error) {
+func (s *Service) CreateThread(ctx context.Context, accountID, agentID string) (*models.Thread, error) {
 	if !isUUID(accountID) {
 		return nil, errors.New("account_id is invalid")
 	}
@@ -79,55 +79,43 @@ func (s *Service) CreateSession(ctx context.Context, accountID, agentID string) 
 	if _, err := s.GetAgent(ctx, accountID, agentID); err != nil {
 		return nil, err
 	}
-	session, err := s.repo.CreateSession(ctx, accountID, agentID)
+	thread, err := s.repo.CreateThread(ctx, accountID, agentID)
 	if err != nil {
-		return nil, fmt.Errorf("create session: %w", err)
+		return nil, fmt.Errorf("create thread: %w", err)
 	}
-	return session, nil
+	return thread, nil
 }
 
-func (s *Service) GetSession(ctx context.Context, accountID, agentID, sessionID string) (*models.Session, error) {
+func (s *Service) GetThread(ctx context.Context, accountID, threadID string) (*models.Thread, error) {
 	if !isUUID(accountID) {
 		return nil, errors.New("account_id is invalid")
 	}
-	if !isUUID(agentID) {
-		return nil, errors.New("agent_id is invalid")
+	if !isUUID(threadID) {
+		return nil, errors.New("thread_id is invalid")
 	}
-	if !isUUID(sessionID) {
-		return nil, errors.New("session_id is invalid")
-	}
-	found, err := s.repo.GetSessionByID(ctx, accountID, agentID, sessionID)
+	found, err := s.repo.GetThreadByID(ctx, accountID, threadID)
 	if err != nil {
-		return nil, fmt.Errorf("get session: %w", err)
+		return nil, fmt.Errorf("get thread: %w", err)
 	}
 	if found == nil {
-		return nil, errors.New("session not found")
+		return nil, errors.New("thread not found")
 	}
 	return found, nil
 }
 
-func (s *Service) CloseSession(ctx context.Context, accountID, agentID, sessionID string) error {
+func (s *Service) DeleteThread(ctx context.Context, accountID, threadID string) error {
 	if !isUUID(accountID) {
 		return errors.New("account_id is invalid")
 	}
-	if !isUUID(agentID) {
-		return errors.New("agent_id is invalid")
+	if !isUUID(threadID) {
+		return errors.New("thread_id is invalid")
 	}
-	if !isUUID(sessionID) {
-		return errors.New("session_id is invalid")
-	}
-	closed, err := s.repo.CloseSessionByID(ctx, accountID, agentID, sessionID)
+	deleted, err := s.repo.DeleteThreadByID(ctx, accountID, threadID)
 	if err != nil {
-		return fmt.Errorf("close session: %w", err)
+		return fmt.Errorf("delete thread: %w", err)
 	}
-	if !closed {
-		existing, getErr := s.repo.GetSessionByID(ctx, accountID, agentID, sessionID)
-		if getErr != nil {
-			return fmt.Errorf("close session: %w", getErr)
-		}
-		if existing == nil {
-			return errors.New("session not found")
-		}
+	if !deleted {
+		return errors.New("thread not found")
 	}
 	return nil
 }

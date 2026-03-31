@@ -4,7 +4,7 @@ Evaluates the memory API against the [LoCoMo](https://github.com/snap-research/l
 
 ## How It Works
 
-1. Ingests all conversation turns **sequentially** into the memory API (one session per conversation).
+1. Creates one thread per conversation and ingests all turns **sequentially** into that thread.
 2. For each QA pair, queries memory with the question and collects the returned facts.
 3. Sends `(question, ground_truth, returned facts)` to GPT-4o-mini to score as `pass / partial / fail`.
 4. Writes `results.json` and prints a summary.
@@ -63,7 +63,7 @@ python locomo/run.py --limit 1 --out smoke_results.json
   "conversations": [
     {
       "sample_id": "1",
-      "session_id": "test-agent_1",
+      "thread_id": "55555555-5555-5555-5555-555555555555",
       "qa": [
         {
           "question": "What did Angela buy on her birthday?",

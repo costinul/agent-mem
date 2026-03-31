@@ -10,8 +10,14 @@ import (
 )
 
 func (e *MemoryEngine) AddFactual(ctx context.Context, input models.FactualInput) (models.MemoryOutput, error) {
-	if strings.TrimSpace(input.AccountID) == "" || strings.TrimSpace(input.AgentID) == "" {
-		return models.MemoryOutput{}, errors.New("account_id and agent_id are required")
+	if strings.TrimSpace(input.AccountID) == "" {
+		return models.MemoryOutput{}, errors.New("account_id is required")
+	}
+	if strings.TrimSpace(input.ThreadID) == "" {
+		return models.MemoryOutput{}, errors.New("thread_id is required")
+	}
+	if strings.TrimSpace(input.AgentID) == "" {
+		return models.MemoryOutput{}, errors.New("thread agent is required")
 	}
 	if len(input.Inputs) == 0 {
 		return models.MemoryOutput{}, errors.New("inputs are required")
@@ -25,21 +31,17 @@ func (e *MemoryEngine) AddFactual(ctx context.Context, input models.FactualInput
 		}
 	}
 
-	var sessionID *string
-	if strings.TrimSpace(input.SessionID) != "" {
-		s := strings.TrimSpace(input.SessionID)
-		sessionID = &s
-	}
+	threadID := ptrString(input.ThreadID)
 	event, err := e.repo.InsertEvent(ctx, models.Event{
 		AccountID: input.AccountID,
 		AgentID:   input.AgentID,
-		SessionID: sessionID,
+		ThreadID:  threadID,
 	})
 	if err != nil {
 		return models.MemoryOutput{}, fmt.Errorf("insert event: %w", err)
 	}
 
-	storedSources, decompositions, err := e.persistAndDecomposeSources(ctx, event.ID, strings.TrimSpace(input.SessionID), input.Inputs)
+	storedSources, decompositions, err := e.persistAndDecomposeSources(ctx, event.ID, strings.TrimSpace(input.ThreadID), input.Inputs)
 	if err != nil {
 		return models.MemoryOutput{}, err
 	}
@@ -60,7 +62,7 @@ func (e *MemoryEngine) AddFactual(ctx context.Context, input models.FactualInput
 		fact := models.Fact{
 			AccountID: input.AccountID,
 			AgentID:   ptrString(input.AgentID),
-			SessionID: sessionID,
+			ThreadID:  threadID,
 			SourceID:  sourceID,
 			Kind:      extractedFact.Kind,
 			Text:      extractedFact.Text,

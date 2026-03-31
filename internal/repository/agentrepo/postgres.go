@@ -3,7 +3,6 @@ package agentrepo
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	"agentmem/internal/database"
 	models "agentmem/internal/models"
@@ -70,62 +69,49 @@ func (r *PostgresRepository) DeleteAgentByID(ctx context.Context, accountID, age
 	return rows > 0, nil
 }
 
-func (r *PostgresRepository) CreateSession(ctx context.Context, accountID, agentID string) (*models.Session, error) {
-	var (
-		session  models.Session
-		closedAt sql.NullTime
-	)
+func (r *PostgresRepository) CreateThread(ctx context.Context, accountID, agentID string) (*models.Thread, error) {
+	var thread models.Thread
 	err := r.db.QueryRowContext(
 		ctx,
-		`INSERT INTO sessions (account_id, agent_id)
+		`INSERT INTO threads (account_id, agent_id)
 		 VALUES ($1, $2)
-		 RETURNING id, account_id, agent_id, created_at, closed_at`,
+		 RETURNING id, account_id, agent_id, created_at`,
 		accountID,
 		agentID,
-	).Scan(&session.ID, &session.AccountID, &session.AgentID, &session.CreatedAt, &closedAt)
+	).Scan(&thread.ID, &thread.AccountID, &thread.AgentID, &thread.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
-	session.ClosedAt = nullTimePtr(closedAt)
-	return &session, nil
+	return &thread, nil
 }
 
-func (r *PostgresRepository) GetSessionByID(ctx context.Context, accountID, agentID, sessionID string) (*models.Session, error) {
-	var (
-		session  models.Session
-		closedAt sql.NullTime
-	)
+func (r *PostgresRepository) GetThreadByID(ctx context.Context, accountID, threadID string) (*models.Thread, error) {
+	var thread models.Thread
 	err := r.db.QueryRowContext(
 		ctx,
-		`SELECT id, account_id, agent_id, created_at, closed_at
-		 FROM sessions
-		 WHERE id = $1 AND account_id = $2 AND agent_id = $3`,
-		sessionID,
+		`SELECT id, account_id, agent_id, created_at
+		 FROM threads
+		 WHERE id = $1 AND account_id = $2`,
+		threadID,
 		accountID,
-		agentID,
-	).Scan(&session.ID, &session.AccountID, &session.AgentID, &session.CreatedAt, &closedAt)
+	).Scan(&thread.ID, &thread.AccountID, &thread.AgentID, &thread.CreatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
 		return nil, err
 	}
-	session.ClosedAt = nullTimePtr(closedAt)
-	return &session, nil
+	return &thread, nil
 }
 
-func (r *PostgresRepository) CloseSessionByID(ctx context.Context, accountID, agentID, sessionID string) (bool, error) {
+func (r *PostgresRepository) DeleteThreadByID(ctx context.Context, accountID, threadID string) (bool, error) {
 	result, err := r.db.ExecContext(
 		ctx,
-		`UPDATE sessions
-		 SET closed_at = now()
+		`DELETE FROM threads
 		 WHERE id = $1
-		   AND account_id = $2
-		   AND agent_id = $3
-		   AND closed_at IS NULL`,
-		sessionID,
+		   AND account_id = $2`,
+		threadID,
 		accountID,
-		agentID,
 	)
 	if err != nil {
 		return false, err
@@ -135,12 +121,4 @@ func (r *PostgresRepository) CloseSessionByID(ctx context.Context, accountID, ag
 		return false, err
 	}
 	return rows > 0, nil
-}
-
-func nullTimePtr(value sql.NullTime) *time.Time {
-	if !value.Valid {
-		return nil
-	}
-	typed := value.Time
-	return &typed
 }

@@ -20,8 +20,8 @@ type Server struct {
 func NewServer(engine *engine.MemoryEngine, accountSvc *account.Service, agentSvc *agent.Service) *Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler)
-	mux.HandleFunc("POST /memory/contextual", requireAPIKey(accountSvc, contextualHandler(engine)))
-	mux.HandleFunc("POST /memory/factual", requireAPIKey(accountSvc, factualHandler(engine)))
+	mux.HandleFunc("POST /memory/contextual", requireAPIKey(accountSvc, contextualHandler(engine, agentSvc)))
+	mux.HandleFunc("POST /memory/factual", requireAPIKey(accountSvc, factualHandler(engine, agentSvc)))
 	mux.HandleFunc("GET /facts/{id}", requireAPIKey(accountSvc, getFactHandler(engine)))
 	mux.HandleFunc("PUT /facts/{id}", requireAPIKey(accountSvc, updateFactHandler(engine)))
 	mux.HandleFunc("DELETE /facts/{id}", requireAPIKey(accountSvc, deleteFactHandler(engine)))
@@ -29,9 +29,9 @@ func NewServer(engine *engine.MemoryEngine, accountSvc *account.Service, agentSv
 	mux.HandleFunc("POST /agents", requireAPIKey(accountSvc, createAgentHandler(agentSvc)))
 	mux.HandleFunc("GET /agents/{id}", requireAPIKey(accountSvc, getAgentHandler(agentSvc)))
 	mux.HandleFunc("DELETE /agents/{id}", requireAPIKey(accountSvc, deleteAgentHandler(agentSvc)))
-	mux.HandleFunc("POST /agents/{agentId}/sessions", requireAPIKey(accountSvc, createSessionHandler(agentSvc)))
-	mux.HandleFunc("GET /agents/{agentId}/sessions/{id}", requireAPIKey(accountSvc, getSessionHandler(agentSvc)))
-	mux.HandleFunc("DELETE /agents/{agentId}/sessions/{id}", requireAPIKey(accountSvc, deleteSessionHandler(agentSvc)))
+	mux.HandleFunc("POST /threads", requireAPIKey(accountSvc, createThreadHandler(agentSvc)))
+	mux.HandleFunc("GET /threads/{id}", requireAPIKey(accountSvc, getThreadHandler(agentSvc)))
+	mux.HandleFunc("DELETE /threads/{id}", requireAPIKey(accountSvc, deleteThreadHandler(agentSvc)))
 	mux.Handle("GET /swagger/", httpSwagger.Handler(httpSwagger.PersistAuthorization(true)))
 
 	return &Server{

@@ -26,12 +26,17 @@ class MemoryAPIClient:
             raise RuntimeError("MemoryAPIClient must be used as an async context manager")
         return self._client
 
-    async def ingest(self, session_id: str, role: str, content: str) -> dict:
+    async def create_thread(self) -> dict:
+        """Create a new thread for the configured agent."""
+        payload = {"agent_id": self.agent_id}
+        resp = await self._client_or_raise().post(f"{self.base_url}/threads", json=payload)
+        resp.raise_for_status()
+        return resp.json()
+
+    async def ingest(self, thread_id: str, role: str, content: str) -> dict:
         """Send a single conversation turn to /memory/contextual for ingestion."""
         payload = {
-            "account_id": self.account_id,
-            "agent_id": self.agent_id,
-            "session_id": session_id,
+            "thread_id": thread_id,
             "message_history": 0,
             "inputs": [{"kind": role, "content": content, "content_type": "text/plain"}],
         }
@@ -39,12 +44,10 @@ class MemoryAPIClient:
         resp.raise_for_status()
         return resp.json()
 
-    async def query(self, session_id: str, question: str) -> dict:
+    async def query(self, thread_id: str, question: str) -> dict:
         """Query memory with a question and return the response (facts + messages)."""
         payload = {
-            "account_id": self.account_id,
-            "agent_id": self.agent_id,
-            "session_id": session_id,
+            "thread_id": thread_id,
             "message_history": 0,
             "inputs": [{"kind": "user", "content": question, "content_type": "text/plain"}],
         }

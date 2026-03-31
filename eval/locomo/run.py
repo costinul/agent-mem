@@ -86,7 +86,8 @@ async def evaluate_sample(
     semaphore: asyncio.Semaphore,
 ) -> dict:
     sample_id = str(sample["sample_id"])
-    session_id = f"{client.agent_id}_{sample_id}"
+    thread = await client.create_thread()
+    thread_id = thread["id"]
     conversation = sample["conversation"]
     qa_pairs = sample.get("qa", [])
 
@@ -99,7 +100,7 @@ async def evaluate_sample(
                     continue
                 role = _speaker_to_role(turn.get("speaker", ""), conversation)
                 try:
-                    await client.ingest(session_id, role, text)
+                    await client.ingest(thread_id, role, text)
                 except Exception as exc:
                     print(f"  [WARN] ingest error in sample {sample_id}: {exc}")
 
@@ -114,7 +115,7 @@ async def evaluate_sample(
                 continue
 
             try:
-                memory_output = await client.query(session_id, question)
+                memory_output = await client.query(thread_id, question)
                 facts = [f["text"] for f in memory_output.get("facts", [])]
             except Exception as exc:
                 print(f"  [WARN] query error in sample {sample_id}: {exc}")
@@ -138,7 +139,7 @@ async def evaluate_sample(
                 "reason": reason,
             })
 
-    return {"sample_id": sample_id, "session_id": session_id, "qa": qa_results}
+    return {"sample_id": sample_id, "thread_id": thread_id, "qa": qa_results}
 
 
 # ── summary ────────────────────────────────────────────────────────────────────

@@ -44,7 +44,7 @@ func TestCreateAndGetAgent(t *testing.T) {
 	}
 }
 
-func TestCreateAndDeleteSession(t *testing.T) {
+func TestCreateGetAndDeleteThread(t *testing.T) {
 	server := newAgentTestServer()
 
 	createAgentReq := httptest.NewRequest(http.MethodPost, "/agents", bytes.NewBufferString(`{"name":"assistant-2"}`))
@@ -58,28 +58,36 @@ func TestCreateAndDeleteSession(t *testing.T) {
 		t.Fatalf("agent id is empty")
 	}
 
-	createSessionReq := httptest.NewRequest(http.MethodPost, "/agents/"+created.ID+"/sessions", nil)
-	createSessionReq.Header.Set("Authorization", "Bearer "+testAPIKey)
-	createSessionRec := httptest.NewRecorder()
-	server.httpServer.Handler.ServeHTTP(createSessionRec, createSessionReq)
-	if createSessionRec.Code != http.StatusCreated {
-		t.Fatalf("create session status = %d, want %d", createSessionRec.Code, http.StatusCreated)
+	createThreadReq := httptest.NewRequest(http.MethodPost, "/threads", bytes.NewBufferString(`{"agent_id":"`+created.ID+`"}`))
+	createThreadReq.Header.Set("Authorization", "Bearer "+testAPIKey)
+	createThreadRec := httptest.NewRecorder()
+	server.httpServer.Handler.ServeHTTP(createThreadRec, createThreadReq)
+	if createThreadRec.Code != http.StatusCreated {
+		t.Fatalf("create thread status = %d, want %d", createThreadRec.Code, http.StatusCreated)
 	}
 
-	var session models.Session
-	if err := json.Unmarshal(createSessionRec.Body.Bytes(), &session); err != nil {
-		t.Fatalf("unmarshal session response: %v", err)
+	var thread models.Thread
+	if err := json.Unmarshal(createThreadRec.Body.Bytes(), &thread); err != nil {
+		t.Fatalf("unmarshal thread response: %v", err)
 	}
-	if session.ID == "" {
-		t.Fatalf("session id is empty")
+	if thread.ID == "" {
+		t.Fatalf("thread id is empty")
 	}
 
-	deleteSessionReq := httptest.NewRequest(http.MethodDelete, "/agents/"+created.ID+"/sessions/"+session.ID, nil)
-	deleteSessionReq.Header.Set("Authorization", "Bearer "+testAPIKey)
-	deleteSessionRec := httptest.NewRecorder()
-	server.httpServer.Handler.ServeHTTP(deleteSessionRec, deleteSessionReq)
-	if deleteSessionRec.Code != http.StatusOK {
-		t.Fatalf("delete session status = %d, want %d", deleteSessionRec.Code, http.StatusOK)
+	getThreadReq := httptest.NewRequest(http.MethodGet, "/threads/"+thread.ID, nil)
+	getThreadReq.Header.Set("Authorization", "Bearer "+testAPIKey)
+	getThreadRec := httptest.NewRecorder()
+	server.httpServer.Handler.ServeHTTP(getThreadRec, getThreadReq)
+	if getThreadRec.Code != http.StatusOK {
+		t.Fatalf("get thread status = %d, want %d", getThreadRec.Code, http.StatusOK)
+	}
+
+	deleteThreadReq := httptest.NewRequest(http.MethodDelete, "/threads/"+thread.ID, nil)
+	deleteThreadReq.Header.Set("Authorization", "Bearer "+testAPIKey)
+	deleteThreadRec := httptest.NewRecorder()
+	server.httpServer.Handler.ServeHTTP(deleteThreadRec, deleteThreadReq)
+	if deleteThreadRec.Code != http.StatusOK {
+		t.Fatalf("delete thread status = %d, want %d", deleteThreadRec.Code, http.StatusOK)
 	}
 }
 
@@ -91,14 +99,14 @@ func newAgentTestServer() *Server {
 }
 
 type statefulAgentRepo struct {
-	agents   map[string]models.Agent
-	sessions map[string]models.Session
+	agents  map[string]models.Agent
+	threads map[string]models.Thread
 }
 
 func newStatefulAgentRepo() *statefulAgentRepo {
 	return &statefulAgentRepo{
-		agents:   make(map[string]models.Agent),
-		sessions: make(map[string]models.Session),
+		agents:  make(map[string]models.Agent),
+		threads: make(map[string]models.Thread),
 	}
 }
 
@@ -136,37 +144,35 @@ func (r *statefulAgentRepo) DeleteAgentByID(_ context.Context, accountID, agentI
 	return true, nil
 }
 
-func (r *statefulAgentRepo) CreateSession(_ context.Context, accountID, agentID string) (*models.Session, error) {
-	session := models.Session{
+func (r *statefulAgentRepo) CreateThread(_ context.Context, accountID, agentID string) (*models.Thread, error) {
+	thread := models.Thread{
 		ID:        "55555555-5555-5555-5555-555555555555",
 		AccountID: accountID,
 		AgentID:   agentID,
 		CreatedAt: time.Now().UTC(),
 	}
-	if len(r.sessions) > 0 {
-		session.ID = "66666666-6666-6666-6666-666666666666"
+	if len(r.threads) > 0 {
+		thread.ID = "66666666-6666-6666-6666-666666666666"
 	}
-	r.sessions[session.ID] = session
-	copy := session
+	r.threads[thread.ID] = thread
+	copy := thread
 	return &copy, nil
 }
 
-func (r *statefulAgentRepo) GetSessionByID(_ context.Context, accountID, agentID, sessionID string) (*models.Session, error) {
-	session, ok := r.sessions[sessionID]
-	if !ok || session.AccountID != accountID || session.AgentID != agentID {
+func (r *statefulAgentRepo) GetThreadByID(_ context.Context, accountID, threadID string) (*models.Thread, error) {
+	thread, ok := r.threads[threadID]
+	if !ok || thread.AccountID != accountID {
 		return nil, nil
 	}
-	copy := session
+	copy := thread
 	return &copy, nil
 }
 
-func (r *statefulAgentRepo) CloseSessionByID(_ context.Context, accountID, agentID, sessionID string) (bool, error) {
-	session, ok := r.sessions[sessionID]
-	if !ok || session.AccountID != accountID || session.AgentID != agentID {
+func (r *statefulAgentRepo) DeleteThreadByID(_ context.Context, accountID, threadID string) (bool, error) {
+	thread, ok := r.threads[threadID]
+	if !ok || thread.AccountID != accountID {
 		return false, nil
 	}
-	now := time.Now().UTC()
-	session.ClosedAt = &now
-	r.sessions[sessionID] = session
+	delete(r.threads, threadID)
 	return true, nil
 }

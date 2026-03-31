@@ -11,7 +11,7 @@ type Repository interface {
 	GetAgentByID(ctx context.Context, accountID, agentID string) (*models.Agent, error)
 	DeleteAgentByID(ctx context.Context, accountID, agentID string) (bool, error)
 
-	CreateSession(ctx context.Context, accountID, agentID string) (*models.Session, error)
-	GetSessionByID(ctx context.Context, accountID, agentID, sessionID string) (*models.Session, error)
-	CloseSessionByID(ctx context.Context, accountID, agentID, sessionID string) (bool, error)
+	CreateThread(ctx context.Context, accountID, agentID string) (*models.Thread, error)
+	GetThreadByID(ctx context.Context, accountID, threadID string) (*models.Thread, error)
+	DeleteThreadByID(ctx context.Context, accountID, threadID string) (bool, error)
 }
