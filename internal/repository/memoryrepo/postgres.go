@@ -269,6 +269,7 @@ func (r *PostgresRepository) ListFactsByScope(ctx context.Context, accountID str
 		 WHERE account_id = $1
 		   AND ($2::uuid IS NULL OR agent_id = $2)
 		   AND ($3::uuid IS NULL OR thread_id = $3)
+		   AND superseded_at IS NULL
 		 ORDER BY created_at ASC`,
 		accountID,
 		agentID,
@@ -375,6 +376,7 @@ func (r *PostgresRepository) SearchFactsByEmbedding(ctx context.Context, params 
 		   AND ($2::uuid IS NULL OR agent_id = $2)
 		   AND ($3::uuid IS NULL OR thread_id = $3)
 		   AND embedding IS NOT NULL
+		   AND superseded_at IS NULL
 		   AND (1 - (embedding <=> $4::vector)) >= $5
 		 ORDER BY embedding <=> $4::vector ASC
 		 LIMIT $6`,
@@ -417,16 +419,19 @@ func (r *PostgresRepository) SearchFactsByEmbedding(ctx context.Context, params 
 	return facts, rows.Err()
 }
 
-func (r *PostgresRepository) DeleteFacts(ctx context.Context, factIDs []string) error {
-	if len(factIDs) == 0 {
-		return nil
+func (r *PostgresRepository) SupersedeFact(ctx context.Context, oldFactID string, newFact models.Fact) (*models.Fact, error) {
+	inserted, err := r.InsertFact(ctx, newFact)
+	if err != nil {
+		return nil, fmt.Errorf("insert successor fact: %w", err)
 	}
-	for _, factID := range factIDs {
-		if _, err := r.db.ExecContext(ctx, `DELETE FROM facts WHERE id = $1`, factID); err != nil {
-			return fmt.Errorf("delete fact %s: %w", factID, err)
-		}
+	_, err = r.db.ExecContext(ctx,
+		`UPDATE facts SET superseded_at = now(), superseded_by = $2, updated_at = now() WHERE id = $1`,
+		oldFactID, inserted.ID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("supersede fact %s: %w", oldFactID, err)
 	}
-	return nil
+	return inserted, nil
 }
 
 func nullStringPtr(value sql.NullString) *string {

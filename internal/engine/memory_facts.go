@@ -61,46 +61,6 @@ func (e *MemoryEngine) UpdateFactForAccount(ctx context.Context, accountID, fact
 	return e.mapFactForOutput(ctx, *fact, false)
 }
 
-func (e *MemoryEngine) DeleteFacts(ctx context.Context, factIDs []string, source models.SourceKind) error {
-	return e.DeleteFactsForAccount(ctx, "", factIDs, source)
-}
-
-func (e *MemoryEngine) DeleteFactsForAccount(ctx context.Context, accountID string, factIDs []string, source models.SourceKind) error {
-	if len(factIDs) == 0 {
-		return errors.New("fact_ids are required")
-	}
-	for _, factID := range factIDs {
-		fact, err := e.repo.GetFactByID(ctx, factID)
-		if err != nil {
-			return fmt.Errorf("get fact %s: %w", factID, err)
-		}
-		if fact == nil {
-			continue
-		}
-		if strings.TrimSpace(accountID) != "" && fact.AccountID != strings.TrimSpace(accountID) {
-			continue
-		}
-		if err := e.ensureSourceCanMutateFact(ctx, source, *fact); err != nil {
-			return err
-		}
-	}
-	authorizedIDs := make([]string, 0, len(factIDs))
-	for _, factID := range factIDs {
-		fact, err := e.repo.GetFactByID(ctx, factID)
-		if err != nil {
-			return fmt.Errorf("get fact %s: %w", factID, err)
-		}
-		if fact == nil {
-			continue
-		}
-		if strings.TrimSpace(accountID) != "" && fact.AccountID != strings.TrimSpace(accountID) {
-			continue
-		}
-		authorizedIDs = append(authorizedIDs, factID)
-	}
-	return e.repo.DeleteFacts(ctx, authorizedIDs)
-}
-
 func (e *MemoryEngine) buildOutput(ctx context.Context, input models.MemoryInput, facts []models.Fact) (models.MemoryOutput, error) {
 	output := models.MemoryOutput{
 		Facts: make([]models.ReturnedFact, 0, len(facts)),

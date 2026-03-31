@@ -125,7 +125,7 @@ func (a *LLMAdapter) Evaluate(ctx context.Context, req EvaluateRequest) (models.
 		FactsToReturn: factsToReturn,
 		FactsToStore:  factsToStore,
 		FactsToUpdate: factsToUpdate,
-		FactsToDelete: out.FactsToDelete,
+		FactsToEvolve: out.FactsToEvolve,
 	}, nil
 }
 
@@ -169,11 +169,11 @@ type evaluateOutput struct {
 	FactsToReturn []string               `json:"facts_to_return"`
 	FactsToStore  []models.ExtractedFact `json:"facts_to_store"`
 	FactsToUpdate []factUpdate           `json:"facts_to_update"`
-	FactsToDelete []string               `json:"facts_to_delete"`
+	FactsToEvolve []models.FactEvolution `json:"facts_to_evolve"`
 }
 
 func (o *evaluateOutput) SchemaDescription() string {
-	return "Evaluation result: which existing facts to return, which new facts to store, which existing facts to update, and which to delete."
+	return "Evaluation result: which existing facts to return, which new facts to store, which existing facts to update, and which to evolve into new versions."
 }
 
 func (o *evaluateOutput) Validate() error {

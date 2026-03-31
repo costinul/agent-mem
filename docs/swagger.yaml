@@ -45,10 +45,11 @@ definitions:
     type: object
   memory.EvaluateResult:
     properties:
-      facts_to_delete:
-        description: IDs of facts to remove.
+      facts_to_evolve:
+        description: Facts superseded by new information; old fact is preserved with
+          lineage.
         items:
-          type: string
+          $ref: '#/definitions/memory.FactEvolution'
         type: array
       facts_to_return:
         description: Relevant existing + new facts to return to the agent.
@@ -85,6 +86,12 @@ definitions:
       source_id:
         description: The source that produced this fact.
         type: string
+      superseded_at:
+        description: Non-nil means this fact has been evolved into a successor.
+        type: string
+      superseded_by:
+        description: ID of the successor fact.
+        type: string
       text:
         type: string
       thread_id:
@@ -93,14 +100,14 @@ definitions:
       updated_at:
         type: string
     type: object
-  memory.FactDeleteBody:
+  memory.FactEvolution:
     properties:
-      fact_ids:
-        items:
-          type: string
-        type: array
-      source:
-        $ref: '#/definitions/memory.SourceKind'
+      new_kind:
+        $ref: '#/definitions/memory.FactKind'
+      new_text:
+        type: string
+      old_fact_id:
+        type: string
     type: object
   memory.FactKind:
     enum:
@@ -357,47 +364,6 @@ paths:
       tags:
       - agents
   /facts/{id}:
-    delete:
-      consumes:
-      - application/json
-      description: Delete facts by ID or a list of IDs.
-      parameters:
-      - description: Fact ID (optional if provided in body)
-        in: path
-        name: id
-        type: string
-      - description: Delete Body
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/memory.FactDeleteBody'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: '{"status": "deleted"}'
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/api.apiError'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/api.apiError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/api.apiError'
-      security:
-      - ApiKeyAuth: []
-      summary: Delete Facts
-      tags:
-      - facts
     get:
       description: Retrieve a specific fact by its ID, optionally including original
         sources.

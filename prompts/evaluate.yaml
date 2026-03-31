@@ -6,9 +6,9 @@ system_prompt: |
   - facts_to_return: IDs of existing retrieved facts that are relevant to the current context and should be returned to the agent.
   - facts_to_store: New facts that do not exist in memory yet and should be stored. Use the new facts list as input, but only include ones that add real value. Do not store duplicates of existing facts.
   - facts_to_update: Existing facts that are directly contradicted by new information. Provide the existing fact's ID and the corrected text.
-  - facts_to_delete: IDs of existing facts that are explicitly invalidated or superseded and should be removed entirely.
+  - facts_to_evolve: Existing facts that are invalidated or superseded. Provide the old fact's ID and a new_text that preserves the historical context (e.g. "User previously owned a red car", "User lied about having a blue cat"). The old fact is kept with lineage but marked as superseded; the new text becomes the active successor.
 
-  Be conservative: only update or delete when there is a clear contradiction or explicit invalidation. If a new fact is already covered by an existing fact, do not store it again.
+  Be conservative: only update or evolve when there is a clear contradiction or explicit invalidation. If a new fact is already covered by an existing fact, do not store it again.
 prompt: |
   New facts extracted from current input:
   {{- range $i, $f := .NewFacts}}

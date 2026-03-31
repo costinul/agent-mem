@@ -161,6 +161,9 @@ func (r *InMemoryRepository) ListFactsByScope(_ context.Context, accountID strin
 
 	facts := make([]models.Fact, 0)
 	for _, fact := range r.facts {
+		if fact.SupersededAt != nil {
+			continue
+		}
 		if fact.AccountID != accountID {
 			continue
 		}
@@ -216,6 +219,9 @@ func (r *InMemoryRepository) SearchFactsByEmbedding(_ context.Context, params Se
 	}
 	candidates := make([]candidate, 0)
 	for _, fact := range r.facts {
+		if fact.SupersededAt != nil {
+			continue
+		}
 		if fact.AccountID != params.AccountID {
 			continue
 		}
@@ -253,14 +259,29 @@ func (r *InMemoryRepository) SearchFactsByEmbedding(_ context.Context, params Se
 	return result, nil
 }
 
-func (r *InMemoryRepository) DeleteFacts(_ context.Context, factIDs []string) error {
+func (r *InMemoryRepository) SupersedeFact(_ context.Context, oldFactID string, newFact models.Fact) (*models.Fact, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	for _, id := range factIDs {
-		delete(r.facts, id)
+	if newFact.ID == "" {
+		newFact.ID = uuid.NewString()
 	}
-	return nil
+	now := time.Now().UTC()
+	if newFact.CreatedAt.IsZero() {
+		newFact.CreatedAt = now
+	}
+	newFact.UpdatedAt = now
+	r.facts[newFact.ID] = newFact
+
+	if old, ok := r.facts[oldFactID]; ok {
+		old.SupersededAt = &now
+		old.SupersededBy = &newFact.ID
+		old.UpdatedAt = now
+		r.facts[oldFactID] = old
+	}
+
+	stored := newFact
+	return &stored, nil
 }
 
 func cosineSimilarity(a, b []float64) float64 {

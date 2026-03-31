@@ -320,70 +320,6 @@ const docTemplate = `{
                     }
                 }
             },
-            "delete": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Delete facts by ID or a list of IDs.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "facts"
-                ],
-                "summary": "Delete Facts",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Fact ID (optional if provided in body)",
-                        "name": "id",
-                        "in": "path"
-                    },
-                    {
-                        "description": "Delete Body",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/memory.FactDeleteBody"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "{\"status\": \"deleted\"}",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiError"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiError"
-                        }
-                    }
-                }
-            }
         },
         "/health": {
             "get": {
@@ -771,11 +707,11 @@ const docTemplate = `{
         "memory.EvaluateResult": {
             "type": "object",
             "properties": {
-                "facts_to_delete": {
-                    "description": "IDs of facts to remove.",
+                "facts_to_evolve": {
+                    "description": "Facts superseded by new information; old fact is preserved with lineage.",
                     "type": "array",
                     "items": {
-                        "type": "string"
+                        "$ref": "#/definitions/memory.FactEvolution"
                     }
                 },
                 "facts_to_return": {
@@ -829,6 +765,14 @@ const docTemplate = `{
                     "description": "The source that produced this fact.",
                     "type": "string"
                 },
+                "superseded_at": {
+                    "description": "Non-nil means this fact has been evolved into a successor.",
+                    "type": "string"
+                },
+                "superseded_by": {
+                    "description": "ID of the successor fact.",
+                    "type": "string"
+                },
                 "text": {
                     "type": "string"
                 },
@@ -841,17 +785,17 @@ const docTemplate = `{
                 }
             }
         },
-        "memory.FactDeleteBody": {
+        "memory.FactEvolution": {
             "type": "object",
             "properties": {
-                "fact_ids": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
+                "new_kind": {
+                    "$ref": "#/definitions/memory.FactKind"
                 },
-                "source": {
-                    "$ref": "#/definitions/memory.SourceKind"
+                "new_text": {
+                    "type": "string"
+                },
+                "old_fact_id": {
+                    "type": "string"
                 }
             }
         },

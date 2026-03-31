@@ -130,13 +130,13 @@ USER and AGENT sources are context providers. They carry the intent behind other
   - Facts to return to the agent (relevant existing + new)
   - Facts to store (new facts)
   - Facts to update (existing facts contradicted by new ones, trust hierarchy validated)
-  - Facts to delete (explicit removal requests, trust hierarchy validated)
+  - Facts to evolve (superseded facts get a successor with historical context, trust hierarchy validated)
 
 ### Step 4 — Database Update
 
 - Insert new facts.
 - Update contradicted facts (trust hierarchy validated).
-- Delete removed facts (trust hierarchy validated).
+- Evolve superseded facts (old fact preserved with lineage, trust hierarchy validated).
 
 ### Step 5 — Return
 
@@ -158,7 +158,6 @@ USER and AGENT sources are context providers. They carry the intent behind other
 ### Fact Management — Direct operations by fact ID.
 
 - Get — retrieve fact by ID. No restrictions.
-- Delete — remove fact by ID or array of IDs. Requires source level equal or higher than the target fact's source.
 - Update — replace fact text by ID, regenerate embedding. Requires source level equal or higher than the target fact's source.
 
 ---
@@ -212,7 +211,6 @@ POST /memory/contextual     — main smart pipeline. Requires ThreadID. Read-wri
 POST   /memory/factual      — add memory to an existing thread.
 GET    /facts/:id            — retrieve fact by ID.
 PUT    /facts/:id            — update fact by ID. Requires source level.
-DELETE /facts/:id            — delete fact by ID or array. Requires source level.
 ```
 
 ---

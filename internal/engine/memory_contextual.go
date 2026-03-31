@@ -191,9 +191,37 @@ func (e *MemoryEngine) applyEvaluateResult(
 			return nil, fmt.Errorf("update contextual fact: %w", err)
 		}
 	}
-	if err := e.repo.DeleteFacts(ctx, result.FactsToDelete); err != nil {
-		return nil, fmt.Errorf("delete contextual facts: %w", err)
+
+	if len(result.FactsToEvolve) > 0 {
+		evolveTexts := make([]string, 0, len(result.FactsToEvolve))
+		for _, ev := range result.FactsToEvolve {
+			evolveTexts = append(evolveTexts, ev.NewText)
+		}
+		evolveEmbeddings, err := e.ai.Embed(ctx, evolveTexts)
+		if err != nil {
+			return nil, fmt.Errorf("embed evolved facts: %w", err)
+		}
+		for idx, ev := range result.FactsToEvolve {
+			sourceID := selectSourceIDForExtractedFact(storedSources, 0)
+			successor := models.Fact{
+				AccountID: input.AccountID,
+				AgentID:   ptrString(input.AgentID),
+				ThreadID:  ptrString(input.ThreadID),
+				SourceID:  sourceID,
+				Kind:      ev.NewKind,
+				Text:      ev.NewText,
+			}
+			if idx < len(evolveEmbeddings) {
+				successor.Embedding = evolveEmbeddings[idx]
+			}
+			inserted, err := e.repo.SupersedeFact(ctx, ev.OldFactID, successor)
+			if err != nil {
+				return nil, fmt.Errorf("evolve fact %s: %w", ev.OldFactID, err)
+			}
+			stored = append(stored, *inserted)
+		}
 	}
+
 	_ = newFacts
 	return stored, nil
 }

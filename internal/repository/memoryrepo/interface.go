@@ -19,7 +19,7 @@ type Repository interface {
 	GetFactByID(ctx context.Context, factID string) (*models.Fact, error)
 	SearchFactsByEmbedding(ctx context.Context, params SearchByEmbeddingParams) ([]models.Fact, error)
 	UpdateFact(ctx context.Context, fact models.Fact) error
-	DeleteFacts(ctx context.Context, factIDs []string) error
+	SupersedeFact(ctx context.Context, oldFactID string, newFact models.Fact) (*models.Fact, error)
 }
 
 type SearchByEmbeddingParams struct {

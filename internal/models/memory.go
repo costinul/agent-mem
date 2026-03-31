@@ -73,16 +73,18 @@ type Source struct {
 
 // Fact is an atomic piece of information extracted from a source.
 type Fact struct {
-	ID        string    `json:"id"`
-	AccountID string    `json:"account_id"`
-	AgentID   *string   `json:"agent_id"`
-	ThreadID  *string   `json:"thread_id"` // Null means agent-level or account-level scope.
-	SourceID  string    `json:"source_id"` // The source that produced this fact.
-	Kind      FactKind  `json:"kind"`
-	Text      string    `json:"text"`
-	Embedding []float64 `json:"embedding"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID           string     `json:"id"`
+	AccountID    string     `json:"account_id"`
+	AgentID      *string    `json:"agent_id"`
+	ThreadID     *string    `json:"thread_id"`    // Null means agent-level or account-level scope.
+	SourceID     string     `json:"source_id"`    // The source that produced this fact.
+	Kind         FactKind   `json:"kind"`
+	Text         string     `json:"text"`
+	Embedding    []float64  `json:"embedding"`
+	SupersededAt *time.Time `json:"superseded_at"` // Non-nil means this fact has been evolved into a successor.
+	SupersededBy *string    `json:"superseded_by"` // ID of the successor fact.
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
 }
 
 // =====================
@@ -110,11 +112,18 @@ type ExtractedQuery struct {
 // Operational — Evaluate
 // =====================
 
+// FactEvolution describes a fact that should be superseded by a new version.
+type FactEvolution struct {
+	OldFactID string   `json:"old_fact_id"`
+	NewText   string   `json:"new_text"`
+	NewKind   FactKind `json:"new_kind"`
+}
+
 // EvaluateResult is the output of the evaluate step.
 // Trust hierarchy is enforced: a source can only alter facts from equal or lower trust level.
 type EvaluateResult struct {
-	FactsToReturn []Fact   `json:"facts_to_return"` // Relevant existing + new facts to return to the agent.
-	FactsToStore  []Fact   `json:"facts_to_store"`  // New facts to insert.
-	FactsToUpdate []Fact   `json:"facts_to_update"` // Existing facts contradicted by higher/equal trust source.
-	FactsToDelete []string `json:"facts_to_delete"` // IDs of facts to remove.
+	FactsToReturn []Fact          `json:"facts_to_return"` // Relevant existing + new facts to return to the agent.
+	FactsToStore  []Fact          `json:"facts_to_store"`  // New facts to insert.
+	FactsToUpdate []Fact          `json:"facts_to_update"` // Existing facts contradicted by higher/equal trust source.
+	FactsToEvolve []FactEvolution `json:"facts_to_evolve"` // Facts superseded by new information; old fact is preserved with lineage.
 }

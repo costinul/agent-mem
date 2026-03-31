@@ -45,15 +45,47 @@ func TestInMemoryFactLifecycle(t *testing.T) {
 		t.Fatalf("GetFactByID() updated text = %q, want %q", updated.Text, "updated")
 	}
 
-	if err := repo.DeleteFacts(ctx, []string{inserted.ID}); err != nil {
-		t.Fatalf("DeleteFacts() error = %v", err)
-	}
-	deleted, err := repo.GetFactByID(ctx, inserted.ID)
+	successor, err := repo.SupersedeFact(ctx, inserted.ID, models.Fact{
+		AccountID: "acct-1",
+		SourceID:  "source-1",
+		Kind:      models.FACT_KIND_KNOWLEDGE,
+		Text:      "previously: hello",
+		Embedding: []float64{1, 0, 0},
+	})
 	if err != nil {
-		t.Fatalf("GetFactByID() after delete error = %v", err)
+		t.Fatalf("SupersedeFact() error = %v", err)
 	}
-	if deleted != nil {
-		t.Fatalf("GetFactByID() after delete = %v, want nil", deleted)
+	if successor == nil || successor.Text != "previously: hello" {
+		t.Fatalf("SupersedeFact() successor = %v, want text %q", successor, "previously: hello")
+	}
+
+	old, err := repo.GetFactByID(ctx, inserted.ID)
+	if err != nil {
+		t.Fatalf("GetFactByID() after supersede error = %v", err)
+	}
+	if old == nil {
+		t.Fatal("GetFactByID() after supersede returned nil, want superseded fact")
+	}
+	if old.SupersededAt == nil {
+		t.Fatal("superseded fact should have SupersededAt set")
+	}
+	if old.SupersededBy == nil || *old.SupersededBy != successor.ID {
+		t.Fatalf("superseded fact SupersededBy = %v, want %s", old.SupersededBy, successor.ID)
+	}
+
+	results, err := repo.SearchFactsByEmbedding(ctx, SearchByEmbeddingParams{
+		AccountID:     "acct-1",
+		Embedding:     []float64{1, 0, 0},
+		MinSimilarity: 0.5,
+		Limit:         10,
+	})
+	if err != nil {
+		t.Fatalf("SearchFactsByEmbedding() after supersede error = %v", err)
+	}
+	for _, r := range results {
+		if r.ID == inserted.ID {
+			t.Fatal("superseded fact should be excluded from search results")
+		}
 	}
 }
 

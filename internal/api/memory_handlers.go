@@ -180,52 +180,6 @@ func updateFactHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
 	}
 }
 
-// deleteFactHandler deletes one or more facts.
-// @Summary Delete Facts
-// @Description Delete facts by ID or a list of IDs.
-// @Tags facts
-// @Accept json
-// @Produce json
-// @Param id path string false "Fact ID (optional if provided in body)"
-// @Param body body memory.FactDeleteBody true "Delete Body"
-// @Success 200 {object} map[string]string "{"status": "deleted"}"
-// @Failure 400 {object} apiError
-// @Failure 401 {object} apiError
-// @Failure 500 {object} apiError
-// @Security ApiKeyAuth
-// @Router /facts/{id} [delete]
-func deleteFactHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		accountID := accountIDFromContext(r.Context())
-		if accountID == "" {
-			writeJSON(w, http.StatusUnauthorized, apiError{Error: "missing account context"})
-			return
-		}
-		factID := strings.TrimSpace(r.PathValue("id"))
-		var body models.FactDeleteBody
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			writeJSON(w, http.StatusBadRequest, apiError{Error: "invalid JSON payload"})
-			return
-		}
-		if _, ok := models.SourceTrustHierarchy[body.Source]; !ok {
-			writeJSON(w, http.StatusBadRequest, apiError{Error: "source is invalid"})
-			return
-		}
-		if factID != "" {
-			body.FactIDs = append(body.FactIDs, factID)
-		}
-		if len(body.FactIDs) == 0 {
-			writeJSON(w, http.StatusBadRequest, apiError{Error: "fact_ids are required"})
-			return
-		}
-		if err := memEngine.DeleteFactsForAccount(r.Context(), accountID, dedupeStrings(body.FactIDs), body.Source); err != nil {
-			writeEngineError(w, err)
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
-	}
-}
-
 func writeJSON(w http.ResponseWriter, code int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)

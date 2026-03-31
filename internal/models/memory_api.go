@@ -68,11 +68,6 @@ type FactUpdateRequest struct {
 	Source SourceKind `json:"source"` // Must be equal or higher trust than the target fact's source.
 }
 
-type FactDeleteRequest struct {
-	FactIDs []string   `json:"fact_ids"`
-	Source  SourceKind `json:"source"` // Must be equal or higher trust than the target fact's source.
-}
-
 // FactualInput is the request body for the factual interface.
 type FactualInput struct {
 	AccountID string      `json:"-" swaggerignore:"true"`
@@ -84,11 +79,6 @@ type FactualInput struct {
 type FactUpdateBody struct {
 	Text   string     `json:"text"`
 	Source SourceKind `json:"source"`
-}
-
-type FactDeleteBody struct {
-	FactIDs []string   `json:"fact_ids"`
-	Source  SourceKind `json:"source"`
 }
 
 type ThreadCreateBody struct {
