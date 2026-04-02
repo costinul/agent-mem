@@ -25,4 +25,4 @@ max_tokens: 4096
 requirements:
   min_context_window: 16000
   specializations:
-    - schema
+    - text

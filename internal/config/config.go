@@ -33,8 +33,8 @@ func Load() (*Config, error) {
 			PostgresDSN: strings.TrimSpace(os.Getenv("POSTGRES_DSN")),
 		},
 		AI: AIConfig{
-			SchemaModel:    getEnvOrDefault("AI_SCHEMA_MODEL", "schema"),
-			EmbeddingModel: getEnvOrDefault("AI_EMBEDDING_MODEL", "embedding"),
+			SchemaModel:    os.Getenv("AI_SCHEMA_MODEL"),
+			EmbeddingModel: os.Getenv("AI_EMBEDDING_MODEL"),
 		},
 	}
 
@@ -50,6 +50,14 @@ func (c *Config) validate() error {
 
 	if c.Database.PostgresDSN == "" {
 		missing = append(missing, "POSTGRES_DSN")
+	}
+
+	if c.AI.SchemaModel == "" {
+		missing = append(missing, "AI_SCHEMA_MODEL")
+	}
+
+	if c.AI.EmbeddingModel == "" {
+		missing = append(missing, "AI_EMBEDDING_MODEL")
 	}
 
 	if len(missing) > 0 {
