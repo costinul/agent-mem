@@ -1,0 +1,5 @@
+Prompt 1: Project Alpha is led by Sarah. The deadline is Q3.
+Prompt 2: Project Beta is a sub-project of Alpha, led by John.
+Prompt 3: Sarah left the company. John is taking over all her projects. Project Alpha's deadline is pushed to Q4.
+Prompt 4 (Get Memory): Who is leading Project Alpha and Project Beta, and when is the main project due?
+Expectation: John leads both Project Alpha and Project Beta. The deadline for Project Alpha is Q4.

@@ -1,0 +1,5 @@
+Prompt 1: Alice works at TechCorp as a Junior Developer. Bob is her manager.
+Prompt 2: Alice got promoted to Senior Developer.
+Prompt 3: TechCorp was acquired by MegaCorp. Bob moved to the HR department.
+Prompt 4 (Get Memory): What is Alice's current role and who does she work for? Where is Bob now?
+Expectation: Alice is a Senior Developer at TechCorp (which is owned by MegaCorp). Bob is in the HR department.

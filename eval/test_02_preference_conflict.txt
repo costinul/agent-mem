@@ -1,0 +1,5 @@
+Prompt 1: My favorite color is blue and I drive a Honda Civic.
+Prompt 2: I sold my car yesterday and bought a red Toyota Corolla.
+Prompt 3: Actually, I realized my favorite color is now red because of my new car.
+Prompt 4 (Get Memory): What car do I drive and what is my favorite color?
+Expectation: Drives a red Toyota Corolla. Favorite color is red (changed from blue).
