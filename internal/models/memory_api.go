@@ -81,6 +81,23 @@ type FactUpdateBody struct {
 	Source SourceKind `json:"source"`
 }
 
+// FactListOutput is the response for listing/browsing facts.
+type FactListOutput struct {
+	Facts  []ReturnedFact `json:"facts"`
+	Total  int            `json:"total"`
+	Limit  int            `json:"limit"`
+	Offset int            `json:"offset"`
+}
+
+// RecallInput is the request body for read-only memory retrieval.
+type RecallInput struct {
+	AccountID string `json:"-" swaggerignore:"true"`
+	AgentID   string `json:"agent_id"`
+	ThreadID  string `json:"thread_id"`
+	Query     string `json:"query"`
+	Limit     int    `json:"limit"`
+}
+
 type ThreadCreateBody struct {
 	AgentID string `json:"agent_id"`
 }

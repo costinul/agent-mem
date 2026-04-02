@@ -2,12 +2,14 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
 	"agentmem/internal/agent"
 	"agentmem/internal/engine"
 	models "agentmem/internal/models"
+	"agentmem/internal/repository/memoryrepo"
 )
 
 type apiError struct {
@@ -84,6 +86,41 @@ func factualHandler(memEngine *engine.MemoryEngine, agentSvc *agent.Service) htt
 			return
 		}
 		output, err := memEngine.AddFactual(r.Context(), input)
+		if err != nil {
+			writeEngineError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, output)
+	}
+}
+
+// recallHandler handles read-only memory retrieval by semantic search.
+// @Summary Recall Memory
+// @Description Retrieve relevant facts by semantic similarity to a query. No storage or mutation.
+// @Tags memory
+// @Accept json
+// @Produce json
+// @Param input body memory.RecallInput true "Recall Input"
+// @Success 200 {object} memory.MemoryOutput
+// @Failure 400 {object} apiError
+// @Failure 401 {object} apiError
+// @Failure 500 {object} apiError
+// @Security ApiKeyAuth
+// @Router /memory/recall [post]
+func recallHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		accountID := accountIDFromContext(r.Context())
+		if accountID == "" {
+			writeJSON(w, http.StatusUnauthorized, apiError{Error: "missing account context"})
+			return
+		}
+		var input models.RecallInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeJSON(w, http.StatusBadRequest, apiError{Error: "invalid JSON payload"})
+			return
+		}
+		input.AccountID = accountID
+		output, err := memEngine.Recall(r.Context(), input)
 		if err != nil {
 			writeEngineError(w, err)
 			return
@@ -177,6 +214,89 @@ func updateFactHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, http.StatusOK, fact)
+	}
+}
+
+// listFactsHandler lists facts with optional filters.
+// @Summary List Facts
+// @Description List facts scoped to the account, with optional agent, thread, and kind filters.
+// @Tags facts
+// @Produce json
+// @Param agent_id query string false "Agent ID"
+// @Param thread_id query string false "Thread ID"
+// @Param kind query string false "Fact kind (KNOWLEDGE, RULE, PREFERENCE)"
+// @Param limit query int false "Max results (default 50)"
+// @Param offset query int false "Offset for pagination"
+// @Success 200 {object} memory.FactListOutput
+// @Failure 401 {object} apiError
+// @Failure 500 {object} apiError
+// @Security ApiKeyAuth
+// @Router /facts [get]
+func listFactsHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		accountID := accountIDFromContext(r.Context())
+		if accountID == "" {
+			writeJSON(w, http.StatusUnauthorized, apiError{Error: "missing account context"})
+			return
+		}
+		q := r.URL.Query()
+		params := memoryrepo.ListFactsParams{}
+		if v := strings.TrimSpace(q.Get("agent_id")); v != "" {
+			params.AgentID = &v
+		}
+		if v := strings.TrimSpace(q.Get("thread_id")); v != "" {
+			params.ThreadID = &v
+		}
+		if v := strings.TrimSpace(q.Get("kind")); v != "" {
+			kind := models.FactKind(v)
+			params.Kind = &kind
+		}
+		if v := q.Get("limit"); v != "" {
+			fmt.Sscanf(v, "%d", &params.Limit)
+		}
+		if v := q.Get("offset"); v != "" {
+			fmt.Sscanf(v, "%d", &params.Offset)
+		}
+
+		output, err := memEngine.ListFactsForAccount(r.Context(), accountID, params)
+		if err != nil {
+			writeEngineError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, output)
+	}
+}
+
+// deleteFactHandler deletes a fact by ID.
+// @Summary Delete Fact
+// @Description Delete a specific fact by its ID.
+// @Tags facts
+// @Produce json
+// @Param id path string true "Fact ID"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} apiError
+// @Failure 401 {object} apiError
+// @Failure 404 {object} apiError
+// @Failure 500 {object} apiError
+// @Security ApiKeyAuth
+// @Router /facts/{id} [delete]
+func deleteFactHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		accountID := accountIDFromContext(r.Context())
+		if accountID == "" {
+			writeJSON(w, http.StatusUnauthorized, apiError{Error: "missing account context"})
+			return
+		}
+		factID := strings.TrimSpace(r.PathValue("id"))
+		if factID == "" {
+			writeJSON(w, http.StatusBadRequest, apiError{Error: "fact id is required"})
+			return
+		}
+		if err := memEngine.DeleteFactForAccount(r.Context(), accountID, factID); err != nil {
+			writeEngineError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 	}
 }
 

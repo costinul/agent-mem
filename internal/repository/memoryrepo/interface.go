@@ -16,10 +16,21 @@ type Repository interface {
 
 	InsertFact(ctx context.Context, fact models.Fact) (*models.Fact, error)
 	ListFactsByScope(ctx context.Context, accountID string, agentID, threadID *string) ([]models.Fact, error)
+	ListFactsFiltered(ctx context.Context, params ListFactsParams) ([]models.Fact, int, error)
 	GetFactByID(ctx context.Context, factID string) (*models.Fact, error)
 	SearchFactsByEmbedding(ctx context.Context, params SearchByEmbeddingParams) ([]models.Fact, error)
 	UpdateFact(ctx context.Context, fact models.Fact) error
+	DeleteFact(ctx context.Context, factID string) error
 	SupersedeFact(ctx context.Context, oldFactID string, newFact models.Fact) (*models.Fact, error)
+}
+
+type ListFactsParams struct {
+	AccountID string
+	AgentID   *string
+	ThreadID  *string
+	Kind      *models.FactKind
+	Limit     int
+	Offset    int
 }
 
 type SearchByEmbeddingParams struct {

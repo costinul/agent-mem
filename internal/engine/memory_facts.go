@@ -7,7 +7,32 @@ import (
 	"strings"
 
 	models "agentmem/internal/models"
+	"agentmem/internal/repository/memoryrepo"
 )
+
+func (e *MemoryEngine) ListFactsForAccount(ctx context.Context, accountID string, params memoryrepo.ListFactsParams) (models.FactListOutput, error) {
+	params.AccountID = accountID
+	facts, total, err := e.repo.ListFactsFiltered(ctx, params)
+	if err != nil {
+		return models.FactListOutput{}, fmt.Errorf("list facts: %w", err)
+	}
+
+	returned := make([]models.ReturnedFact, 0, len(facts))
+	for _, fact := range facts {
+		mapped, err := e.mapFactForOutput(ctx, fact, false)
+		if err != nil {
+			return models.FactListOutput{}, err
+		}
+		returned = append(returned, mapped)
+	}
+
+	return models.FactListOutput{
+		Facts:  returned,
+		Total:  total,
+		Limit:  params.Limit,
+		Offset: params.Offset,
+	}, nil
+}
 
 func (e *MemoryEngine) GetFact(ctx context.Context, factID string, includeSources bool) (models.ReturnedFact, error) {
 	return e.GetFactForAccount(ctx, "", factID, includeSources)
@@ -59,6 +84,20 @@ func (e *MemoryEngine) UpdateFactForAccount(ctx context.Context, accountID, fact
 		return models.ReturnedFact{}, fmt.Errorf("update fact: %w", err)
 	}
 	return e.mapFactForOutput(ctx, *fact, false)
+}
+
+func (e *MemoryEngine) DeleteFactForAccount(ctx context.Context, accountID, factID string) error {
+	fact, err := e.repo.GetFactByID(ctx, factID)
+	if err != nil {
+		return fmt.Errorf("get fact: %w", err)
+	}
+	if fact == nil {
+		return errors.New("fact not found")
+	}
+	if strings.TrimSpace(accountID) != "" && fact.AccountID != strings.TrimSpace(accountID) {
+		return errors.New("fact not found")
+	}
+	return e.repo.DeleteFact(ctx, factID)
 }
 
 func (e *MemoryEngine) buildOutput(ctx context.Context, input models.MemoryInput, facts []models.Fact) (models.MemoryOutput, error) {

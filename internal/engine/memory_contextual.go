@@ -27,7 +27,7 @@ func (e *MemoryEngine) ProcessContextual(ctx context.Context, input models.Memor
 		return models.MemoryOutput{}, fmt.Errorf("insert event: %w", err)
 	}
 
-	storedSources, decompositions, err := e.persistAndDecomposeSources(ctx, event.ID, input.ThreadID, input.Inputs)
+	storedSources, decompositions, err := e.persistAndDecomposeSources(ctx, event.ID, input.ThreadID, input.Inputs, true)
 	if err != nil {
 		return models.MemoryOutput{}, err
 	}
@@ -109,6 +109,13 @@ func (e *MemoryEngine) buildSearchEmbeddings(ctx context.Context, decompositions
 }
 
 func (e *MemoryEngine) retrieveFacts(ctx context.Context, accountID, agentID, threadID string, embeddings [][]float64) ([]models.Fact, error) {
+	return e.retrieveFactsWithLimit(ctx, accountID, agentID, threadID, embeddings, 10)
+}
+
+func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, agentID, threadID string, embeddings [][]float64, limit int) ([]models.Fact, error) {
+	if limit <= 0 {
+		limit = 10
+	}
 	aid := ptrString(agentID)
 	tid := ptrString(threadID)
 	seen := map[string]struct{}{}
@@ -120,7 +127,7 @@ func (e *MemoryEngine) retrieveFacts(ctx context.Context, accountID, agentID, th
 			AgentID:   aid,
 			ThreadID:  tid,
 			Embedding: emb,
-			Limit:     10,
+			Limit:     limit,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("search thread facts: %w", err)
@@ -129,7 +136,7 @@ func (e *MemoryEngine) retrieveFacts(ctx context.Context, accountID, agentID, th
 			AccountID: accountID,
 			AgentID:   aid,
 			Embedding: emb,
-			Limit:     10,
+			Limit:     limit,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("search agent facts: %w", err)
@@ -137,7 +144,7 @@ func (e *MemoryEngine) retrieveFacts(ctx context.Context, accountID, agentID, th
 		accountFacts, err := e.repo.SearchFactsByEmbedding(ctx, memoryrepo.SearchByEmbeddingParams{
 			AccountID: accountID,
 			Embedding: emb,
-			Limit:     10,
+			Limit:     limit,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("search account facts: %w", err)

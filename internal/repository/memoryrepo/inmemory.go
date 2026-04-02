@@ -185,6 +185,64 @@ func (r *InMemoryRepository) ListFactsByScope(_ context.Context, accountID strin
 	return facts, nil
 }
 
+func (r *InMemoryRepository) ListFactsFiltered(_ context.Context, params ListFactsParams) ([]models.Fact, int, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	matched := make([]models.Fact, 0)
+	for _, fact := range r.facts {
+		if fact.SupersededAt != nil {
+			continue
+		}
+		if fact.AccountID != params.AccountID {
+			continue
+		}
+		if params.AgentID != nil {
+			if fact.AgentID == nil || *fact.AgentID != *params.AgentID {
+				continue
+			}
+		}
+		if params.ThreadID != nil {
+			if fact.ThreadID == nil || *fact.ThreadID != *params.ThreadID {
+				continue
+			}
+		}
+		if params.Kind != nil && fact.Kind != *params.Kind {
+			continue
+		}
+		matched = append(matched, fact)
+	}
+
+	sort.Slice(matched, func(i, j int) bool {
+		return matched[i].CreatedAt.After(matched[j].CreatedAt)
+	})
+
+	total := len(matched)
+	limit := params.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	offset := params.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	if offset >= len(matched) {
+		return []models.Fact{}, total, nil
+	}
+	end := offset + limit
+	if end > len(matched) {
+		end = len(matched)
+	}
+	return matched[offset:end], total, nil
+}
+
+func (r *InMemoryRepository) DeleteFact(_ context.Context, factID string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.facts, factID)
+	return nil
+}
+
 func (r *InMemoryRepository) UpdateFact(_ context.Context, fact models.Fact) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

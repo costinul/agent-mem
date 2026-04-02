@@ -307,6 +307,68 @@ func (r *PostgresRepository) ListFactsByScope(ctx context.Context, accountID str
 	return facts, rows.Err()
 }
 
+func (r *PostgresRepository) ListFactsFiltered(ctx context.Context, params ListFactsParams) ([]models.Fact, int, error) {
+	if params.Limit <= 0 {
+		params.Limit = 50
+	}
+	if params.Offset < 0 {
+		params.Offset = 0
+	}
+
+	baseWhere := `WHERE account_id = $1
+		   AND ($2::uuid IS NULL OR agent_id = $2)
+		   AND ($3::uuid IS NULL OR thread_id = $3)
+		   AND ($4::text IS NULL OR kind = $4)
+		   AND superseded_at IS NULL`
+
+	var kindParam *string
+	if params.Kind != nil {
+		k := string(*params.Kind)
+		kindParam = &k
+	}
+
+	var total int
+	err := r.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM facts `+baseWhere,
+		params.AccountID, params.AgentID, params.ThreadID, kindParam,
+	).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, account_id, agent_id, thread_id, source_id, kind, text, created_at, updated_at
+		 FROM facts `+baseWhere+`
+		 ORDER BY created_at DESC
+		 LIMIT $5 OFFSET $6`,
+		params.AccountID, params.AgentID, params.ThreadID, kindParam, params.Limit, params.Offset,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	facts := make([]models.Fact, 0)
+	for rows.Next() {
+		var (
+			fact   models.Fact
+			agent  sql.NullString
+			thread sql.NullString
+		)
+		if err := rows.Scan(
+			&fact.ID, &fact.AccountID, &agent, &thread,
+			&fact.SourceID, &fact.Kind, &fact.Text,
+			&fact.CreatedAt, &fact.UpdatedAt,
+		); err != nil {
+			return nil, 0, err
+		}
+		fact.AgentID = nullStringPtr(agent)
+		fact.ThreadID = nullStringPtr(thread)
+		facts = append(facts, fact)
+	}
+	return facts, total, rows.Err()
+}
+
 func (r *PostgresRepository) GetFactByID(ctx context.Context, factID string) (*models.Fact, error) {
 	var (
 		fact     models.Fact
@@ -417,6 +479,11 @@ func (r *PostgresRepository) SearchFactsByEmbedding(ctx context.Context, params 
 		facts = append(facts, fact)
 	}
 	return facts, rows.Err()
+}
+
+func (r *PostgresRepository) DeleteFact(ctx context.Context, factID string) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM facts WHERE id = $1`, factID)
+	return err
 }
 
 func (r *PostgresRepository) SupersedeFact(ctx context.Context, oldFactID string, newFact models.Fact) (*models.Fact, error) {

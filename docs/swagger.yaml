@@ -128,6 +128,19 @@ definitions:
     - FACT_KIND_KNOWLEDGE
     - FACT_KIND_RULE
     - FACT_KIND_PREFERENCE
+  memory.FactListOutput:
+    properties:
+      facts:
+        items:
+          $ref: '#/definitions/memory.ReturnedFact'
+        type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+    type: object
   memory.FactUpdateBody:
     properties:
       source:
@@ -183,6 +196,17 @@ definitions:
         items:
           $ref: '#/definitions/memory.ConversationMessage'
         type: array
+    type: object
+  memory.RecallInput:
+    properties:
+      agent_id:
+        type: string
+      limit:
+        type: integer
+      query:
+        type: string
+      thread_id:
+        type: string
     type: object
   memory.ReturnedFact:
     properties:
@@ -363,7 +387,90 @@ paths:
       summary: Get Agent
       tags:
       - agents
+  /facts:
+    get:
+      description: List facts scoped to the account, with optional agent, thread,
+        and kind filters.
+      parameters:
+      - description: Agent ID
+        in: query
+        name: agent_id
+        type: string
+      - description: Thread ID
+        in: query
+        name: thread_id
+        type: string
+      - description: Fact kind (KNOWLEDGE, RULE, PREFERENCE)
+        in: query
+        name: kind
+        type: string
+      - description: Max results (default 50)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset for pagination
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/memory.FactListOutput'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiError'
+      security:
+      - ApiKeyAuth: []
+      summary: List Facts
+      tags:
+      - facts
   /facts/{id}:
+    delete:
+      description: Delete a specific fact by its ID.
+      parameters:
+      - description: Fact ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiError'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete Fact
+      tags:
+      - facts
     get:
       description: Retrieve a specific fact by its ID, optionally including original
         sources.
@@ -533,6 +640,43 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Add Factual Memory
+      tags:
+      - memory
+  /memory/recall:
+    post:
+      consumes:
+      - application/json
+      description: Retrieve relevant facts by semantic similarity to a query. No storage
+        or mutation.
+      parameters:
+      - description: Recall Input
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/memory.RecallInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/memory.MemoryOutput'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiError'
+      security:
+      - ApiKeyAuth: []
+      summary: Recall Memory
       tags:
       - memory
   /threads:

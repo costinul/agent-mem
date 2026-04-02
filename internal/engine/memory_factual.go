@@ -4,78 +4,91 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 
 	models "agentmem/internal/models"
 )
 
 func (e *MemoryEngine) AddFactual(ctx context.Context, input models.FactualInput) (models.MemoryOutput, error) {
-	if strings.TrimSpace(input.AccountID) == "" {
-		return models.MemoryOutput{}, errors.New("account_id is required")
-	}
-	if strings.TrimSpace(input.ThreadID) == "" {
-		return models.MemoryOutput{}, errors.New("thread_id is required")
-	}
-	if strings.TrimSpace(input.AgentID) == "" {
-		return models.MemoryOutput{}, errors.New("thread agent is required")
-	}
-	if len(input.Inputs) == 0 {
-		return models.MemoryOutput{}, errors.New("inputs are required")
-	}
-	for idx, item := range input.Inputs {
-		if strings.TrimSpace(item.Content) == "" {
-			return models.MemoryOutput{}, fmt.Errorf("inputs[%d].content is required", idx)
-		}
-		if _, ok := models.SourceTrustHierarchy[item.Kind]; !ok {
-			return models.MemoryOutput{}, fmt.Errorf("inputs[%d].kind is invalid", idx)
-		}
+	if err := validateFactualInput(input); err != nil {
+		return models.MemoryOutput{}, err
 	}
 
-	threadID := ptrString(input.ThreadID)
+	log.Printf("factual pipeline start account=%s agent=%s thread=%s inputs=%d", input.AccountID, input.AgentID, input.ThreadID, len(input.Inputs))
+	threadID := input.ThreadID
 	event, err := e.repo.InsertEvent(ctx, models.Event{
 		AccountID: input.AccountID,
 		AgentID:   input.AgentID,
-		ThreadID:  threadID,
+		ThreadID:  ptrString(threadID),
 	})
 	if err != nil {
 		return models.MemoryOutput{}, fmt.Errorf("insert event: %w", err)
 	}
 
-	storedSources, decompositions, err := e.persistAndDecomposeSources(ctx, event.ID, strings.TrimSpace(input.ThreadID), input.Inputs)
+	storedSources, decompositions, err := e.persistAndDecomposeSources(ctx, event.ID, threadID, input.Inputs, false)
 	if err != nil {
 		return models.MemoryOutput{}, err
 	}
 
-	extracted := flattenExtractedFacts(decompositions)
-	texts := make([]string, 0, len(extracted))
-	for _, fact := range extracted {
-		texts = append(texts, fact.Text)
-	}
-	embeddings, err := e.ai.Embed(ctx, texts)
+	queryEmbeddings, err := e.buildSearchEmbeddings(ctx, decompositions)
 	if err != nil {
-		return models.MemoryOutput{}, fmt.Errorf("embed factual facts: %w", err)
+		return models.MemoryOutput{}, err
 	}
 
-	stored := make([]models.Fact, 0, len(extracted))
-	for idx, extractedFact := range extracted {
-		sourceID := selectSourceIDForExtractedFact(storedSources, idx)
-		fact := models.Fact{
-			AccountID: input.AccountID,
-			AgentID:   ptrString(input.AgentID),
-			ThreadID:  threadID,
-			SourceID:  sourceID,
-			Kind:      extractedFact.Kind,
-			Text:      extractedFact.Text,
-			Embedding: embeddings[idx],
-		}
-		inserted, err := e.repo.InsertFact(ctx, fact)
-		if err != nil {
-			return models.MemoryOutput{}, fmt.Errorf("insert factual fact: %w", err)
-		}
-		stored = append(stored, *inserted)
+	retrieved, err := e.retrieveFacts(ctx, input.AccountID, input.AgentID, threadID, queryEmbeddings)
+	if err != nil {
+		return models.MemoryOutput{}, err
 	}
 
-	return e.buildOutput(ctx, models.MemoryInput{
+	evalInput := flattenExtractedFacts(decompositions)
+	evalResult, err := e.ai.Evaluate(ctx, EvaluateRequest{
+		NewFacts:       evalInput,
+		RetrievedFacts: retrieved,
+	})
+	if err != nil {
+		return models.MemoryOutput{}, fmt.Errorf("evaluate facts: %w", err)
+	}
+
+	memInput := models.MemoryInput{
+		AccountID:      input.AccountID,
+		AgentID:        input.AgentID,
+		ThreadID:       threadID,
 		IncludeSources: true,
-	}, stored)
+	}
+	storedFacts, err := e.applyEvaluateResult(ctx, memInput, storedSources, evalInput, evalResult)
+	if err != nil {
+		return models.MemoryOutput{}, err
+	}
+
+	output, err := e.buildOutput(ctx, memInput, append(evalResult.FactsToReturn, storedFacts...))
+	if err != nil {
+		return models.MemoryOutput{}, err
+	}
+	log.Printf("factual pipeline completed event=%s returned_facts=%d", event.ID, len(output.Facts))
+	return output, nil
+}
+
+func validateFactualInput(input models.FactualInput) error {
+	if strings.TrimSpace(input.AccountID) == "" {
+		return errors.New("account_id is required")
+	}
+	if strings.TrimSpace(input.ThreadID) == "" {
+		return errors.New("thread_id is required")
+	}
+	if strings.TrimSpace(input.AgentID) == "" {
+		return errors.New("thread agent is required")
+	}
+	if len(input.Inputs) == 0 {
+		return errors.New("inputs are required")
+	}
+	for idx, item := range input.Inputs {
+		if strings.TrimSpace(item.Content) == "" {
+			return fmt.Errorf("inputs[%d].content is required", idx)
+		}
+		if _, ok := models.SourceTrustHierarchy[item.Kind]; !ok {
+			return fmt.Errorf("inputs[%d].kind is invalid", idx)
+		}
+	}
+	return nil
 }

@@ -8,13 +8,13 @@ import (
 	models "agentmem/internal/models"
 )
 
-func (e *MemoryEngine) persistAndDecomposeSources(ctx context.Context, eventID, threadID string, inputs []models.InputItem) ([]models.Source, []models.Decomposition, error) {
+func (e *MemoryEngine) persistAndDecomposeSources(ctx context.Context, eventID, threadID string, inputs []models.InputItem, withMessageHistory bool) ([]models.Source, []models.Decomposition, error) {
 	storedSources := make([]models.Source, 0, len(inputs))
 	contextHeader := buildEventContextHeader(inputs)
 	decompositions := make([]models.Decomposition, 0, len(inputs))
 
 	var msgHistory []string
-	if threadID != "" {
+	if withMessageHistory && threadID != "" {
 		recent, err := e.repo.ListConversationSourcesByThreadID(ctx, threadID, 10)
 		if err != nil {
 			return nil, nil, fmt.Errorf("load message history: %w", err)
