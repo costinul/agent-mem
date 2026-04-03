@@ -1,5 +1,31 @@
-Prompt 1: My favorite color is blue and I drive a Honda Civic.
-Prompt 2: I sold my car yesterday and bought a red Toyota Corolla.
-Prompt 3: Actually, I realized my favorite color is now red because of my new car.
-Prompt 4 (Get Memory): What car do I drive and what is my favorite color?
-Expectation: Drives a red Toyota Corolla. Favorite color is red (changed from blue).
+Prompt 1 (user):
+I've been thinking about redecorating my home office since I'm going to be spending a lot more time in it now. Right now the walls are this awful beige that the previous tenant picked, and the furniture is just a random Ikea desk I bought in college. My favorite color has always been blue — like a deep navy blue, not that bright electric blue — so I'm thinking of doing an accent wall behind my monitor in that color. I actually just ordered some paint samples from Benjamin Moore, the shade is called "Hale Navy" and it looks gorgeous in the photos. My girlfriend thinks I should do green instead but I'm not budging on this one. On a completely different note, I drive a 2019 Honda Civic that I bought used about two years ago. It's been reliable but nothing exciting — silver, base model, no frills. I mainly use it for grocery runs and the occasional weekend trip to the coast. I've been thinking about getting something more fun once I pay off my student loans, maybe something sporty. My commute used to be about twenty minutes each way when I was going to the office, but now that I'm remote that's obviously not a factor anymore. I did put new tires on it last month though because the old ones were getting dangerously bald, especially for Oregon rain.
+
+Prompt 2 (user):
+Okay so big weekend. I finally pulled the trigger and sold my Honda Civic. Got a decent price for it too — listed it on Craigslist Thursday evening and by Saturday morning I had three people wanting to look at it. Ended up selling it to a college kid for twelve thousand, which was actually more than I expected given the mileage. The reason I sold it is because I went and bought a 2024 Toyota Corolla in red. Yeah, red! I know that sounds unlike me since I literally just told you blue is my favorite color, but there's a story behind it. My girlfriend and I went to the Toyota dealership originally just to test drive a RAV4 because she needs a bigger car for when she goes hiking with all her gear. While she was doing paperwork for her thing, I wandered around the lot and spotted this Corolla in the most gorgeous shade of red — Toyota calls it "Supersonic Red" — and it just spoke to me. It's got the SE trim with the sport suspension and the upgraded stereo, and the monthly payment worked out almost the same as what I was paying for the Civic after the trade-in value. My girlfriend thought it was an impulse buy but honestly I'd been wanting to upgrade for months, the Civic just gave me the excuse by needing new brakes soon. Pixel seems to like the new car too, he sits in the back seat and watches everything go by through the window.
+
+Get Memory 1:
+What car does the user drive?
+Expected: A 2024 Toyota Corolla in red (Supersonic Red), SE trim. Sold the previous 2019 Honda Civic.
+
+Prompt 3 (user):
+You know what's funny, I think my new car is actually changing my aesthetic preferences. Ever since I got the red Corolla I've been noticing how much I'm drawn to warm colors now. I was at Target last week and caught myself buying a red throw blanket, red kitchen towels, even a red phone case. My girlfriend pointed it out and I was like "huh, I guess my favorite color might actually be red now?" Which is wild because I've been a blue person my entire life — literally since I was a kid, my bedroom was always blue, my backpacks were blue, my first bike was blue. But something about that red on the car just shifts my whole perception. I even went back to the Benjamin Moore website and started looking at their red and burgundy shades for the accent wall instead of the Hale Navy I originally picked. There's one called "Caliente" that I think would look incredible. I haven't committed to it yet because my girlfriend says I'm having some kind of midlife crisis at twenty-eight, but honestly I just think tastes evolve. I did keep the navy blue rug I bought a few weeks ago though because it actually looks great as a contrast with all the red accents. So maybe I'm more of a red-and-navy person now. But if you asked me point blank what's my favorite color today, I'd say red.
+
+Get Memory 2:
+What is the user's favorite color?
+Expected: Red (changed from blue, influenced by the red Toyota Corolla).
+
+Get Memory 3:
+What color is the user planning for their accent wall?
+Expected: Red/burgundy (shade called "Caliente" from Benjamin Moore). Originally planned navy blue ("Hale Navy") but changed preference.
+
+Prompt 4 (user):
+Alright so I need to vent. I got rear-ended yesterday in a parking lot. Some teenager backed out of a spot without looking and crunched my rear bumper. Nobody was hurt, Pixel was at home thankfully, but I'm absolutely furious because I've only had the Corolla for like two months and it was pristine. The kid's insurance is covering it, and Toyota said the repair should take about ten days, so I'm driving a rental in the meantime — they gave me a white Nissan Sentra which is possibly the most boring car on planet Earth. On the bright side, the insurance adjuster said the frame is fine and it's purely cosmetic, so the car should be good as new once they replace the bumper and repaint it. My girlfriend is being really supportive about it, she knows how much I love that car. She also suggested I look into getting a dashcam installed when I get it back, which is actually a really smart idea. I'm looking at the Viofo A129 Pro which does front and rear recording. In other news, I finally painted the accent wall this past weekend. Went with the Caliente red and it looks absolutely stunning. The navy rug ties the whole room together. My home office actually feels like a real space now instead of a sad beige box.
+
+Get Memory 4:
+What happened to the user's car recently?
+Expected: The red Toyota Corolla was rear-ended in a parking lot, is in the shop for bumper repair (~10 days), user is driving a white Nissan Sentra rental.
+
+Get Memory 5:
+What color did the user paint their accent wall?
+Expected: Red — the Benjamin Moore shade called "Caliente."

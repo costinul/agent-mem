@@ -1,5 +1,31 @@
-Prompt 1: Alice works at TechCorp as a Junior Developer. Bob is her manager.
-Prompt 2: Alice got promoted to Senior Developer.
-Prompt 3: TechCorp was acquired by MegaCorp. Bob moved to the HR department.
-Prompt 4 (Get Memory): What is Alice's current role and who does she work for? Where is Bob now?
-Expectation: Alice is a Senior Developer at TechCorp (which is owned by MegaCorp). Bob is in the HR department.
+Prompt 1 (user):
+So I just started at this new place, TechCorp, about three weeks ago. I'm working as a Junior Developer on their payments team. The onboarding was kind of a mess honestly — they gave me a laptop that had the wrong OS image, so I spent the first two days just setting up my environment while everyone else was already pushing code. My manager Bob has been pretty chill about it though, he said not to worry and that it happens to everyone. Bob's been at TechCorp for like six years, he started as an intern and worked his way up to Engineering Manager. He manages about twelve people across two squads. The office is in downtown Portland, right next to that food cart pod on Alder Street, which is honestly the best perk of the job so far. I've been eating lunch there almost every day. The tech stack is mostly Go and React, which I'm comfortable with, though they use some internal tooling that has basically zero documentation. Bob said he'd pair with me next week to walk through the deployment pipeline because apparently it's pretty custom. Oh and they use Slack for everything — like literally everything, even stuff that should probably be in Jira.
+
+Prompt 2 (user):
+Big news — I got promoted! I'm now a Senior Developer at TechCorp. It happened way faster than I expected honestly. There was a production incident last month where our payment processing pipeline went down during peak hours, and I ended up being the one who figured out the root cause. Turned out there was a race condition in the queue consumer that only manifested under high load. I wrote a pretty detailed post-mortem and proposed a fix that involved switching to a distributed lock pattern, and the VP of Engineering apparently read it and was impressed. Bob put me up for the promotion right after that. The pay bump is decent too — not life-changing, but enough that I can finally stop worrying about rent every month. I'm also going to be tech lead for the new checkout redesign project, which is kind of terrifying but also exciting. I'll be working with the design team directly and I've never really done that before. Bob said he'll mentor me through it. I also moved desks — I'm now sitting next to the window which has a pretty nice view of the West Hills.
+
+Get Memory 1:
+What is the user's current job title and company?
+Expected: Senior Developer at TechCorp.
+
+Prompt 3 (user):
+Wild week at work. So apparently TechCorp got acquired by MegaCorp. The announcement came out Monday morning in an all-hands that nobody saw coming — even Bob seemed surprised and he usually knows everything that's going on. MegaCorp is this massive enterprise software conglomerate based out of Seattle, they have like twenty thousand employees across fifty countries. The CEO of MegaCorp did a video call during the all-hands and said all the usual stuff about "preserving TechCorp's culture" and "synergies" but honestly nobody really believes that. The immediate changes are mostly administrative — we're switching to MegaCorp's benefits provider, which actually has better dental coverage so that's a win. Our email domains are getting migrated too, so I'll be costinel@megacorp.com instead of costinel@techcorp.com. The bigger news for me personally is that Bob is moving to HR. Yeah, HR. Apparently MegaCorp has this whole "People Operations" division and they wanted someone with deep institutional knowledge of TechCorp's engineering org to help with the integration. Bob seemed a bit conflicted about it but said it's a good career opportunity. My new manager is going to be someone named Diane who's transferring from MegaCorp's Seattle office. I haven't met her yet. The checkout redesign project I was leading is on hold until the integration settles.
+
+Get Memory 2:
+Who is the user's current manager?
+Expected: Diane (Bob moved to HR after the MegaCorp acquisition).
+
+Get Memory 3:
+What happened to Bob?
+Expected: Bob moved to the HR / People Operations department after MegaCorp acquired TechCorp.
+
+Prompt 4 (user):
+Quick update on the work situation. So Diane has been my manager for about two months now and honestly she's great — very different style from Bob but in a good way. She's much more structured, does weekly one-on-ones with a proper agenda and everything. She also pushed hard to get the checkout redesign project restarted, which I'm grateful for because it was just sitting in limbo. The other big change is that MegaCorp decided to consolidate all the Portland engineering teams into their existing Seattle campus. They gave everyone the option to relocate or go remote. I chose remote because my girlfriend just signed a two-year lease on our apartment here and we really don't want to move. About half the team chose to relocate though, so there's been a lot of turnover. On the technical side, we're migrating everything to MegaCorp's cloud infrastructure — they use Azure exclusively, which is new for me since TechCorp was all-in on AWS. It's been a steep learning curve but Diane has been patient about it. Oh, I also adopted a dog last weekend. His name is Pixel, he's a two-year-old corgi mix and he is the cutest thing alive.
+
+Get Memory 4:
+What is the user's work arrangement?
+Expected: The user works remotely from Portland.
+
+Get Memory 5:
+Does the user have any pets?
+Expected: Yes, a dog named Pixel, a two-year-old corgi mix.
