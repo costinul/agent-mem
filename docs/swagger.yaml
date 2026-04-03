@@ -43,30 +43,6 @@ definitions:
       thread_id:
         type: string
     type: object
-  memory.EvaluateResult:
-    properties:
-      facts_to_evolve:
-        description: Facts superseded by new information; old fact is preserved with
-          lineage.
-        items:
-          $ref: '#/definitions/memory.FactEvolution'
-        type: array
-      facts_to_return:
-        description: Relevant existing + new facts to return to the agent.
-        items:
-          $ref: '#/definitions/memory.Fact'
-        type: array
-      facts_to_store:
-        description: New facts to insert.
-        items:
-          $ref: '#/definitions/memory.Fact'
-        type: array
-      facts_to_update:
-        description: Existing facts contradicted by higher/equal trust source.
-        items:
-          $ref: '#/definitions/memory.Fact'
-        type: array
-    type: object
   memory.Fact:
     properties:
       account_id:
@@ -98,15 +74,6 @@ definitions:
         description: Null means agent-level or account-level scope.
         type: string
       updated_at:
-        type: string
-    type: object
-  memory.FactEvolution:
-    properties:
-      new_kind:
-        $ref: '#/definitions/memory.FactKind'
-      new_text:
-        type: string
-      old_fact_id:
         type: string
     type: object
   memory.FactKind:
@@ -170,43 +137,38 @@ definitions:
     type: object
   memory.MemoryInput:
     properties:
-      include_sources:
-        description: When true, return original source content with facts.
-        type: boolean
       inputs:
         items:
           $ref: '#/definitions/memory.InputItem'
         type: array
-      message_history:
-        description: Number of recent raw messages to return. 0 = facts only.
-        type: integer
       thread_id:
         type: string
-    type: object
-  memory.MemoryOutput:
-    properties:
-      facts:
-        description: Relevant facts for the agent.
-        items:
-          $ref: '#/definitions/memory.ReturnedFact'
-        type: array
-      messages:
-        description: Recent USER/AGENT messages from sources. Empty if MessageHistory
-          is 0.
-        items:
-          $ref: '#/definitions/memory.ConversationMessage'
-        type: array
     type: object
   memory.RecallInput:
     properties:
       agent_id:
         type: string
+      include_sources:
+        type: boolean
       limit:
+        type: integer
+      message_history:
         type: integer
       query:
         type: string
       thread_id:
         type: string
+    type: object
+  memory.RecallOutput:
+    properties:
+      facts:
+        items:
+          $ref: '#/definitions/memory.ReturnedFact'
+        type: array
+      messages:
+        items:
+          $ref: '#/definitions/memory.ConversationMessage'
+        type: array
     type: object
   memory.ReturnedFact:
     properties:
@@ -267,6 +229,13 @@ definitions:
     properties:
       agent_id:
         type: string
+    type: object
+  memory.WriteOutput:
+    properties:
+      facts:
+        items:
+          $ref: '#/definitions/memory.ReturnedFact'
+        type: array
     type: object
 host: localhost:8080
 info:
@@ -573,8 +542,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Process input through the contextual smart pipeline to retrieve
-        relevant facts and messages.
+      description: Process input through the contextual smart pipeline to store, update,
+        and evolve facts.
       parameters:
       - description: Memory Input
         in: body
@@ -588,7 +557,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/memory.MemoryOutput'
+            $ref: '#/definitions/memory.WriteOutput'
         "400":
           description: Bad Request
           schema:
@@ -610,7 +579,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Add new facts to the memory engine.
+      description: Process input through the factual pipeline to store, update, and
+        evolve facts (no conversation context).
       parameters:
       - description: Factual Input
         in: body
@@ -624,7 +594,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/memory.EvaluateResult'
+            $ref: '#/definitions/memory.WriteOutput'
         "400":
           description: Bad Request
           schema:
@@ -661,7 +631,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/memory.MemoryOutput'
+            $ref: '#/definitions/memory.RecallOutput'
         "400":
           description: Bad Request
           schema:

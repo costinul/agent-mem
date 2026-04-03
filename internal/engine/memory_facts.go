@@ -100,8 +100,31 @@ func (e *MemoryEngine) DeleteFactForAccount(ctx context.Context, accountID, fact
 	return e.repo.DeleteFact(ctx, factID)
 }
 
-func (e *MemoryEngine) buildOutput(ctx context.Context, input models.MemoryInput, facts []models.Fact) (models.MemoryOutput, error) {
-	output := models.MemoryOutput{
+func (e *MemoryEngine) buildWriteOutput(ctx context.Context, facts []models.Fact) (models.WriteOutput, error) {
+	output := models.WriteOutput{
+		Facts: make([]models.ReturnedFact, 0, len(facts)),
+	}
+	seen := map[string]struct{}{}
+	for _, fact := range facts {
+		key := fact.ID
+		if key == "" {
+			key = strings.ToLower(strings.TrimSpace(fmt.Sprintf("%s|%s", fact.Kind, fact.Text)))
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		mapped, err := e.mapFactForOutput(ctx, fact, false)
+		if err != nil {
+			return models.WriteOutput{}, err
+		}
+		output.Facts = append(output.Facts, mapped)
+	}
+	return output, nil
+}
+
+func (e *MemoryEngine) buildRecallOutput(ctx context.Context, input models.RecallInput, facts []models.Fact) (models.RecallOutput, error) {
+	output := models.RecallOutput{
 		Facts: make([]models.ReturnedFact, 0, len(facts)),
 	}
 	seen := map[string]struct{}{}
@@ -116,7 +139,7 @@ func (e *MemoryEngine) buildOutput(ctx context.Context, input models.MemoryInput
 		seen[key] = struct{}{}
 		mapped, err := e.mapFactForOutput(ctx, fact, input.IncludeSources)
 		if err != nil {
-			return models.MemoryOutput{}, err
+			return models.RecallOutput{}, err
 		}
 		output.Facts = append(output.Facts, mapped)
 	}
@@ -124,7 +147,7 @@ func (e *MemoryEngine) buildOutput(ctx context.Context, input models.MemoryInput
 	if input.MessageHistory > 0 && strings.TrimSpace(input.ThreadID) != "" {
 		sources, err := e.repo.ListConversationSourcesByThreadID(ctx, input.ThreadID, input.MessageHistory)
 		if err != nil {
-			return models.MemoryOutput{}, fmt.Errorf("list conversation sources: %w", err)
+			return models.RecallOutput{}, fmt.Errorf("list conversation sources: %w", err)
 		}
 		output.Messages = make([]models.ConversationMessage, 0, len(sources))
 		for _, source := range sources {

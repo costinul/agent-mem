@@ -476,7 +476,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Process input through the contextual smart pipeline to retrieve relevant facts and messages.",
+                "description": "Process input through the contextual smart pipeline to store, update, and evolve facts.",
                 "consumes": [
                     "application/json"
                 ],
@@ -502,7 +502,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/memory.MemoryOutput"
+                            "$ref": "#/definitions/memory.WriteOutput"
                         }
                     },
                     "400": {
@@ -533,7 +533,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Add new facts to the memory engine.",
+                "description": "Process input through the factual pipeline to store, update, and evolve facts (no conversation context).",
                 "consumes": [
                     "application/json"
                 ],
@@ -559,7 +559,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/memory.EvaluateResult"
+                            "$ref": "#/definitions/memory.WriteOutput"
                         }
                     },
                     "400": {
@@ -616,7 +616,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/memory.MemoryOutput"
+                            "$ref": "#/definitions/memory.RecallOutput"
                         }
                     },
                     "400": {
@@ -889,39 +889,6 @@ const docTemplate = `{
                 }
             }
         },
-        "memory.EvaluateResult": {
-            "type": "object",
-            "properties": {
-                "facts_to_evolve": {
-                    "description": "Facts superseded by new information; old fact is preserved with lineage.",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/memory.FactEvolution"
-                    }
-                },
-                "facts_to_return": {
-                    "description": "Relevant existing + new facts to return to the agent.",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/memory.Fact"
-                    }
-                },
-                "facts_to_store": {
-                    "description": "New facts to insert.",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/memory.Fact"
-                    }
-                },
-                "facts_to_update": {
-                    "description": "Existing facts contradicted by higher/equal trust source.",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/memory.Fact"
-                    }
-                }
-            }
-        },
         "memory.Fact": {
             "type": "object",
             "properties": {
@@ -966,20 +933,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "memory.FactEvolution": {
-            "type": "object",
-            "properties": {
-                "new_kind": {
-                    "$ref": "#/definitions/memory.FactKind"
-                },
-                "new_text": {
-                    "type": "string"
-                },
-                "old_fact_id": {
                     "type": "string"
                 }
             }
@@ -1071,41 +1024,14 @@ const docTemplate = `{
         "memory.MemoryInput": {
             "type": "object",
             "properties": {
-                "include_sources": {
-                    "description": "When true, return original source content with facts.",
-                    "type": "boolean"
-                },
                 "inputs": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/memory.InputItem"
                     }
                 },
-                "message_history": {
-                    "description": "Number of recent raw messages to return. 0 = facts only.",
-                    "type": "integer"
-                },
                 "thread_id": {
                     "type": "string"
-                }
-            }
-        },
-        "memory.MemoryOutput": {
-            "type": "object",
-            "properties": {
-                "facts": {
-                    "description": "Relevant facts for the agent.",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/memory.ReturnedFact"
-                    }
-                },
-                "messages": {
-                    "description": "Recent USER/AGENT messages from sources. Empty if MessageHistory is 0.",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/memory.ConversationMessage"
-                    }
                 }
             }
         },
@@ -1115,7 +1041,13 @@ const docTemplate = `{
                 "agent_id": {
                     "type": "string"
                 },
+                "include_sources": {
+                    "type": "boolean"
+                },
                 "limit": {
+                    "type": "integer"
+                },
+                "message_history": {
                     "type": "integer"
                 },
                 "query": {
@@ -1123,6 +1055,23 @@ const docTemplate = `{
                 },
                 "thread_id": {
                     "type": "string"
+                }
+            }
+        },
+        "memory.RecallOutput": {
+            "type": "object",
+            "properties": {
+                "facts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/memory.ReturnedFact"
+                    }
+                },
+                "messages": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/memory.ConversationMessage"
+                    }
                 }
             }
         },
@@ -1204,6 +1153,17 @@ const docTemplate = `{
             "properties": {
                 "agent_id": {
                     "type": "string"
+                }
+            }
+        },
+        "memory.WriteOutput": {
+            "type": "object",
+            "properties": {
+                "facts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/memory.ReturnedFact"
+                    }
                 }
             }
         }

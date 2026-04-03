@@ -45,7 +45,7 @@ func setupEngine(t *testing.T) (*engine.MemoryEngine, *memoryrepo.InMemoryReposi
 	return eng, repo
 }
 
-func sendMessage(t *testing.T, eng *engine.MemoryEngine, content string) models.MemoryOutput {
+func sendMessage(t *testing.T, eng *engine.MemoryEngine, content string) models.WriteOutput {
 	t.Helper()
 	output, err := eng.ProcessContextual(context.Background(), models.MemoryInput{
 		AccountID: "eval-account",

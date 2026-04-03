@@ -10,9 +10,9 @@ import (
 	models "agentmem/internal/models"
 )
 
-func (e *MemoryEngine) AddFactual(ctx context.Context, input models.FactualInput) (models.MemoryOutput, error) {
+func (e *MemoryEngine) AddFactual(ctx context.Context, input models.FactualInput) (models.WriteOutput, error) {
 	if err := validateFactualInput(input); err != nil {
-		return models.MemoryOutput{}, err
+		return models.WriteOutput{}, err
 	}
 
 	log.Printf("factual pipeline start account=%s agent=%s thread=%s inputs=%d", input.AccountID, input.AgentID, input.ThreadID, len(input.Inputs))
@@ -23,22 +23,22 @@ func (e *MemoryEngine) AddFactual(ctx context.Context, input models.FactualInput
 		ThreadID:  ptrString(threadID),
 	})
 	if err != nil {
-		return models.MemoryOutput{}, fmt.Errorf("insert event: %w", err)
+		return models.WriteOutput{}, fmt.Errorf("insert event: %w", err)
 	}
 
 	storedSources, decompositions, err := e.persistAndDecomposeSources(ctx, event.ID, threadID, input.Inputs, false)
 	if err != nil {
-		return models.MemoryOutput{}, err
+		return models.WriteOutput{}, err
 	}
 
 	queryEmbeddings, err := e.buildSearchEmbeddings(ctx, decompositions)
 	if err != nil {
-		return models.MemoryOutput{}, err
+		return models.WriteOutput{}, err
 	}
 
 	retrieved, err := e.retrieveFacts(ctx, input.AccountID, input.AgentID, threadID, queryEmbeddings)
 	if err != nil {
-		return models.MemoryOutput{}, err
+		return models.WriteOutput{}, err
 	}
 
 	evalInput := flattenExtractedFacts(decompositions)
@@ -47,23 +47,22 @@ func (e *MemoryEngine) AddFactual(ctx context.Context, input models.FactualInput
 		RetrievedFacts: retrieved,
 	})
 	if err != nil {
-		return models.MemoryOutput{}, fmt.Errorf("evaluate facts: %w", err)
+		return models.WriteOutput{}, fmt.Errorf("evaluate facts: %w", err)
 	}
 
 	memInput := models.MemoryInput{
-		AccountID:      input.AccountID,
-		AgentID:        input.AgentID,
-		ThreadID:       threadID,
-		IncludeSources: true,
+		AccountID: input.AccountID,
+		AgentID:   input.AgentID,
+		ThreadID:  threadID,
 	}
 	storedFacts, err := e.applyEvaluateResult(ctx, memInput, storedSources, evalInput, evalResult)
 	if err != nil {
-		return models.MemoryOutput{}, err
+		return models.WriteOutput{}, err
 	}
 
-	output, err := e.buildOutput(ctx, memInput, append(evalResult.FactsToReturn, storedFacts...))
+	output, err := e.buildWriteOutput(ctx, append(evalResult.FactsToReturn, storedFacts...))
 	if err != nil {
-		return models.MemoryOutput{}, err
+		return models.WriteOutput{}, err
 	}
 	log.Printf("factual pipeline completed event=%s returned_facts=%d", event.ID, len(output.Facts))
 	return output, nil

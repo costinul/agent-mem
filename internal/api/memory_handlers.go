@@ -18,12 +18,12 @@ type apiError struct {
 
 // contextualHandler handles the contextual smart pipeline.
 // @Summary Process Contextual Memory
-// @Description Process input through the contextual smart pipeline to retrieve relevant facts and messages.
+// @Description Process input through the contextual smart pipeline to store, update, and evolve facts.
 // @Tags memory
 // @Accept json
 // @Produce json
 // @Param input body memory.MemoryInput true "Memory Input"
-// @Success 200 {object} memory.MemoryOutput
+// @Success 200 {object} memory.WriteOutput
 // @Failure 400 {object} apiError
 // @Failure 401 {object} apiError
 // @Failure 500 {object} apiError
@@ -57,12 +57,12 @@ func contextualHandler(memEngine *engine.MemoryEngine, agentSvc *agent.Service) 
 
 // factualHandler handles the factual interface.
 // @Summary Add Factual Memory
-// @Description Add new facts to the memory engine.
+// @Description Process input through the factual pipeline to store, update, and evolve facts (no conversation context).
 // @Tags memory
 // @Accept json
 // @Produce json
 // @Param input body memory.FactualInput true "Factual Input"
-// @Success 200 {object} memory.EvaluateResult
+// @Success 200 {object} memory.WriteOutput
 // @Failure 400 {object} apiError
 // @Failure 401 {object} apiError
 // @Failure 500 {object} apiError
@@ -101,7 +101,7 @@ func factualHandler(memEngine *engine.MemoryEngine, agentSvc *agent.Service) htt
 // @Accept json
 // @Produce json
 // @Param input body memory.RecallInput true "Recall Input"
-// @Success 200 {object} memory.MemoryOutput
+// @Success 200 {object} memory.RecallOutput
 // @Failure 400 {object} apiError
 // @Failure 401 {object} apiError
 // @Failure 500 {object} apiError

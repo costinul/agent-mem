@@ -8,12 +8,10 @@ import "time"
 
 // MemoryInput is the request body for the contextual smart pipeline.
 type MemoryInput struct {
-	AccountID      string      `json:"-" swaggerignore:"true"`
-	AgentID        string      `json:"-" swaggerignore:"true"`
-	ThreadID       string      `json:"thread_id"`
-	IncludeSources bool        `json:"include_sources"` // When true, return original source content with facts.
-	MessageHistory int         `json:"message_history"` // Number of recent raw messages to return. 0 = facts only.
-	Inputs         []InputItem `json:"inputs"`
+	AccountID string      `json:"-" swaggerignore:"true"`
+	AgentID   string      `json:"-" swaggerignore:"true"`
+	ThreadID  string      `json:"thread_id"`
+	Inputs    []InputItem `json:"inputs"`
 }
 
 // InputItem is a single piece of content within one API call.
@@ -28,10 +26,15 @@ type InputItem struct {
 // API — Output
 // =====================
 
-// MemoryOutput is the response from the contextual smart pipeline.
-type MemoryOutput struct {
-	Facts    []ReturnedFact        `json:"facts"`    // Relevant facts for the agent.
-	Messages []ConversationMessage `json:"messages"` // Recent USER/AGENT messages from sources. Empty if MessageHistory is 0.
+// WriteOutput is the response from contextual/factual write pipelines.
+type WriteOutput struct {
+	Facts []ReturnedFact `json:"facts"`
+}
+
+// RecallOutput is the response from the recall (read-only retrieval) endpoint.
+type RecallOutput struct {
+	Facts    []ReturnedFact        `json:"facts"`
+	Messages []ConversationMessage `json:"messages,omitempty"`
 }
 
 // ReturnedFact is a fact returned to the agent.
@@ -91,11 +94,13 @@ type FactListOutput struct {
 
 // RecallInput is the request body for read-only memory retrieval.
 type RecallInput struct {
-	AccountID string `json:"-" swaggerignore:"true"`
-	AgentID   string `json:"agent_id"`
-	ThreadID  string `json:"thread_id"`
-	Query     string `json:"query"`
-	Limit     int    `json:"limit"`
+	AccountID      string `json:"-" swaggerignore:"true"`
+	AgentID        string `json:"agent_id"`
+	ThreadID       string `json:"thread_id"`
+	Query          string `json:"query"`
+	Limit          int    `json:"limit"`
+	IncludeSources bool   `json:"include_sources"`
+	MessageHistory int    `json:"message_history"`
 }
 
 type ThreadCreateBody struct {

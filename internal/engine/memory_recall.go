@@ -9,12 +9,12 @@ import (
 	models "agentmem/internal/models"
 )
 
-func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (models.MemoryOutput, error) {
+func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (models.RecallOutput, error) {
 	if strings.TrimSpace(input.AccountID) == "" {
-		return models.MemoryOutput{}, errors.New("account_id is required")
+		return models.RecallOutput{}, errors.New("account_id is required")
 	}
 	if strings.TrimSpace(input.Query) == "" {
-		return models.MemoryOutput{}, errors.New("query is required")
+		return models.RecallOutput{}, errors.New("query is required")
 	}
 
 	limit := input.Limit
@@ -24,13 +24,13 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 
 	embeddings, err := e.ai.Embed(ctx, []string{input.Query})
 	if err != nil {
-		return models.MemoryOutput{}, fmt.Errorf("embed recall query: %w", err)
+		return models.RecallOutput{}, fmt.Errorf("embed recall query: %w", err)
 	}
 
 	retrieved, err := e.retrieveFactsWithLimit(ctx, input.AccountID, input.AgentID, input.ThreadID, embeddings, limit)
 	if err != nil {
-		return models.MemoryOutput{}, err
+		return models.RecallOutput{}, err
 	}
 
-	return e.buildOutput(ctx, models.MemoryInput{IncludeSources: true}, retrieved)
+	return e.buildRecallOutput(ctx, input, retrieved)
 }
