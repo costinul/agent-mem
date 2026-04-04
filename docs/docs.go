@@ -819,6 +819,70 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/threads/{id}/messages": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve raw conversation messages (user and agent turns) for a thread, ordered chronologically.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "threads"
+                ],
+                "summary": "List Thread Messages",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Thread ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Max messages to return (default 20)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/memory.ThreadMessagesOutput"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.apiError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.apiError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.apiError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.apiError"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -1047,9 +1111,6 @@ const docTemplate = `{
                 "limit": {
                     "type": "integer"
                 },
-                "message_history": {
-                    "type": "integer"
-                },
                 "query": {
                     "type": "string"
                 },
@@ -1065,12 +1126,6 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/memory.ReturnedFact"
-                    }
-                },
-                "messages": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/memory.ConversationMessage"
                     }
                 }
             }
@@ -1153,6 +1208,17 @@ const docTemplate = `{
             "properties": {
                 "agent_id": {
                     "type": "string"
+                }
+            }
+        },
+        "memory.ThreadMessagesOutput": {
+            "type": "object",
+            "properties": {
+                "messages": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/memory.ConversationMessage"
+                    }
                 }
             }
         },

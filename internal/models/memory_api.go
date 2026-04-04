@@ -33,8 +33,12 @@ type WriteOutput struct {
 
 // RecallOutput is the response from the recall (read-only retrieval) endpoint.
 type RecallOutput struct {
-	Facts    []ReturnedFact        `json:"facts"`
-	Messages []ConversationMessage `json:"messages,omitempty"`
+	Facts []ReturnedFact `json:"facts"`
+}
+
+// ThreadMessagesOutput is the response from the thread messages endpoint.
+type ThreadMessagesOutput struct {
+	Messages []ConversationMessage `json:"messages"`
 }
 
 // ReturnedFact is a fact returned to the agent.
@@ -100,7 +104,6 @@ type RecallInput struct {
 	Query          string `json:"query"`
 	Limit          int    `json:"limit"`
 	IncludeSources bool   `json:"include_sources"`
-	MessageHistory int    `json:"message_history"`
 }
 
 type ThreadCreateBody struct {

@@ -2,10 +2,10 @@ package engine
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
+	"agentmem/internal/errs"
 	models "agentmem/internal/models"
 	"agentmem/internal/repository/memoryrepo"
 )
@@ -44,10 +44,10 @@ func (e *MemoryEngine) GetFactForAccount(ctx context.Context, accountID, factID 
 		return models.ReturnedFact{}, fmt.Errorf("get fact: %w", err)
 	}
 	if fact == nil {
-		return models.ReturnedFact{}, errors.New("fact not found")
+		return models.ReturnedFact{}, errs.NewNotFound("fact not found")
 	}
 	if strings.TrimSpace(accountID) != "" && fact.AccountID != strings.TrimSpace(accountID) {
-		return models.ReturnedFact{}, errors.New("fact not found")
+		return models.ReturnedFact{}, errs.NewNotFound("fact not found")
 	}
 	return e.mapFactForOutput(ctx, *fact, includeSources)
 }
@@ -58,17 +58,17 @@ func (e *MemoryEngine) UpdateFact(ctx context.Context, factID string, text strin
 
 func (e *MemoryEngine) UpdateFactForAccount(ctx context.Context, accountID, factID string, text string, source models.SourceKind) (models.ReturnedFact, error) {
 	if strings.TrimSpace(text) == "" {
-		return models.ReturnedFact{}, errors.New("text is required")
+		return models.ReturnedFact{}, errs.NewValidation("text is required")
 	}
 	fact, err := e.repo.GetFactByID(ctx, factID)
 	if err != nil {
 		return models.ReturnedFact{}, fmt.Errorf("get fact: %w", err)
 	}
 	if fact == nil {
-		return models.ReturnedFact{}, errors.New("fact not found")
+		return models.ReturnedFact{}, errs.NewNotFound("fact not found")
 	}
 	if strings.TrimSpace(accountID) != "" && fact.AccountID != strings.TrimSpace(accountID) {
-		return models.ReturnedFact{}, errors.New("fact not found")
+		return models.ReturnedFact{}, errs.NewNotFound("fact not found")
 	}
 
 	if err := e.ensureSourceCanMutateFact(ctx, source, *fact); err != nil {
@@ -92,10 +92,10 @@ func (e *MemoryEngine) DeleteFactForAccount(ctx context.Context, accountID, fact
 		return fmt.Errorf("get fact: %w", err)
 	}
 	if fact == nil {
-		return errors.New("fact not found")
+		return errs.NewNotFound("fact not found")
 	}
 	if strings.TrimSpace(accountID) != "" && fact.AccountID != strings.TrimSpace(accountID) {
-		return errors.New("fact not found")
+		return errs.NewNotFound("fact not found")
 	}
 	return e.repo.DeleteFact(ctx, factID)
 }
@@ -144,27 +144,6 @@ func (e *MemoryEngine) buildRecallOutput(ctx context.Context, input models.Recal
 		output.Facts = append(output.Facts, mapped)
 	}
 
-	if input.MessageHistory > 0 && strings.TrimSpace(input.ThreadID) != "" {
-		sources, err := e.repo.ListConversationSourcesByThreadID(ctx, input.ThreadID, input.MessageHistory)
-		if err != nil {
-			return models.RecallOutput{}, fmt.Errorf("list conversation sources: %w", err)
-		}
-		output.Messages = make([]models.ConversationMessage, 0, len(sources))
-		for _, source := range sources {
-			content := ""
-			if source.Content != nil {
-				content = *source.Content
-			}
-			output.Messages = append(output.Messages, models.ConversationMessage{
-				SourceID:  source.ID,
-				EventID:   source.EventID,
-				ThreadID:  input.ThreadID,
-				Kind:      source.Kind,
-				Content:   content,
-				CreatedAt: source.CreatedAt,
-			})
-		}
-	}
 	return output, nil
 }
 
@@ -194,19 +173,19 @@ func (e *MemoryEngine) ensureSourceCanMutateFact(ctx context.Context, source mod
 		return fmt.Errorf("load fact source: %w", err)
 	}
 	if targetSource == nil {
-		return errors.New("fact source not found")
+		return errs.NewNotFound("fact source not found")
 	}
 	if targetSource.Kind == models.SOURCE_SYSTEM {
-		return errors.New("system facts are immutable")
+		return errs.NewValidation("system facts are immutable")
 	}
 
 	callerTrust, ok := models.SourceTrustHierarchy[source]
 	if !ok {
-		return fmt.Errorf("invalid source kind: %s", source)
+		return errs.NewValidation("invalid source kind: %s", source)
 	}
 	targetTrust := models.SourceTrustHierarchy[targetSource.Kind]
 	if callerTrust < targetTrust {
-		return fmt.Errorf("source %s is not allowed to mutate fact from %s", source, targetSource.Kind)
+		return errs.NewValidation("source %s is not allowed to mutate fact from %s", source, targetSource.Kind)
 	}
 	return nil
 }

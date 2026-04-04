@@ -2,10 +2,10 @@ package agent
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
+	"agentmem/internal/errs"
 	models "agentmem/internal/models"
 	"agentmem/internal/repository/agentrepo"
 
@@ -22,11 +22,11 @@ func NewService(repo agentrepo.Repository) *Service {
 
 func (s *Service) CreateAgent(ctx context.Context, accountID, name string) (*models.Agent, error) {
 	if !isUUID(accountID) {
-		return nil, errors.New("account_id is invalid")
+		return nil, errs.NewValidation("account_id is invalid")
 	}
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return nil, errors.New("name is required")
+		return nil, errs.NewValidation("name is required")
 	}
 	created, err := s.repo.CreateAgent(ctx, accountID, name)
 	if err != nil {
@@ -37,44 +37,44 @@ func (s *Service) CreateAgent(ctx context.Context, accountID, name string) (*mod
 
 func (s *Service) GetAgent(ctx context.Context, accountID, agentID string) (*models.Agent, error) {
 	if !isUUID(accountID) {
-		return nil, errors.New("account_id is invalid")
+		return nil, errs.NewValidation("account_id is invalid")
 	}
 	if !isUUID(agentID) {
-		return nil, errors.New("agent_id is invalid")
+		return nil, errs.NewValidation("agent_id is invalid")
 	}
 	found, err := s.repo.GetAgentByID(ctx, accountID, agentID)
 	if err != nil {
 		return nil, fmt.Errorf("get agent: %w", err)
 	}
 	if found == nil {
-		return nil, errors.New("agent not found")
+		return nil, errs.NewNotFound("agent not found")
 	}
 	return found, nil
 }
 
 func (s *Service) DeleteAgent(ctx context.Context, accountID, agentID string) error {
 	if !isUUID(accountID) {
-		return errors.New("account_id is invalid")
+		return errs.NewValidation("account_id is invalid")
 	}
 	if !isUUID(agentID) {
-		return errors.New("agent_id is invalid")
+		return errs.NewValidation("agent_id is invalid")
 	}
 	deleted, err := s.repo.DeleteAgentByID(ctx, accountID, agentID)
 	if err != nil {
 		return fmt.Errorf("delete agent: %w", err)
 	}
 	if !deleted {
-		return errors.New("agent not found")
+		return errs.NewNotFound("agent not found")
 	}
 	return nil
 }
 
 func (s *Service) CreateThread(ctx context.Context, accountID, agentID string) (*models.Thread, error) {
 	if !isUUID(accountID) {
-		return nil, errors.New("account_id is invalid")
+		return nil, errs.NewValidation("account_id is invalid")
 	}
 	if !isUUID(agentID) {
-		return nil, errors.New("agent_id is invalid")
+		return nil, errs.NewValidation("agent_id is invalid")
 	}
 	if _, err := s.GetAgent(ctx, accountID, agentID); err != nil {
 		return nil, err
@@ -88,34 +88,34 @@ func (s *Service) CreateThread(ctx context.Context, accountID, agentID string) (
 
 func (s *Service) GetThread(ctx context.Context, accountID, threadID string) (*models.Thread, error) {
 	if !isUUID(accountID) {
-		return nil, errors.New("account_id is invalid")
+		return nil, errs.NewValidation("account_id is invalid")
 	}
 	if !isUUID(threadID) {
-		return nil, errors.New("thread_id is invalid")
+		return nil, errs.NewValidation("thread_id is invalid")
 	}
 	found, err := s.repo.GetThreadByID(ctx, accountID, threadID)
 	if err != nil {
 		return nil, fmt.Errorf("get thread: %w", err)
 	}
 	if found == nil {
-		return nil, errors.New("thread not found")
+		return nil, errs.NewNotFound("thread not found")
 	}
 	return found, nil
 }
 
 func (s *Service) DeleteThread(ctx context.Context, accountID, threadID string) error {
 	if !isUUID(accountID) {
-		return errors.New("account_id is invalid")
+		return errs.NewValidation("account_id is invalid")
 	}
 	if !isUUID(threadID) {
-		return errors.New("thread_id is invalid")
+		return errs.NewValidation("thread_id is invalid")
 	}
 	deleted, err := s.repo.DeleteThreadByID(ctx, accountID, threadID)
 	if err != nil {
 		return fmt.Errorf("delete thread: %w", err)
 	}
 	if !deleted {
-		return errors.New("thread not found")
+		return errs.NewNotFound("thread not found")
 	}
 	return nil
 }

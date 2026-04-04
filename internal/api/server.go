@@ -36,6 +36,7 @@ func NewServer(engine *engine.MemoryEngine, accountSvc *account.Service, agentSv
 	mux.HandleFunc("POST /threads", requireAPIKey(accountSvc, createThreadHandler(agentSvc)))
 	mux.HandleFunc("GET /threads/{id}", requireAPIKey(accountSvc, getThreadHandler(agentSvc)))
 	mux.HandleFunc("DELETE /threads/{id}", requireAPIKey(accountSvc, deleteThreadHandler(agentSvc)))
+	mux.HandleFunc("GET /threads/{id}/messages", requireAPIKey(accountSvc, listThreadMessagesHandler(agentSvc, engine)))
 	mux.Handle("GET /swagger/", httpSwagger.Handler(httpSwagger.PersistAuthorization(true)))
 
 	return &Server{

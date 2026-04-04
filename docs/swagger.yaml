@@ -152,8 +152,6 @@ definitions:
         type: boolean
       limit:
         type: integer
-      message_history:
-        type: integer
       query:
         type: string
       thread_id:
@@ -164,10 +162,6 @@ definitions:
       facts:
         items:
           $ref: '#/definitions/memory.ReturnedFact'
-        type: array
-      messages:
-        items:
-          $ref: '#/definitions/memory.ConversationMessage'
         type: array
     type: object
   memory.ReturnedFact:
@@ -229,6 +223,13 @@ definitions:
     properties:
       agent_id:
         type: string
+    type: object
+  memory.ThreadMessagesOutput:
+    properties:
+      messages:
+        items:
+          $ref: '#/definitions/memory.ConversationMessage'
+        type: array
     type: object
   memory.WriteOutput:
     properties:
@@ -763,6 +764,48 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Get Thread
+      tags:
+      - threads
+  /threads/{id}/messages:
+    get:
+      description: Retrieve raw conversation messages (user and agent turns) for a
+        thread, ordered chronologically.
+      parameters:
+      - description: Thread ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Max messages to return (default 20)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/memory.ThreadMessagesOutput'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiError'
+      security:
+      - ApiKeyAuth: []
+      summary: List Thread Messages
       tags:
       - threads
 securityDefinitions:

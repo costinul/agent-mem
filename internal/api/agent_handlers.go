@@ -3,9 +3,11 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"agentmem/internal/agent"
+	"agentmem/internal/engine"
 	models "agentmem/internal/models"
 )
 
@@ -222,5 +224,52 @@ func deleteThreadHandler(agentSvc *agent.Service) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+	}
+}
+
+// listThreadMessagesHandler returns raw conversation messages for a thread.
+// @Summary List Thread Messages
+// @Description Retrieve raw conversation messages (user and agent turns) for a thread, ordered chronologically.
+// @Tags threads
+// @Produce json
+// @Param id path string true "Thread ID"
+// @Param limit query int false "Max messages to return (default 20)"
+// @Success 200 {object} memory.ThreadMessagesOutput
+// @Failure 400 {object} apiError
+// @Failure 401 {object} apiError
+// @Failure 404 {object} apiError
+// @Failure 500 {object} apiError
+// @Security ApiKeyAuth
+// @Router /threads/{id}/messages [get]
+func listThreadMessagesHandler(agentSvc *agent.Service, memEngine *engine.MemoryEngine) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		accountID := accountIDFromContext(r.Context())
+		if accountID == "" {
+			writeJSON(w, http.StatusUnauthorized, apiError{Error: "missing account context"})
+			return
+		}
+		threadID := strings.TrimSpace(r.PathValue("id"))
+		if threadID == "" {
+			writeJSON(w, http.StatusBadRequest, apiError{Error: "thread id is required"})
+			return
+		}
+		if _, err := agentSvc.GetThread(r.Context(), accountID, threadID); err != nil {
+			writeEngineError(w, r, err)
+			return
+		}
+
+		limit := 20
+		if raw := r.URL.Query().Get("limit"); raw != "" {
+			if n, err := strconv.Atoi(raw); err == nil && n > 0 {
+				limit = n
+			}
+		}
+
+		messages, err := memEngine.ListThreadMessages(r.Context(), threadID, limit)
+		if err != nil {
+			writeEngineError(w, r, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, models.ThreadMessagesOutput{Messages: messages})
 	}
 }

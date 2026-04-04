@@ -2,11 +2,14 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"runtime/debug"
 	"strings"
+
+	"agentmem/internal/errs"
 
 	"agentmem/internal/agent"
 	"agentmem/internal/engine"
@@ -321,31 +324,40 @@ func writeJSON(w http.ResponseWriter, code int, payload any) {
 }
 
 func writeEngineError(w http.ResponseWriter, r *http.Request, err error) {
-	message := strings.TrimSpace(err.Error())
-	lowerMessage := strings.ToLower(message)
+	method := ""
+	path := ""
+	accountID := ""
+	if r != nil {
+		method = r.Method
+		path = r.URL.Path
+		accountID = accountIDFromContext(r.Context())
+	}
+
+	var valErr *errs.ValidationError
+	var notFoundErr *errs.NotFoundError
 	switch {
-	case strings.Contains(lowerMessage, "not found"):
-		writeJSON(w, http.StatusNotFound, apiError{Error: message})
-	case strings.Contains(lowerMessage, "required"),
-		strings.Contains(lowerMessage, "invalid"),
-		strings.Contains(lowerMessage, "immutable"),
-		strings.Contains(lowerMessage, "not allowed"):
-		writeJSON(w, http.StatusBadRequest, apiError{Error: message})
-	default:
-		method := ""
-		path := ""
-		accountID := ""
-		if r != nil {
-			method = r.Method
-			path = r.URL.Path
-			accountID = accountIDFromContext(r.Context())
-		}
-		slog.Error(
-			"api internal error",
+	case errors.As(err, &valErr):
+		slog.Warn("api validation error",
 			"method", method,
 			"path", path,
 			"account", accountID,
-			"error", message,
+			"error", err.Error(),
+		)
+		writeJSON(w, http.StatusBadRequest, apiError{Error: valErr.Error()})
+	case errors.As(err, &notFoundErr):
+		slog.Warn("api not found",
+			"method", method,
+			"path", path,
+			"account", accountID,
+			"error", err.Error(),
+		)
+		writeJSON(w, http.StatusNotFound, apiError{Error: notFoundErr.Error()})
+	default:
+		slog.Error("api internal error",
+			"method", method,
+			"path", path,
+			"account", accountID,
+			"error", err.Error(),
 			"stack", string(debug.Stack()),
 		)
 		writeJSON(w, http.StatusInternalServerError, apiError{Error: "internal server error"})

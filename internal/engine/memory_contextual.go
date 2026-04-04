@@ -2,11 +2,11 @@ package engine
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"strings"
 
+	"agentmem/internal/errs"
 	models "agentmem/internal/models"
 	"agentmem/internal/repository/memoryrepo"
 )
@@ -66,23 +66,23 @@ func (e *MemoryEngine) ProcessContextual(ctx context.Context, input models.Memor
 
 func validateContextualInput(input models.MemoryInput) error {
 	if strings.TrimSpace(input.AccountID) == "" {
-		return errors.New("account_id is required")
+		return errs.NewValidation("account_id is required")
 	}
 	if strings.TrimSpace(input.ThreadID) == "" {
-		return errors.New("thread_id is required")
+		return errs.NewValidation("thread_id is required")
 	}
 	if strings.TrimSpace(input.AgentID) == "" {
-		return errors.New("thread agent is required")
+		return errs.NewValidation("thread agent is required")
 	}
 	if len(input.Inputs) == 0 {
-		return errors.New("inputs are required")
+		return errs.NewValidation("inputs are required")
 	}
 	for idx, item := range input.Inputs {
 		if strings.TrimSpace(item.Content) == "" {
-			return fmt.Errorf("inputs[%d].content is required", idx)
+			return errs.NewValidation("inputs[%d].content is required", idx)
 		}
 		if _, ok := models.SourceTrustHierarchy[item.Kind]; !ok {
-			return fmt.Errorf("inputs[%d].kind is invalid", idx)
+			return errs.NewValidation("inputs[%d].kind is invalid", idx)
 		}
 	}
 	return nil
