@@ -107,7 +107,7 @@ func factualHandler(memEngine *engine.MemoryEngine, agentSvc *agent.Service) htt
 // @Failure 500 {object} apiError
 // @Security ApiKeyAuth
 // @Router /memory/recall [post]
-func recallHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
+func recallHandler(memEngine *engine.MemoryEngine, agentSvc *agent.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		accountID := accountIDFromContext(r.Context())
 		if accountID == "" {
@@ -120,6 +120,18 @@ func recallHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
 			return
 		}
 		input.AccountID = accountID
+		if input.AgentID != "" {
+			if err := validateAgentOwnership(r.Context(), agentSvc, accountID, input.AgentID); err != nil {
+				writeEngineError(w, err)
+				return
+			}
+		}
+		if input.ThreadID != "" {
+			if _, err := agentSvc.GetThread(r.Context(), accountID, input.ThreadID); err != nil {
+				writeEngineError(w, err)
+				return
+			}
+		}
 		output, err := memEngine.Recall(r.Context(), input)
 		if err != nil {
 			writeEngineError(w, err)

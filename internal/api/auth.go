@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"agentmem/internal/account"
+	"agentmem/internal/agent"
 )
 
 type contextKey string
@@ -27,6 +28,11 @@ func requireAPIKey(accountSvc *account.Service, next http.HandlerFunc) http.Hand
 		ctx := context.WithValue(r.Context(), accountIDContextKey, key.AccountID)
 		next(w, r.WithContext(ctx))
 	}
+}
+
+func validateAgentOwnership(ctx context.Context, agentSvc *agent.Service, accountID, agentID string) error {
+	_, err := agentSvc.GetAgent(ctx, accountID, agentID)
+	return err
 }
 
 func accountIDFromContext(ctx context.Context) string {
