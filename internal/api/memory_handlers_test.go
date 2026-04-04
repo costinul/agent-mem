@@ -7,8 +7,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -72,6 +74,25 @@ func TestProtectedRouteRequiresAPIKey(t *testing.T) {
 	server.httpServer.Handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestWriteEngineErrorLogsInternalServerErrors(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/memory/contextual", nil)
+	rec := httptest.NewRecorder()
+
+	var logs bytes.Buffer
+	previousWriter := log.Writer()
+	log.SetOutput(&logs)
+	defer log.SetOutput(previousWriter)
+
+	writeEngineError(rec, req, errors.New("backend exploded"))
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+	if !strings.Contains(logs.String(), "api internal error") {
+		t.Fatalf("expected log to contain internal error marker, got %q", logs.String())
 	}
 }
 

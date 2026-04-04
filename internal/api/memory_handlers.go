@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -43,12 +44,12 @@ func contextualHandler(memEngine *engine.MemoryEngine, agentSvc *agent.Service) 
 		}
 		input.AccountID = accountID
 		if err := populateAgentFromThread(r, agentSvc, &input.AgentID, input.ThreadID); err != nil {
-			writeEngineError(w, err)
+			writeEngineError(w, r, err)
 			return
 		}
 		output, err := memEngine.ProcessContextual(r.Context(), input)
 		if err != nil {
-			writeEngineError(w, err)
+			writeEngineError(w, r, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, output)
@@ -82,12 +83,12 @@ func factualHandler(memEngine *engine.MemoryEngine, agentSvc *agent.Service) htt
 		}
 		input.AccountID = accountID
 		if err := populateAgentFromThread(r, agentSvc, &input.AgentID, input.ThreadID); err != nil {
-			writeEngineError(w, err)
+			writeEngineError(w, r, err)
 			return
 		}
 		output, err := memEngine.AddFactual(r.Context(), input)
 		if err != nil {
-			writeEngineError(w, err)
+			writeEngineError(w, r, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, output)
@@ -122,19 +123,19 @@ func recallHandler(memEngine *engine.MemoryEngine, agentSvc *agent.Service) http
 		input.AccountID = accountID
 		if input.AgentID != "" {
 			if err := validateAgentOwnership(r.Context(), agentSvc, accountID, input.AgentID); err != nil {
-				writeEngineError(w, err)
+				writeEngineError(w, r, err)
 				return
 			}
 		}
 		if input.ThreadID != "" {
 			if _, err := agentSvc.GetThread(r.Context(), accountID, input.ThreadID); err != nil {
-				writeEngineError(w, err)
+				writeEngineError(w, r, err)
 				return
 			}
 		}
 		output, err := memEngine.Recall(r.Context(), input)
 		if err != nil {
-			writeEngineError(w, err)
+			writeEngineError(w, r, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, output)
@@ -171,7 +172,7 @@ func getFactHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
 		includeSources := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("include_sources")), "true")
 		fact, err := memEngine.GetFactForAccount(r.Context(), accountID, factID, includeSources)
 		if err != nil {
-			writeEngineError(w, err)
+			writeEngineError(w, r, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, fact)
@@ -222,7 +223,7 @@ func updateFactHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
 
 		fact, err := memEngine.UpdateFactForAccount(r.Context(), accountID, factID, body.Text, body.Source)
 		if err != nil {
-			writeEngineError(w, err)
+			writeEngineError(w, r, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, fact)
@@ -272,7 +273,7 @@ func listFactsHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
 
 		output, err := memEngine.ListFactsForAccount(r.Context(), accountID, params)
 		if err != nil {
-			writeEngineError(w, err)
+			writeEngineError(w, r, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, output)
@@ -305,7 +306,7 @@ func deleteFactHandler(memEngine *engine.MemoryEngine) http.HandlerFunc {
 			return
 		}
 		if err := memEngine.DeleteFactForAccount(r.Context(), accountID, factID); err != nil {
-			writeEngineError(w, err)
+			writeEngineError(w, r, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
@@ -318,17 +319,27 @@ func writeJSON(w http.ResponseWriter, code int, payload any) {
 	_ = json.NewEncoder(w).Encode(payload)
 }
 
-func writeEngineError(w http.ResponseWriter, err error) {
+func writeEngineError(w http.ResponseWriter, r *http.Request, err error) {
 	message := strings.TrimSpace(err.Error())
+	lowerMessage := strings.ToLower(message)
 	switch {
-	case strings.Contains(strings.ToLower(message), "not found"):
+	case strings.Contains(lowerMessage, "not found"):
 		writeJSON(w, http.StatusNotFound, apiError{Error: message})
-	case strings.Contains(strings.ToLower(message), "required"),
-		strings.Contains(strings.ToLower(message), "invalid"),
-		strings.Contains(strings.ToLower(message), "immutable"),
-		strings.Contains(strings.ToLower(message), "not allowed"):
+	case strings.Contains(lowerMessage, "required"),
+		strings.Contains(lowerMessage, "invalid"),
+		strings.Contains(lowerMessage, "immutable"),
+		strings.Contains(lowerMessage, "not allowed"):
 		writeJSON(w, http.StatusBadRequest, apiError{Error: message})
 	default:
+		method := ""
+		path := ""
+		accountID := ""
+		if r != nil {
+			method = r.Method
+			path = r.URL.Path
+			accountID = accountIDFromContext(r.Context())
+		}
+		log.Printf("api internal error method=%s path=%s account=%s err=%q", method, path, accountID, message)
 		writeJSON(w, http.StatusInternalServerError, apiError{Error: "internal server error"})
 	}
 }

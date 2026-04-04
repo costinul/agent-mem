@@ -38,7 +38,7 @@ func createAgentHandler(agentSvc *agent.Service) http.HandlerFunc {
 
 		created, err := agentSvc.CreateAgent(r.Context(), accountID, body.Name)
 		if err != nil {
-			writeEngineError(w, err)
+			writeEngineError(w, r, err)
 			return
 		}
 		writeJSON(w, http.StatusCreated, created)
@@ -73,7 +73,7 @@ func getAgentHandler(agentSvc *agent.Service) http.HandlerFunc {
 
 		found, err := agentSvc.GetAgent(r.Context(), accountID, agentID)
 		if err != nil {
-			writeEngineError(w, err)
+			writeEngineError(w, r, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, found)
@@ -107,7 +107,7 @@ func deleteAgentHandler(agentSvc *agent.Service) http.HandlerFunc {
 		}
 
 		if err := agentSvc.DeleteAgent(r.Context(), accountID, agentID); err != nil {
-			writeEngineError(w, err)
+			writeEngineError(w, r, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
@@ -149,7 +149,7 @@ func createThreadHandler(agentSvc *agent.Service) http.HandlerFunc {
 
 		thread, err := agentSvc.CreateThread(r.Context(), accountID, agentID)
 		if err != nil {
-			writeEngineError(w, err)
+			writeEngineError(w, r, err)
 			return
 		}
 		writeJSON(w, http.StatusCreated, thread)
@@ -184,7 +184,7 @@ func getThreadHandler(agentSvc *agent.Service) http.HandlerFunc {
 
 		thread, err := agentSvc.GetThread(r.Context(), accountID, threadID)
 		if err != nil {
-			writeEngineError(w, err)
+			writeEngineError(w, r, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, thread)
@@ -218,7 +218,7 @@ func deleteThreadHandler(agentSvc *agent.Service) http.HandlerFunc {
 		}
 
 		if err := agentSvc.DeleteThread(r.Context(), accountID, threadID); err != nil {
-			writeEngineError(w, err)
+			writeEngineError(w, r, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
