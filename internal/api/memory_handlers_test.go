@@ -7,7 +7,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"log"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -82,17 +83,46 @@ func TestWriteEngineErrorLogsInternalServerErrors(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	var logs bytes.Buffer
-	previousWriter := log.Writer()
-	log.SetOutput(&logs)
-	defer log.SetOutput(previousWriter)
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
+	defer slog.SetDefault(slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
 	writeEngineError(rec, req, errors.New("backend exploded"))
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
 	}
-	if !strings.Contains(logs.String(), "api internal error") {
+	if !strings.Contains(logs.String(), `"msg":"api internal error"`) {
 		t.Fatalf("expected log to contain internal error marker, got %q", logs.String())
+	}
+	if !strings.Contains(logs.String(), `"stack":"`) {
+		t.Fatalf("expected log to contain stack trace, got %q", logs.String())
+	}
+}
+
+func TestWithRecoveryLogsPanicsAndReturnsInternalServerError(t *testing.T) {
+	var logs bytes.Buffer
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
+	defer slog.SetDefault(slog.New(slog.NewJSONHandler(io.Discard, nil)))
+
+	handler := withRecovery(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		panic("boom")
+	}))
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/panic", nil)
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+	if !strings.Contains(rec.Body.String(), "internal server error") {
+		t.Fatalf("expected sanitized 500 payload, got %q", rec.Body.String())
+	}
+	if !strings.Contains(logs.String(), `"msg":"api panic recovered"`) {
+		t.Fatalf("expected panic recovery log, got %q", logs.String())
+	}
+	if !strings.Contains(logs.String(), `"stack":"`) {
+		t.Fatalf("expected panic stack trace in logs, got %q", logs.String())
 	}
 }
 

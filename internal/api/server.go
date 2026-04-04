@@ -5,7 +5,10 @@ import (
 	"agentmem/internal/agent"
 	"agentmem/internal/engine"
 	"context"
+	"fmt"
+	"log/slog"
 	"net/http"
+	"runtime/debug"
 
 	_ "agentmem/docs"
 
@@ -37,7 +40,7 @@ func NewServer(engine *engine.MemoryEngine, accountSvc *account.Service, agentSv
 
 	return &Server{
 		httpServer: &http.Server{
-			Handler: mux,
+			Handler: withRecovery(mux),
 		},
 		engine: engine,
 	}
@@ -50,4 +53,23 @@ func (s *Server) Start(port string) error {
 
 func (s *Server) Shutdown(ctx context.Context) error {
 	return s.httpServer.Shutdown(ctx)
+}
+
+func withRecovery(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				slog.Error(
+					"api panic recovered",
+					"method", r.Method,
+					"path", r.URL.Path,
+					"account", accountIDFromContext(r.Context()),
+					"panic", fmt.Sprint(recovered),
+					"stack", string(debug.Stack()),
+				)
+				writeJSON(w, http.StatusInternalServerError, apiError{Error: "internal server error"})
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
 }

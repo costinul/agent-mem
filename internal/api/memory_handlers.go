@@ -3,8 +3,9 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
+	"runtime/debug"
 	"strings"
 
 	"agentmem/internal/agent"
@@ -339,7 +340,14 @@ func writeEngineError(w http.ResponseWriter, r *http.Request, err error) {
 			path = r.URL.Path
 			accountID = accountIDFromContext(r.Context())
 		}
-		log.Printf("api internal error method=%s path=%s account=%s err=%q", method, path, accountID, message)
+		slog.Error(
+			"api internal error",
+			"method", method,
+			"path", path,
+			"account", accountID,
+			"error", message,
+			"stack", string(debug.Stack()),
+		)
 		writeJSON(w, http.StatusInternalServerError, apiError{Error: "internal server error"})
 	}
 }

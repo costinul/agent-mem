@@ -6,9 +6,11 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -43,6 +45,7 @@ func main() {
 		log.Printf("failed to load configuration: %v", err)
 		os.Exit(1)
 	}
+	configureLogger(cfg.LogLevel)
 	log.Printf("Configuration loaded (port: %s, log_level: %s)", cfg.Port, cfg.LogLevel)
 
 	log.Println("Connecting to database...")
@@ -101,6 +104,27 @@ func main() {
 		log.Printf("failed to shutdown API server: %v", err)
 	}
 	log.Println("Server shutdown complete")
+}
+
+func configureLogger(level string) {
+	logLevel := parseLogLevel(level)
+	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel})
+	slog.SetDefault(slog.New(handler))
+	log.SetFlags(0)
+	log.SetOutput(slog.NewLogLogger(handler, logLevel).Writer())
+}
+
+func parseLogLevel(level string) slog.Level {
+	switch strings.ToLower(strings.TrimSpace(level)) {
+	case "debug":
+		return slog.LevelDebug
+	case "warn", "warning":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
 }
 
 // envSecretStorage resolves secrets from environment variables.
