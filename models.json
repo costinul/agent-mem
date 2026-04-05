@@ -21,7 +21,7 @@
   "provider": "azure",
   "model": "text-embedding-3-small",
   "endpoint": "https://cchat-ai.cognitiveservices.azure.com/",
-  "api_key": "OPENAI_API_KEY",
+  "api_key": "AZURE_OPENAI_API_KEY",
   "context_window_size": 8191,
   "embedding_size": 0,
   "function_calls": false,

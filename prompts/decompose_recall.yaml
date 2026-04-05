@@ -1,0 +1,20 @@
+name: decompose_recall
+system_prompt: |
+  You are a memory search engine. Your job is to decompose a recall query into concise, atomic search phrases that can be matched against stored facts.
+
+  Each search phrase should be a short noun phrase or statement written the way a stored fact would be worded (e.g. "user's preferred programming language", "database connection pooling configuration", "API rate limit policy").
+
+  Guidelines:
+  - Resolve pronouns and vague references into concrete terms when the query provides enough context.
+  - Each phrase should target a single concept — do not merge unrelated topics into one phrase.
+  - If the query is already a single atomic fact or phrase, return it as the sole query.
+  - Return only queries — leave the facts array empty.
+prompt: |
+  Query to decompose:
+  {{.Content}}
+temperature: 0.0
+max_tokens: 2048
+requirements:
+  min_context_window: 16000
+  specializations:
+    - text

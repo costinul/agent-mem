@@ -20,6 +20,11 @@ type DecomposeRequest struct {
 	MessageHistory []string
 }
 
+// DecomposeRecallRequest is the input for decomposing a recall query into search phrases.
+type DecomposeRecallRequest struct {
+	Content string
+}
+
 // EvaluateRequest is the input for the evaluate step.
 type EvaluateRequest struct {
 	NewFacts       []models.ExtractedFact
@@ -74,6 +79,22 @@ func (a *LLMAdapter) Decompose(ctx context.Context, req DecomposeRequest) (model
 	}, out)
 	if err != nil {
 		return models.Decomposition{}, fmt.Errorf("decompose %s source: %w", req.SourceKind, err)
+	}
+
+	return models.Decomposition{
+		Facts:   out.Facts,
+		Queries: out.Queries,
+	}, nil
+}
+
+// DecomposeRecall breaks a recall query into atomic search phrases via the LLM.
+func (a *LLMAdapter) DecomposeRecall(ctx context.Context, query string) (models.Decomposition, error) {
+	out := &decompositionOutput{}
+	err := a.client.ExecuteAs(ctx, uuid.New(), "decompose_recall", a.schemaModel, &bwai.PromptData{
+		Data: DecomposeRecallRequest{Content: query},
+	}, out)
+	if err != nil {
+		return models.Decomposition{}, fmt.Errorf("decompose recall query: %w", err)
 	}
 
 	return models.Decomposition{

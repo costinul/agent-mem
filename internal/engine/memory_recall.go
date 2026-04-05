@@ -22,9 +22,22 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 		limit = 10
 	}
 
-	embeddings, err := e.ai.Embed(ctx, []string{input.Query})
+	decomposition, err := e.ai.DecomposeRecall(ctx, input.Query)
 	if err != nil {
-		return models.RecallOutput{}, fmt.Errorf("embed recall query: %w", err)
+		return models.RecallOutput{}, fmt.Errorf("decompose recall query: %w", err)
+	}
+
+	searchPhrases := make([]string, 0, len(decomposition.Queries))
+	for _, q := range decomposition.Queries {
+		searchPhrases = append(searchPhrases, q.Text)
+	}
+	if len(searchPhrases) == 0 {
+		searchPhrases = []string{input.Query}
+	}
+
+	embeddings, err := e.ai.Embed(ctx, searchPhrases)
+	if err != nil {
+		return models.RecallOutput{}, fmt.Errorf("embed recall search phrases: %w", err)
 	}
 
 	retrieved, err := e.retrieveFactsWithLimit(ctx, input.AccountID, input.AgentID, input.ThreadID, embeddings, limit)
