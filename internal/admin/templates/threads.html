@@ -1,0 +1,52 @@
+{{template "layout.html" .}}
+{{define "content"}}
+<div class="flex items-center justify-between mb-6">
+    <h2 class="text-lg font-semibold text-gray-900">Threads</h2>
+</div>
+
+{{if .FilterAgent}}
+<div class="mb-4 flex items-center gap-2 text-sm text-gray-600">
+    <span>Filtered by agent:</span>
+    <span class="font-medium text-gray-900">{{.FilterAgent}}</span>
+    <a href="/admin/threads" class="text-blue-600 hover:underline text-xs ml-1">clear</a>
+</div>
+{{end}}
+
+<div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+                <th class="text-left px-4 py-3 font-medium text-gray-500">ID</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-500">Agent</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-500">Account</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-500">Created</th>
+                <th class="text-right px-4 py-3 font-medium text-gray-500">Actions</th>
+            </tr>
+        </thead>
+        <tbody id="thread-list" class="divide-y divide-gray-100">
+            {{range .Threads}}
+            <tr id="thread-{{.ID}}">
+                <td class="px-4 py-3 font-mono text-xs text-gray-600">
+                    <a href="/admin/threads/{{.ID}}" class="text-blue-600 hover:underline">{{.ID}}</a>
+                </td>
+                <td class="px-4 py-3 font-mono text-xs text-gray-500">
+                    <a href="/admin/threads?agent_id={{.AgentID}}" class="hover:text-blue-600">{{.AgentID}}</a>
+                </td>
+                <td class="px-4 py-3 font-mono text-xs text-gray-500">{{.AccountID}}</td>
+                <td class="px-4 py-3 text-gray-500">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
+                <td class="px-4 py-3 text-right space-x-3">
+                    <a href="/admin/threads/{{.ID}}" class="text-xs text-blue-600 hover:text-blue-800 font-medium">Details</a>
+                    <button hx-delete="/admin/threads/{{.ID}}?account_id={{.AccountID}}"
+                            hx-target="#thread-{{.ID}}"
+                            hx-swap="outerHTML swap:0.3s"
+                            hx-confirm="Delete this thread and all its events/facts?"
+                            class="text-xs text-red-600 hover:text-red-800 font-medium">Delete</button>
+                </td>
+            </tr>
+            {{else}}
+            <tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">No threads found</td></tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}

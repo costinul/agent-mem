@@ -47,6 +47,21 @@ func (r *InMemoryRepository) InsertEvent(_ context.Context, event models.Event) 
 	return &stored, nil
 }
 
+func (r *InMemoryRepository) ListEventsByThreadID(_ context.Context, threadID string) ([]models.Event, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	events := make([]models.Event, 0)
+	for _, e := range r.events {
+		if e.ThreadID != nil && *e.ThreadID == threadID {
+			events = append(events, e)
+		}
+	}
+	sort.Slice(events, func(i, j int) bool {
+		return events[i].CreatedAt.Before(events[j].CreatedAt)
+	})
+	return events, nil
+}
+
 // =====================
 // Sources
 // =====================
@@ -178,6 +193,21 @@ func (r *InMemoryRepository) ListFactsByScope(_ context.Context, accountID strin
 			}
 		}
 		facts = append(facts, fact)
+	}
+	sort.Slice(facts, func(i, j int) bool {
+		return facts[i].CreatedAt.Before(facts[j].CreatedAt)
+	})
+	return facts, nil
+}
+
+func (r *InMemoryRepository) ListFactsByThreadID(_ context.Context, threadID string) ([]models.Fact, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	facts := make([]models.Fact, 0)
+	for _, f := range r.facts {
+		if f.ThreadID != nil && *f.ThreadID == threadID {
+			facts = append(facts, f)
+		}
 	}
 	sort.Slice(facts, func(i, j int) bool {
 		return facts[i].CreatedAt.Before(facts[j].CreatedAt)

@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Config struct {
@@ -13,6 +14,16 @@ type Config struct {
 	LogLevel string
 	Database DatabaseConfig
 	AI       AIConfig
+	Admin    AdminConfig
+}
+
+type AdminConfig struct {
+	GoogleClientID     string
+	GoogleClientSecret string
+	BaseURL            string
+	SessionTTL         time.Duration
+	SessionCacheTTL    time.Duration
+	Enabled            bool
 }
 
 type DatabaseConfig struct {
@@ -25,6 +36,10 @@ type AIConfig struct {
 }
 
 func Load() (*Config, error) {
+	googleClientID := strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_ID"))
+	googleClientSecret := strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_SECRET"))
+	adminEnabled := googleClientID != "" && googleClientSecret != ""
+
 	cfg := &Config{
 		Port:     getEnvOrDefault("PORT", "8080"),
 		GinMode:  getEnvOrDefault("GIN_MODE", "debug"),
@@ -35,6 +50,14 @@ func Load() (*Config, error) {
 		AI: AIConfig{
 			SchemaModel:    os.Getenv("AI_SCHEMA_MODEL"),
 			EmbeddingModel: os.Getenv("AI_EMBEDDING_MODEL"),
+		},
+		Admin: AdminConfig{
+			GoogleClientID:     googleClientID,
+			GoogleClientSecret: googleClientSecret,
+			BaseURL:            getEnvOrDefault("BASE_URL", "http://localhost:8080"),
+			SessionTTL:         getEnvDurationOrDefault("SESSION_TTL", 24*time.Hour),
+			SessionCacheTTL:    getEnvDurationOrDefault("SESSION_CACHE_TTL", 60*time.Second),
+			Enabled:            adminEnabled,
 		},
 	}
 
@@ -73,6 +96,18 @@ func getEnvOrDefault(key, defaultValue string) string {
 	}
 
 	return defaultValue
+}
+
+func getEnvDurationOrDefault(key string, defaultValue time.Duration) time.Duration {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return defaultValue
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil {
+		return defaultValue
+	}
+	return d
 }
 
 func getEnvIntOrDefault(key string, defaultValue int) int {

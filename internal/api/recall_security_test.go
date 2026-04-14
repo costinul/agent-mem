@@ -46,7 +46,7 @@ func recallSecurityServer(t *testing.T) (*Server, string, string) {
 
 	memEngine := engine.NewMemoryEngine(nil, memoryrepo.NewInMemory(), "", "")
 	accountSvc := account.NewService(&mockAccountRepo{})
-	server := NewServer(memEngine, accountSvc, svc)
+	server := NewServer(memEngine, accountSvc, svc, nil)
 
 	// Return agent B and thread B IDs — these belong to the other account and
 	// should be rejected when requested with account A's API key.

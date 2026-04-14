@@ -17,6 +17,9 @@ type CreateAPIKeyParams struct {
 
 type Repository interface {
 	CreateAccount(ctx context.Context, name string) (*models.Account, error)
+	GetAccountByID(ctx context.Context, id string) (*models.Account, error)
+	ListAllAccounts(ctx context.Context) ([]models.Account, error)
+	DeleteAccountByID(ctx context.Context, id string) error
 	CreateAPIKey(ctx context.Context, params CreateAPIKeyParams) (*models.APIKey, error)
 	InvalidateAPIKeyByID(ctx context.Context, apiKeyID string) (bool, error)
 	InvalidateAPIKeyByPrefix(ctx context.Context, prefix string) (bool, error)

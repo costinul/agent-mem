@@ -2,8 +2,11 @@ package api
 
 import (
 	"agentmem/internal/account"
+	"agentmem/internal/admin"
 	"agentmem/internal/agent"
+	"agentmem/internal/auth"
 	"agentmem/internal/engine"
+	"agentmem/internal/repository/userrepo"
 	"context"
 	"fmt"
 	"log/slog"
@@ -21,7 +24,14 @@ type Server struct {
 	engine     *engine.MemoryEngine
 }
 
-func NewServer(engine *engine.MemoryEngine, accountSvc *account.Service, agentSvc *agent.Service) *Server {
+type AdminDeps struct {
+	GoogleAuth   *auth.GoogleAuth
+	SessionStore auth.SessionStore
+	UserRepo     userrepo.Repository
+	AdminHandler *admin.Handler
+}
+
+func NewServer(engine *engine.MemoryEngine, accountSvc *account.Service, agentSvc *agent.Service, adminDeps *AdminDeps) *Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler)
 	mux.HandleFunc("POST /memory/contextual", requireAPIKey(accountSvc, contextualHandler(engine, agentSvc)))
@@ -39,6 +49,17 @@ func NewServer(engine *engine.MemoryEngine, accountSvc *account.Service, agentSv
 	mux.HandleFunc("DELETE /threads/{id}", requireAPIKey(accountSvc, deleteThreadHandler(agentSvc)))
 	mux.HandleFunc("GET /threads/{id}/messages", requireAPIKey(accountSvc, listThreadMessagesHandler(agentSvc, engine)))
 	mux.Handle("GET /swagger/", httpSwagger.Handler(httpSwagger.PersistAuthorization(true)))
+
+	if adminDeps != nil {
+		mux.HandleFunc("GET /auth/google/login", adminDeps.GoogleAuth.LoginHandler)
+		mux.HandleFunc("GET /auth/google/callback", adminDeps.GoogleAuth.CallbackHandler)
+		mux.HandleFunc("GET /auth/logout", adminDeps.GoogleAuth.LogoutHandler)
+
+		adminMw := func(next http.Handler) http.Handler {
+			return auth.RequireAdmin(adminDeps.SessionStore, adminDeps.UserRepo, next)
+		}
+		adminDeps.AdminHandler.RegisterRoutes(mux, adminMw)
+	}
 
 	return &Server{
 		httpServer: &http.Server{

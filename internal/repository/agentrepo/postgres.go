@@ -3,6 +3,7 @@ package agentrepo
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"agentmem/internal/database"
 	models "agentmem/internal/models"
@@ -69,6 +70,39 @@ func (r *PostgresRepository) DeleteAgentByID(ctx context.Context, accountID, age
 	return rows > 0, nil
 }
 
+func (r *PostgresRepository) ListAllAgents(ctx context.Context, accountID string) ([]models.Agent, error) {
+	query := `SELECT id, account_id, name, created_at, updated_at FROM agents`
+	var args []any
+	if accountID != "" {
+		query += ` WHERE account_id = $1`
+		args = append(args, accountID)
+	}
+	query += ` ORDER BY created_at ASC`
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	agents := make([]models.Agent, 0)
+	for rows.Next() {
+		var a models.Agent
+		if err := rows.Scan(&a.ID, &a.AccountID, &a.Name, &a.CreatedAt, &a.UpdatedAt); err != nil {
+			return nil, err
+		}
+		agents = append(agents, a)
+	}
+	return agents, rows.Err()
+}
+
+func (r *PostgresRepository) UpdateAgent(ctx context.Context, accountID, agentID, name string) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE agents SET name = $3, updated_at = now() WHERE id = $1 AND account_id = $2`,
+		agentID, accountID, name)
+	return err
+}
+
 func (r *PostgresRepository) CreateThread(ctx context.Context, accountID, agentID string) (*models.Thread, error) {
 	var thread models.Thread
 	err := r.db.QueryRowContext(
@@ -121,4 +155,36 @@ func (r *PostgresRepository) DeleteThreadByID(ctx context.Context, accountID, th
 		return false, err
 	}
 	return rows > 0, nil
+}
+
+func (r *PostgresRepository) ListAllThreads(ctx context.Context, accountID string, agentID *string) ([]models.Thread, error) {
+	query := `SELECT id, account_id, agent_id, created_at FROM threads WHERE 1=1`
+	args := make([]any, 0, 2)
+	idx := 1
+	if accountID != "" {
+		query += fmt.Sprintf(` AND account_id = $%d`, idx)
+		args = append(args, accountID)
+		idx++
+	}
+	if agentID != nil && *agentID != "" {
+		query += fmt.Sprintf(` AND agent_id = $%d`, idx)
+		args = append(args, *agentID)
+	}
+	query += ` ORDER BY created_at ASC`
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	threads := make([]models.Thread, 0)
+	for rows.Next() {
+		var t models.Thread
+		if err := rows.Scan(&t.ID, &t.AccountID, &t.AgentID, &t.CreatedAt); err != nil {
+			return nil, err
+		}
+		threads = append(threads, t)
+	}
+	return threads, rows.Err()
 }

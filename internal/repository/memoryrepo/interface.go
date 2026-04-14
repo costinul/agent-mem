@@ -8,6 +8,7 @@ import (
 
 type Repository interface {
 	InsertEvent(ctx context.Context, event models.Event) (*models.Event, error)
+	ListEventsByThreadID(ctx context.Context, threadID string) ([]models.Event, error)
 
 	InsertSource(ctx context.Context, source models.Source) (*models.Source, error)
 	GetSourceByID(ctx context.Context, sourceID string) (*models.Source, error)
@@ -16,6 +17,7 @@ type Repository interface {
 
 	InsertFact(ctx context.Context, fact models.Fact) (*models.Fact, error)
 	ListFactsByScope(ctx context.Context, accountID string, agentID, threadID *string) ([]models.Fact, error)
+	ListFactsByThreadID(ctx context.Context, threadID string) ([]models.Fact, error)
 	ListFactsFiltered(ctx context.Context, params ListFactsParams) ([]models.Fact, int, error)
 	GetFactByID(ctx context.Context, factID string) (*models.Fact, error)
 	SearchFactsByEmbedding(ctx context.Context, params SearchByEmbeddingParams) ([]models.Fact, error)

@@ -15,14 +15,17 @@ import (
 	"time"
 
 	"agentmem/internal/account"
+	"agentmem/internal/admin"
 	agentsvc "agentmem/internal/agent"
 	"agentmem/internal/api"
+	"agentmem/internal/auth"
 	"agentmem/internal/config"
 	"agentmem/internal/database"
 	"agentmem/internal/engine"
 	"agentmem/internal/repository/accountrepo"
 	"agentmem/internal/repository/agentrepo"
 	"agentmem/internal/repository/memoryrepo"
+	"agentmem/internal/repository/userrepo"
 
 	"github.com/costinul/bwai"
 	"github.com/costinul/bwai/bwaiclient"
@@ -82,8 +85,31 @@ func main() {
 	log.Println("Initializing MemoryEngine...")
 	engine := engine.NewMemoryEngine(bwaiClient, memoryRepo, cfg.AI.SchemaModel, cfg.AI.EmbeddingModel)
 
+	var adminDeps *api.AdminDeps
+	if cfg.Admin.Enabled {
+		log.Println("Initializing admin UI with Google OAuth...")
+		userRepo := userrepo.NewPostgres(db)
+		pgSessions := auth.NewPgSessionStore(db)
+		sessionStore := auth.NewCachedSessionStore(pgSessions, cfg.Admin.SessionCacheTTL, 1000)
+		googleAuth := auth.NewGoogleAuth(
+			cfg.Admin.GoogleClientID,
+			cfg.Admin.GoogleClientSecret,
+			cfg.Admin.BaseURL,
+			userRepo,
+			sessionStore,
+			cfg.Admin.SessionTTL,
+		)
+		adminHandler := admin.NewHandler(accountRepo, agentRepo, memoryRepo, userRepo, engine)
+		adminDeps = &api.AdminDeps{
+			GoogleAuth:   googleAuth,
+			SessionStore: sessionStore,
+			UserRepo:     userRepo,
+			AdminHandler: adminHandler,
+		}
+	}
+
 	log.Println("Initializing API server...")
-	server := api.NewServer(engine, accountSvc, agentService)
+	server := api.NewServer(engine, accountSvc, agentService, adminDeps)
 	go func() {
 		log.Printf("Starting HTTP server on port %s", cfg.Port)
 		if err := server.Start(cfg.Port); err != nil && !errors.Is(err, http.ErrServerClosed) {

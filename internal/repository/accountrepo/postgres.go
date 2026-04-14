@@ -33,6 +33,44 @@ func (r *PostgresRepository) CreateAccount(ctx context.Context, name string) (*m
 	return &account, nil
 }
 
+func (r *PostgresRepository) GetAccountByID(ctx context.Context, id string) (*models.Account, error) {
+	var acct models.Account
+	err := r.db.QueryRowContext(ctx,
+		`SELECT id, name, created_at, updated_at FROM accounts WHERE id = $1`, id,
+	).Scan(&acct.ID, &acct.Name, &acct.CreatedAt, &acct.UpdatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &acct, nil
+}
+
+func (r *PostgresRepository) ListAllAccounts(ctx context.Context) ([]models.Account, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, name, created_at, updated_at FROM accounts ORDER BY created_at ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	accounts := make([]models.Account, 0)
+	for rows.Next() {
+		var a models.Account
+		if err := rows.Scan(&a.ID, &a.Name, &a.CreatedAt, &a.UpdatedAt); err != nil {
+			return nil, err
+		}
+		accounts = append(accounts, a)
+	}
+	return accounts, rows.Err()
+}
+
+func (r *PostgresRepository) DeleteAccountByID(ctx context.Context, id string) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM accounts WHERE id = $1`, id)
+	return err
+}
+
 func (r *PostgresRepository) CreateAPIKey(ctx context.Context, params CreateAPIKeyParams) (*models.APIKey, error) {
 	var normalizedLabel sql.NullString
 	if params.Label != nil {

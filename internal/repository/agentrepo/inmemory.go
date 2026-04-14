@@ -61,6 +61,31 @@ func (r *InMemoryRepository) DeleteAgentByID(_ context.Context, accountID, agent
 	return true, nil
 }
 
+func (r *InMemoryRepository) ListAllAgents(_ context.Context, accountID string) ([]models.Agent, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	agents := make([]models.Agent, 0)
+	for _, a := range r.agents {
+		if accountID == "" || a.AccountID == accountID {
+			agents = append(agents, a)
+		}
+	}
+	return agents, nil
+}
+
+func (r *InMemoryRepository) UpdateAgent(_ context.Context, accountID, agentID, name string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	a, ok := r.agents[agentID]
+	if !ok || a.AccountID != accountID {
+		return nil
+	}
+	a.Name = name
+	a.UpdatedAt = time.Now().UTC()
+	r.agents[agentID] = a
+	return nil
+}
+
 func (r *InMemoryRepository) CreateThread(_ context.Context, accountID, agentID string) (*models.Thread, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -95,6 +120,22 @@ func (r *InMemoryRepository) DeleteThreadByID(_ context.Context, accountID, thre
 	}
 	delete(r.threads, threadID)
 	return true, nil
+}
+
+func (r *InMemoryRepository) ListAllThreads(_ context.Context, accountID string, agentID *string) ([]models.Thread, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	threads := make([]models.Thread, 0)
+	for _, t := range r.threads {
+		if accountID != "" && t.AccountID != accountID {
+			continue
+		}
+		if agentID != nil && *agentID != "" && t.AgentID != *agentID {
+			continue
+		}
+		threads = append(threads, t)
+	}
+	return threads, nil
 }
 
 var _ Repository = (*InMemoryRepository)(nil)

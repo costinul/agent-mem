@@ -1,0 +1,54 @@
+{{template "layout.html" .}}
+{{define "content"}}
+<div class="flex items-center justify-between mb-6">
+    <h2 class="text-lg font-semibold text-gray-900">Users</h2>
+</div>
+<div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+                <th class="text-left px-4 py-3 font-medium text-gray-500">User</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-500">Email</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-500">Role</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-500">Joined</th>
+                <th class="text-right px-4 py-3 font-medium text-gray-500">Actions</th>
+            </tr>
+        </thead>
+        <tbody id="user-list" class="divide-y divide-gray-100">
+            {{range .Users}}
+            <tr id="user-{{.ID}}">
+                <td class="px-4 py-3">
+                    <div class="flex items-center gap-2">
+                        {{if .Picture}}
+                        <img src="{{.Picture}}" class="w-6 h-6 rounded-full" alt="" referrerpolicy="no-referrer">
+                        {{end}}
+                        <span class="text-gray-900">{{.Name}}</span>
+                    </div>
+                </td>
+                <td class="px-4 py-3 text-gray-600">{{.Email}}</td>
+                <td class="px-4 py-3">
+                    <form hx-put="/admin/users/{{.ID}}/role" hx-target="#user-{{.ID}}" hx-swap="outerHTML">
+                        <select name="role" onchange="this.form.requestSubmit()"
+                                class="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500
+                                       {{if eq .Role "admin"}}bg-indigo-50 text-indigo-700{{else}}bg-gray-50 text-gray-700{{end}}">
+                            <option value="admin" {{if eq .Role "admin"}}selected{{end}}>admin</option>
+                            <option value="user" {{if eq .Role "user"}}selected{{end}}>user</option>
+                        </select>
+                    </form>
+                </td>
+                <td class="px-4 py-3 text-gray-500">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
+                <td class="px-4 py-3 text-right">
+                    <button hx-delete="/admin/users/{{.ID}}"
+                            hx-target="#user-{{.ID}}"
+                            hx-swap="outerHTML swap:0.3s"
+                            hx-confirm="Delete this user? They will need to sign in again to be re-created."
+                            class="text-xs text-red-600 hover:text-red-800 font-medium">Delete</button>
+                </td>
+            </tr>
+            {{else}}
+            <tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">No users</td></tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}

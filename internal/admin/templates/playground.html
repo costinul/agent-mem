@@ -1,0 +1,319 @@
+{{template "layout.html" .}}
+{{define "content"}}
+<div class="mb-6">
+    <h2 class="text-lg font-semibold text-gray-900">Memory Playground</h2>
+    <p class="text-sm text-gray-500 mt-1">Test memory operations directly against the engine.</p>
+</div>
+
+<!-- Context -->
+<div class="bg-white rounded-lg border border-gray-200 p-5 mb-6">
+    <h3 class="text-sm font-semibold text-gray-700 mb-4">Context</h3>
+    <div class="grid grid-cols-3 gap-5">
+        <!-- Account -->
+        <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Account</label>
+            <select id="ctx-account"
+                    hx-get="/admin/playground/agents"
+                    hx-target="#ctx-agent-select"
+                    hx-include="[id='ctx-account']"
+                    hx-vals="js:{account_id: document.getElementById('ctx-account').value}"
+                    hx-trigger="change"
+                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">— select account —</option>
+                {{range .Accounts}}
+                <option value="{{.ID}}">{{.Name}}</option>
+                {{end}}
+            </select>
+        </div>
+
+        <!-- Agent combobox -->
+        <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Agent</label>
+            <div class="relative">
+                <input id="ctx-agent-search" type="text" placeholder="Search agents…"
+                       oninput="filterCombo('ctx-agent-select', this.value)"
+                       onfocus="document.getElementById('ctx-agent-dropdown').classList.remove('hidden')"
+                       class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <div id="ctx-agent-dropdown"
+                     class="hidden absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-52 overflow-y-auto">
+                    <select id="ctx-agent-select" size="6"
+                            hx-get="/admin/playground/threads"
+                            hx-target="#ctx-thread-select"
+                            hx-vals="js:{agent_id: document.getElementById('ctx-agent-select').value}"
+                            hx-trigger="change"
+                            onchange="pickCombo('ctx-agent', 'ctx-agent-dropdown')"
+                            class="w-full text-sm border-0 focus:outline-none [&>option]:px-3 [&>option]:py-2 [&>option]:cursor-pointer [&>option:hover]:bg-blue-50">
+                        <option value="">— select account first —</option>
+                    </select>
+                </div>
+            </div>
+            <input id="ctx-agent-value" type="hidden">
+        </div>
+
+        <!-- Thread combobox -->
+        <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Thread <span class="text-gray-400 font-normal">(optional)</span></label>
+            <div class="relative">
+                <input id="ctx-thread-search" type="text" placeholder="Search threads…"
+                       oninput="filterCombo('ctx-thread-select', this.value)"
+                       onfocus="document.getElementById('ctx-thread-dropdown').classList.remove('hidden')"
+                       class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <div id="ctx-thread-dropdown"
+                     class="hidden absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-52 overflow-y-auto">
+                    <select id="ctx-thread-select" size="6"
+                            onchange="pickCombo('ctx-thread', 'ctx-thread-dropdown')"
+                            class="w-full text-sm border-0 focus:outline-none [&>option]:px-3 [&>option]:py-2 [&>option]:cursor-pointer [&>option:hover]:bg-blue-50">
+                        <option value="">— select agent first —</option>
+                    </select>
+                </div>
+            </div>
+            <input id="ctx-thread-value" type="hidden">
+        </div>
+    </div>
+</div>
+
+<!-- Tabs -->
+<div>
+    <!-- Tab bar -->
+    <div class="border-b border-gray-200 bg-white rounded-t-lg px-5 pt-3">
+        <nav class="-mb-px flex gap-6">
+            <button id="tab-btn-contextual" onclick="switchTab('contextual')"
+                    class="py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600 transition-colors">
+                Contextual
+            </button>
+            <button id="tab-btn-factual" onclick="switchTab('factual')"
+                    class="py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors">
+                Factual
+            </button>
+            <button id="tab-btn-recall" onclick="switchTab('recall')"
+                    class="py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors">
+                Recall
+            </button>
+        </nav>
+    </div>
+
+    <!-- Contextual panel -->
+    <div id="tab-panel-contextual" class="bg-white rounded-b-lg border border-t-0 border-gray-200 p-5">
+        <p class="text-xs text-gray-500 mb-4">Process messages through the full contextual pipeline — extracts facts, deduplicates, and updates memory.</p>
+        <form hx-post="/admin/playground/contextual" hx-target="#playground-result" hx-swap="innerHTML"
+              hx-indicator="#spinner-contextual" onsubmit="injectContext(this)">
+            <input type="hidden" name="account_id">
+            <input type="hidden" name="agent_id">
+            <input type="hidden" name="thread_id">
+            <div id="inputs-contextual" class="space-y-3 mb-4">
+                <!-- first item -->
+                <div class="input-item flex gap-3 items-start p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <select name="kind" class="shrink-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="USER">USER</option>
+                        <option value="AGENT">AGENT</option>
+                        <option value="TOOL">TOOL</option>
+                        <option value="DOCUMENT">DOCUMENT</option>
+                        <option value="SYSTEM">SYSTEM</option>
+                    </select>
+                    <textarea name="content" rows="3" placeholder="Enter message content…"
+                              class="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
+                    <button type="button" onclick="removeInput(this)"
+                            class="shrink-0 mt-1 text-gray-400 hover:text-red-500 transition-colors" title="Remove">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="flex items-center justify-between">
+                <button type="button" onclick="addInput('inputs-contextual')"
+                        class="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 font-medium">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Add input
+                </button>
+                <button type="submit"
+                        class="inline-flex items-center gap-2 bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-blue-700 transition-colors">
+                    <span id="spinner-contextual" class="htmx-indicator">
+                        <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                        </svg>
+                    </span>
+                    Run Contextual
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Factual panel -->
+    <div id="tab-panel-factual" class="hidden bg-white rounded-b-lg border border-t-0 border-gray-200 p-5">
+        <p class="text-xs text-gray-500 mb-4">Directly write facts to memory without conversational context processing.</p>
+        <form hx-post="/admin/playground/factual" hx-target="#playground-result" hx-swap="innerHTML"
+              hx-indicator="#spinner-factual" onsubmit="injectContext(this)">
+            <input type="hidden" name="account_id">
+            <input type="hidden" name="agent_id">
+            <input type="hidden" name="thread_id">
+            <div id="inputs-factual" class="space-y-3 mb-4">
+                <div class="input-item flex gap-3 items-start p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <select name="kind" class="shrink-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="USER">USER</option>
+                        <option value="AGENT">AGENT</option>
+                        <option value="TOOL">TOOL</option>
+                        <option value="DOCUMENT">DOCUMENT</option>
+                        <option value="SYSTEM">SYSTEM</option>
+                    </select>
+                    <textarea name="content" rows="3" placeholder="Enter factual statement…"
+                              class="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
+                    <button type="button" onclick="removeInput(this)"
+                            class="shrink-0 mt-1 text-gray-400 hover:text-red-500 transition-colors" title="Remove">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="flex items-center justify-between">
+                <button type="button" onclick="addInput('inputs-factual')"
+                        class="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 font-medium">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Add input
+                </button>
+                <button type="submit"
+                        class="inline-flex items-center gap-2 bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-blue-700 transition-colors">
+                    <span id="spinner-factual" class="htmx-indicator">
+                        <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                        </svg>
+                    </span>
+                    Run Factual
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Recall panel -->
+    <div id="tab-panel-recall" class="hidden bg-white rounded-b-lg border border-t-0 border-gray-200 p-5">
+        <p class="text-xs text-gray-500 mb-4">Query memory for relevant facts using semantic search. Read-only.</p>
+        <form hx-post="/admin/playground/recall" hx-target="#playground-result" hx-swap="innerHTML"
+              hx-indicator="#spinner-recall" onsubmit="injectContext(this)">
+            <input type="hidden" name="account_id">
+            <input type="hidden" name="agent_id">
+            <input type="hidden" name="thread_id">
+            <div class="mb-4">
+                <label class="block text-xs font-medium text-gray-600 mb-1">Query</label>
+                <input name="query" type="text" placeholder="What do you want to recall…?"
+                       class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div class="flex items-end gap-6 mb-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Limit</label>
+                    <input name="limit" type="number" value="10" min="1" max="100"
+                           class="w-24 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <label class="flex items-center gap-2 text-sm text-gray-700 mb-2 cursor-pointer">
+                    <input name="include_sources" type="checkbox" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                    Include sources
+                </label>
+            </div>
+            <div class="flex justify-end">
+                <button type="submit"
+                        class="inline-flex items-center gap-2 bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-blue-700 transition-colors">
+                    <span id="spinner-recall" class="htmx-indicator">
+                        <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                        </svg>
+                    </span>
+                    Run Recall
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Result -->
+<div id="playground-result"></div>
+
+<script>
+// --- Tab switcher ---
+function switchTab(tab) {
+    ['contextual','factual','recall'].forEach(t => {
+        document.getElementById('tab-btn-'+t).classList.toggle('border-blue-600', t===tab);
+        document.getElementById('tab-btn-'+t).classList.toggle('text-blue-600', t===tab);
+        document.getElementById('tab-btn-'+t).classList.toggle('border-transparent', t!==tab);
+        document.getElementById('tab-btn-'+t).classList.toggle('text-gray-500', t!==tab);
+        document.getElementById('tab-panel-'+t).classList.toggle('hidden', t!==tab);
+    });
+    document.getElementById('playground-result').innerHTML = '';
+}
+
+// --- Combobox helpers ---
+function filterCombo(selectId, query) {
+    const sel = document.getElementById(selectId);
+    const q = query.toLowerCase();
+    Array.from(sel.options).forEach(opt => {
+        opt.style.display = opt.text.toLowerCase().includes(q) ? '' : 'none';
+    });
+    document.getElementById(selectId.replace('-select','-dropdown')).classList.remove('hidden');
+}
+
+function pickCombo(prefix, dropdownId) {
+    const sel = document.getElementById(prefix+'-select');
+    const chosen = sel.options[sel.selectedIndex];
+    document.getElementById(prefix+'-search').value = chosen.value ? chosen.text : '';
+    document.getElementById(prefix+'-value').value  = chosen.value;
+    document.getElementById(dropdownId).classList.add('hidden');
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', function(e) {
+    ['ctx-agent','ctx-thread'].forEach(prefix => {
+        const dd = document.getElementById(prefix+'-dropdown');
+        const search = document.getElementById(prefix+'-search');
+        if (dd && !dd.contains(e.target) && e.target !== search) {
+            dd.classList.add('hidden');
+        }
+    });
+});
+
+// --- Inject context into form before submit ---
+function injectContext(form) {
+    form.querySelector('[name="account_id"]').value = document.getElementById('ctx-account').value;
+    form.querySelector('[name="agent_id"]').value   = document.getElementById('ctx-agent-value').value;
+    form.querySelector('[name="thread_id"]').value  = document.getElementById('ctx-thread-value').value;
+}
+
+// --- Dynamic input items ---
+const inputItemHTML = `
+<div class="input-item flex gap-3 items-start p-3 bg-gray-50 rounded-lg border border-gray-200">
+    <select name="kind" class="shrink-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <option value="USER">USER</option>
+        <option value="AGENT">AGENT</option>
+        <option value="TOOL">TOOL</option>
+        <option value="DOCUMENT">DOCUMENT</option>
+        <option value="SYSTEM">SYSTEM</option>
+    </select>
+    <textarea name="content" rows="3" placeholder="Enter content…"
+              class="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
+    <button type="button" onclick="removeInput(this)"
+            class="shrink-0 mt-1 text-gray-400 hover:text-red-500 transition-colors" title="Remove">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+    </button>
+</div>`;
+
+function addInput(containerId) {
+    const el = document.createElement('div');
+    el.innerHTML = inputItemHTML.trim();
+    document.getElementById(containerId).appendChild(el.firstChild);
+}
+
+function removeInput(btn) {
+    const container = btn.closest('.input-item').parentElement;
+    if (container.querySelectorAll('.input-item').length > 1) {
+        btn.closest('.input-item').remove();
+    }
+}
+</script>
+{{end}}

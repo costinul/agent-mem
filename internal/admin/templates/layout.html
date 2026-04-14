@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} — Agent Memory Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <style>
+        .htmx-indicator { opacity: 0; transition: opacity 200ms ease-in; }
+        .htmx-request .htmx-indicator { opacity: 1; }
+        .fade-out { animation: fadeOut 0.3s ease forwards; }
+        @keyframes fadeOut { to { opacity: 0; height: 0; padding: 0; margin: 0; overflow: hidden; } }
+    </style>
+</head>
+<body class="h-full" hx-boost="true">
+    <div class="flex h-full">
+        <!-- Sidebar -->
+        <nav class="w-56 bg-gray-900 text-gray-300 flex flex-col min-h-screen flex-shrink-0">
+            <div class="px-5 py-5 border-b border-gray-800">
+                <h1 class="text-white font-bold text-lg tracking-tight">Agent Memory</h1>
+                <p class="text-xs text-gray-500 mt-0.5">Admin Panel</p>
+            </div>
+            <div class="flex-1 py-4 space-y-1 px-3">
+                <a href="/admin/accounts" class="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-gray-800 hover:text-white {{if eq .Nav "accounts"}}bg-gray-800 text-white{{end}}">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                    Accounts
+                </a>
+                <a href="/admin/agents" class="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-gray-800 hover:text-white {{if eq .Nav "agents"}}bg-gray-800 text-white{{end}}">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    Agents
+                </a>
+                <a href="/admin/threads" class="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-gray-800 hover:text-white {{if eq .Nav "threads"}}bg-gray-800 text-white{{end}}">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+                    Threads
+                </a>
+                <a href="/admin/users" class="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-gray-800 hover:text-white {{if eq .Nav "users"}}bg-gray-800 text-white{{end}}">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/></svg>
+                    Users
+                </a>
+                <a href="/admin/playground" class="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-gray-800 hover:text-white {{if eq .Nav "playground"}}bg-gray-800 text-white{{end}}">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                    Playground
+                </a>
+            </div>
+            <div class="px-3 py-4 border-t border-gray-800">
+                {{if .User}}
+                <div class="flex items-center gap-2 px-3 mb-3">
+                    {{if .User.Picture}}
+                    <img src="{{.User.Picture}}" class="w-7 h-7 rounded-full" alt="" referrerpolicy="no-referrer">
+                    {{end}}
+                    <div class="min-w-0">
+                        <p class="text-xs text-white truncate">{{.User.Name}}</p>
+                        <p class="text-xs text-gray-500 truncate">{{.User.Email}}</p>
+                    </div>
+                </div>
+                {{end}}
+                <a href="/auth/logout" class="flex items-center gap-2 px-3 py-2 rounded-md text-sm hover:bg-gray-800 hover:text-white text-gray-400">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    Sign out
+                </a>
+            </div>
+        </nav>
+
+        <!-- Main content -->
+        <main class="flex-1 overflow-auto">
+            <div class="max-w-6xl mx-auto px-6 py-8">
+                {{if .Flash}}
+                <div class="mb-4 px-4 py-3 rounded-md bg-green-50 text-green-800 text-sm border border-green-200">
+                    {{.Flash}}
+                </div>
+                {{end}}
+                {{block "content" .}}{{end}}
+            </div>
+        </main>
+    </div>
+</body>
+</html>

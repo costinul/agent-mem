@@ -209,6 +209,18 @@ func (m *mockRepo) CreateAccount(ctx context.Context, name string) (*models.Acco
 	return m.createAccountFn(ctx, name)
 }
 
+func (m *mockRepo) GetAccountByID(context.Context, string) (*models.Account, error) {
+	return nil, nil
+}
+
+func (m *mockRepo) ListAllAccounts(context.Context) ([]models.Account, error) {
+	return nil, nil
+}
+
+func (m *mockRepo) DeleteAccountByID(context.Context, string) error {
+	return nil
+}
+
 func (m *mockRepo) CreateAPIKey(ctx context.Context, params accountrepo.CreateAPIKeyParams) (*models.APIKey, error) {
 	if m.createAPIKeyFn == nil {
 		return nil, errors.New("unexpected CreateAPIKey call")

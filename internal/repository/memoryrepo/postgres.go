@@ -44,6 +44,28 @@ func (r *PostgresRepository) InsertEvent(ctx context.Context, event models.Event
 	return &stored, nil
 }
 
+func (r *PostgresRepository) ListEventsByThreadID(ctx context.Context, threadID string) ([]models.Event, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, account_id, agent_id, thread_id, created_at
+		 FROM events WHERE thread_id = $1 ORDER BY created_at ASC`, threadID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	events := make([]models.Event, 0)
+	for rows.Next() {
+		var e models.Event
+		var tid sql.NullString
+		if err := rows.Scan(&e.ID, &e.AccountID, &e.AgentID, &tid, &e.CreatedAt); err != nil {
+			return nil, err
+		}
+		e.ThreadID = nullStringPtr(tid)
+		events = append(events, e)
+	}
+	return events, rows.Err()
+}
+
 func (r *PostgresRepository) InsertSource(ctx context.Context, source models.Source) (*models.Source, error) {
 	var (
 		stored     models.Source
@@ -302,6 +324,47 @@ func (r *PostgresRepository) ListFactsByScope(ctx context.Context, accountID str
 		}
 		fact.AgentID = nullStringPtr(agent)
 		fact.ThreadID = nullStringPtr(thread)
+		facts = append(facts, fact)
+	}
+	return facts, rows.Err()
+}
+
+func (r *PostgresRepository) ListFactsByThreadID(ctx context.Context, threadID string) ([]models.Fact, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, account_id, agent_id, thread_id, source_id, kind, text,
+		        superseded_at, superseded_by, created_at, updated_at
+		 FROM facts WHERE thread_id = $1
+		 ORDER BY created_at ASC`, threadID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	facts := make([]models.Fact, 0)
+	for rows.Next() {
+		var (
+			fact         models.Fact
+			agent        sql.NullString
+			thread       sql.NullString
+			supersededAt sql.NullTime
+			supersededBy sql.NullString
+		)
+		if err := rows.Scan(
+			&fact.ID, &fact.AccountID, &agent, &thread,
+			&fact.SourceID, &fact.Kind, &fact.Text,
+			&supersededAt, &supersededBy,
+			&fact.CreatedAt, &fact.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		fact.AgentID = nullStringPtr(agent)
+		fact.ThreadID = nullStringPtr(thread)
+		if supersededAt.Valid {
+			fact.SupersededAt = &supersededAt.Time
+		}
+		if supersededBy.Valid {
+			fact.SupersededBy = &supersededBy.String
+		}
 		facts = append(facts, fact)
 	}
 	return facts, rows.Err()

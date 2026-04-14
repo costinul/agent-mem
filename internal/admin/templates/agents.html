@@ -1,0 +1,64 @@
+{{template "layout.html" .}}
+{{define "content"}}
+<div class="flex items-center justify-between mb-6">
+    <h2 class="text-lg font-semibold text-gray-900">Agents</h2>
+    <form hx-post="/admin/agents" hx-target="#agent-list" hx-swap="beforeend" class="flex gap-2">
+        <select name="account_id" required class="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="">Select account</option>
+            {{range .Accounts}}
+            <option value="{{.ID}}">{{.Name}}</option>
+            {{end}}
+        </select>
+        <input type="text" name="name" placeholder="Agent name" required
+               class="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        <button type="submit"
+                class="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors">
+            Create
+        </button>
+    </form>
+</div>
+
+{{if .FilterAccount}}
+<div class="mb-4 flex items-center gap-2 text-sm text-gray-600">
+    <span>Filtered by account:</span>
+    <span class="font-medium text-gray-900">{{.FilterAccount}}</span>
+    <a href="/admin/agents" class="text-blue-600 hover:underline text-xs ml-1">clear</a>
+</div>
+{{end}}
+
+<div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+                <th class="text-left px-4 py-3 font-medium text-gray-500">ID</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-500">Name</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-500">Account</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-500">Created</th>
+                <th class="text-right px-4 py-3 font-medium text-gray-500">Actions</th>
+            </tr>
+        </thead>
+        <tbody id="agent-list" class="divide-y divide-gray-100">
+            {{range .Agents}}
+            <tr id="agent-{{.ID}}">
+                <td class="px-4 py-3 font-mono text-xs text-gray-600">{{.ID}}</td>
+                <td class="px-4 py-3 text-gray-900">{{.Name}}</td>
+                <td class="px-4 py-3 font-mono text-xs text-gray-500">
+                    <a href="/admin/agents?account_id={{.AccountID}}" class="hover:text-blue-600">{{.AccountID}}</a>
+                </td>
+                <td class="px-4 py-3 text-gray-500">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
+                <td class="px-4 py-3 text-right space-x-3">
+                    <a href="/admin/threads?agent_id={{.ID}}" class="text-xs text-blue-600 hover:text-blue-800 font-medium">Threads</a>
+                    <button hx-delete="/admin/agents/{{.ID}}?account_id={{.AccountID}}"
+                            hx-target="#agent-{{.ID}}"
+                            hx-swap="outerHTML swap:0.3s"
+                            hx-confirm="Delete this agent and all its threads?"
+                            class="text-xs text-red-600 hover:text-red-800 font-medium">Delete</button>
+                </td>
+            </tr>
+            {{else}}
+            <tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">No agents found</td></tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}

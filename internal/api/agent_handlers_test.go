@@ -95,7 +95,7 @@ func newAgentTestServer() *Server {
 	memEngine := engine.NewMemoryEngine(nil, memoryrepo.NewInMemory(), "", "")
 	accountSvc := account.NewService(&mockAccountRepo{})
 	agentSvc := agentsvc.NewService(newStatefulAgentRepo())
-	return NewServer(memEngine, accountSvc, agentSvc)
+	return NewServer(memEngine, accountSvc, agentSvc, nil)
 }
 
 type statefulAgentRepo struct {
@@ -175,4 +175,16 @@ func (r *statefulAgentRepo) DeleteThreadByID(_ context.Context, accountID, threa
 	}
 	delete(r.threads, threadID)
 	return true, nil
+}
+
+func (r *statefulAgentRepo) ListAllAgents(context.Context, string) ([]models.Agent, error) {
+	return nil, nil
+}
+
+func (r *statefulAgentRepo) UpdateAgent(context.Context, string, string, string) error {
+	return nil
+}
+
+func (r *statefulAgentRepo) ListAllThreads(context.Context, string, *string) ([]models.Thread, error) {
+	return nil, nil
 }

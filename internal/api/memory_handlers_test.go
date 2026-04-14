@@ -131,7 +131,7 @@ func newTestServer() *Server {
 	memEngine := engine.NewMemoryEngine(nil, repo, "", "")
 	accountSvc := account.NewService(&mockAccountRepo{})
 	agentSvc := agentsvc.NewService(&mockAgentRepo{})
-	return NewServer(memEngine, accountSvc, agentSvc)
+	return NewServer(memEngine, accountSvc, agentSvc, nil)
 }
 
 const (
@@ -143,6 +143,18 @@ type mockAccountRepo struct{}
 
 func (m *mockAccountRepo) CreateAccount(context.Context, string) (*models.Account, error) {
 	return nil, errors.New("unexpected call")
+}
+
+func (m *mockAccountRepo) GetAccountByID(context.Context, string) (*models.Account, error) {
+	return nil, nil
+}
+
+func (m *mockAccountRepo) ListAllAccounts(context.Context) ([]models.Account, error) {
+	return nil, nil
+}
+
+func (m *mockAccountRepo) DeleteAccountByID(context.Context, string) error {
+	return nil
 }
 
 func (m *mockAccountRepo) CreateAPIKey(context.Context, accountrepo.CreateAPIKeyParams) (*models.APIKey, error) {
@@ -188,6 +200,14 @@ func (m *mockAgentRepo) DeleteAgentByID(context.Context, string, string) (bool, 
 	return false, nil
 }
 
+func (m *mockAgentRepo) ListAllAgents(context.Context, string) ([]models.Agent, error) {
+	return nil, nil
+}
+
+func (m *mockAgentRepo) UpdateAgent(context.Context, string, string, string) error {
+	return nil
+}
+
 func (m *mockAgentRepo) CreateThread(context.Context, string, string) (*models.Thread, error) {
 	return nil, errors.New("unexpected call")
 }
@@ -206,6 +226,10 @@ func (m *mockAgentRepo) GetThreadByID(_ context.Context, accountID, threadID str
 
 func (m *mockAgentRepo) DeleteThreadByID(context.Context, string, string) (bool, error) {
 	return false, nil
+}
+
+func (m *mockAgentRepo) ListAllThreads(context.Context, string, *string) ([]models.Thread, error) {
+	return nil, nil
 }
 
 var _ agentrepo.Repository = (*mockAgentRepo)(nil)
