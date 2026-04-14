@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"runtime/debug"
+	"time"
 
 	_ "agentmem/docs"
 
@@ -41,7 +42,7 @@ func NewServer(engine *engine.MemoryEngine, accountSvc *account.Service, agentSv
 
 	return &Server{
 		httpServer: &http.Server{
-			Handler: withRecovery(mux),
+			Handler: withRecovery(withAccessLog(mux)),
 		},
 		engine: engine,
 	}
@@ -72,5 +73,36 @@ func withRecovery(next http.Handler) http.Handler {
 			}
 		}()
 		next.ServeHTTP(w, r)
+	})
+}
+
+type statusResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (w *statusResponseWriter) WriteHeader(statusCode int) {
+	w.statusCode = statusCode
+	w.ResponseWriter.WriteHeader(statusCode)
+}
+
+func withAccessLog(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		writer := &statusResponseWriter{
+			ResponseWriter: w,
+			statusCode:     http.StatusOK,
+		}
+
+		next.ServeHTTP(writer, r)
+
+		slog.Debug(
+			"http request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", writer.statusCode,
+			"duration_ms", time.Since(start).Milliseconds(),
+			"account", accountIDFromContext(r.Context()),
+		)
 	})
 }

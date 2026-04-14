@@ -171,6 +171,9 @@ func (e *MemoryEngine) applyEvaluateResult(
 	if err != nil {
 		return nil, fmt.Errorf("embed new facts: %w", err)
 	}
+	if len(embeddings) != len(newTexts) {
+		return nil, fmt.Errorf("embed new facts: expected %d embeddings, got %d", len(newTexts), len(embeddings))
+	}
 
 	stored := make([]models.Fact, 0, len(result.FactsToStore))
 	for idx, fact := range result.FactsToStore {
@@ -183,14 +186,36 @@ func (e *MemoryEngine) applyEvaluateResult(
 			Kind:      fact.Kind,
 			Text:      fact.Text,
 		}
-		if idx < len(embeddings) {
-			newFact.Embedding = embeddings[idx]
+		if len(embeddings[idx]) == 0 {
+			return nil, fmt.Errorf("embed new facts: empty embedding for fact index %d", idx)
 		}
+		newFact.Embedding = embeddings[idx]
 		inserted, err := e.repo.InsertFact(ctx, newFact)
 		if err != nil {
 			return nil, fmt.Errorf("insert contextual fact: %w", err)
 		}
 		stored = append(stored, *inserted)
+	}
+
+	if len(result.FactsToUpdate) > 0 {
+		updateTexts := make([]string, 0, len(result.FactsToUpdate))
+		for idx := range result.FactsToUpdate {
+			result.FactsToUpdate[idx].Text = strings.TrimSpace(result.FactsToUpdate[idx].Text)
+			updateTexts = append(updateTexts, result.FactsToUpdate[idx].Text)
+		}
+		updateEmbeddings, err := e.ai.Embed(ctx, updateTexts)
+		if err != nil {
+			return nil, fmt.Errorf("embed updated facts: %w", err)
+		}
+		if len(updateEmbeddings) != len(result.FactsToUpdate) {
+			return nil, fmt.Errorf("embed updated facts: expected %d embeddings, got %d", len(result.FactsToUpdate), len(updateEmbeddings))
+		}
+		for idx := range result.FactsToUpdate {
+			if len(updateEmbeddings[idx]) == 0 {
+				return nil, fmt.Errorf("embed updated facts: empty embedding for fact index %d", idx)
+			}
+			result.FactsToUpdate[idx].Embedding = updateEmbeddings[idx]
+		}
 	}
 
 	for _, fact := range result.FactsToUpdate {
@@ -208,6 +233,9 @@ func (e *MemoryEngine) applyEvaluateResult(
 		if err != nil {
 			return nil, fmt.Errorf("embed evolved facts: %w", err)
 		}
+		if len(evolveEmbeddings) != len(result.FactsToEvolve) {
+			return nil, fmt.Errorf("embed evolved facts: expected %d embeddings, got %d", len(result.FactsToEvolve), len(evolveEmbeddings))
+		}
 		for idx, ev := range result.FactsToEvolve {
 			sourceID := selectSourceIDForExtractedFact(storedSources, 0)
 			successor := models.Fact{
@@ -218,9 +246,10 @@ func (e *MemoryEngine) applyEvaluateResult(
 				Kind:      ev.NewKind,
 				Text:      ev.NewText,
 			}
-			if idx < len(evolveEmbeddings) {
-				successor.Embedding = evolveEmbeddings[idx]
+			if len(evolveEmbeddings[idx]) == 0 {
+				return nil, fmt.Errorf("embed evolved facts: empty embedding for fact index %d", idx)
 			}
+			successor.Embedding = evolveEmbeddings[idx]
 			inserted, err := e.repo.SupersedeFact(ctx, ev.OldFactID, successor)
 			if err != nil {
 				return nil, fmt.Errorf("evolve fact %s: %w", ev.OldFactID, err)

@@ -240,7 +240,7 @@ func (r *PostgresRepository) InsertFact(ctx context.Context, fact models.Fact) (
 		fact.SourceID,
 		fact.Kind,
 		fact.Text,
-		vectorLiteral(fact.Embedding),
+		vectorParam(fact.Embedding),
 	).Scan(
 		&stored.ID,
 		&stored.AccountID,
@@ -409,12 +409,12 @@ func (r *PostgresRepository) UpdateFact(ctx context.Context, fact models.Fact) e
 	_, err := r.db.ExecContext(
 		ctx,
 		`UPDATE facts
-		 SET text = $2, kind = $3, embedding = $4::vector, updated_at = now()
+		 SET text = $2, kind = $3, embedding = COALESCE($4::vector, embedding), updated_at = now()
 		 WHERE id = $1`,
 		fact.ID,
 		fact.Text,
 		fact.Kind,
-		vectorLiteral(fact.Embedding),
+		vectorParam(fact.Embedding),
 	)
 	return err
 }
@@ -526,4 +526,11 @@ func vectorLiteral(values []float64) string {
 		parts = append(parts, fmt.Sprintf("%g", value))
 	}
 	return "[" + strings.Join(parts, ",") + "]"
+}
+
+func vectorParam(values []float64) any {
+	if len(values) == 0 {
+		return nil
+	}
+	return vectorLiteral(values)
 }
