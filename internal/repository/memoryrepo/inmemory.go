@@ -347,6 +347,60 @@ func (r *InMemoryRepository) SearchFactsByEmbedding(_ context.Context, params Se
 	return result, nil
 }
 
+func (r *InMemoryRepository) SearchFactsByEmbeddingWithScores(_ context.Context, params SearchByEmbeddingParams) ([]FactWithScore, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	if len(params.Embedding) == 0 {
+		return nil, nil
+	}
+	if params.Limit <= 0 {
+		params.Limit = 20
+	}
+
+	type candidate struct {
+		fact  models.Fact
+		score float64
+	}
+	candidates := make([]candidate, 0)
+	for _, fact := range r.facts {
+		if fact.SupersededAt != nil {
+			continue
+		}
+		if fact.AccountID != params.AccountID {
+			continue
+		}
+		if params.AgentID != nil {
+			if fact.AgentID == nil || *fact.AgentID != *params.AgentID {
+				continue
+			}
+		}
+		if params.ThreadID != nil {
+			if fact.ThreadID == nil || *fact.ThreadID != *params.ThreadID {
+				continue
+			}
+		}
+		candidates = append(candidates, candidate{fact: fact, score: cosineSimilarity(params.Embedding, fact.Embedding)})
+	}
+
+	sort.Slice(candidates, func(i, j int) bool {
+		if candidates[i].score == candidates[j].score {
+			return candidates[i].fact.CreatedAt.Before(candidates[j].fact.CreatedAt)
+		}
+		return candidates[i].score > candidates[j].score
+	})
+
+	if len(candidates) > params.Limit {
+		candidates = candidates[:params.Limit]
+	}
+
+	result := make([]FactWithScore, 0, len(candidates))
+	for _, item := range candidates {
+		result = append(result, FactWithScore{Fact: item.fact, Score: item.score})
+	}
+	return result, nil
+}
+
 func (r *InMemoryRepository) SupersedeFact(_ context.Context, oldFactID string, newFact models.Fact) (*models.Fact, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

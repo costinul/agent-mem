@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"embed"
 	"fmt"
 	"html/template"
@@ -66,6 +67,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, adminMw func(http.Handler) 
 	protected.HandleFunc("GET /admin/threads", h.listThreads)
 	protected.HandleFunc("GET /admin/threads/{id}", h.threadDetail)
 	protected.HandleFunc("DELETE /admin/threads/{id}", h.deleteThread)
+	protected.HandleFunc("POST /admin/threads/{id}/similarity", h.threadSimilarity)
 	protected.HandleFunc("GET /admin/users", h.listUsers)
 	protected.HandleFunc("PUT /admin/users/{id}/role", h.updateUserRole)
 	protected.HandleFunc("DELETE /admin/users/{id}", h.deleteUser)
@@ -75,6 +77,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, adminMw func(http.Handler) 
 	protected.HandleFunc("POST /admin/playground/contextual", h.playgroundContextual)
 	protected.HandleFunc("POST /admin/playground/factual", h.playgroundFactual)
 	protected.HandleFunc("POST /admin/playground/recall", h.playgroundRecall)
+	protected.HandleFunc("POST /admin/playground/decompose", h.playgroundDecompose)
 
 	mux.Handle("/admin/", adminMw(protected))
 }
@@ -322,6 +325,168 @@ func (h *Handler) deleteThread(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/admin/threads", http.StatusSeeOther)
 }
 
+type factRow struct {
+	models.Fact
+	Score string // formatted score, or "" if not scored
+}
+
+func (h *Handler) threadSimilarity(w http.ResponseWriter, r *http.Request) {
+	threadID := r.PathValue("id")
+	query := strings.TrimSpace(r.FormValue("query"))
+
+	threads, err := h.agentRepo.ListAllThreads(r.Context(), "", nil)
+	if err != nil {
+		http.Error(w, "failed to load thread", http.StatusInternalServerError)
+		return
+	}
+	var thread *models.Thread
+	for i := range threads {
+		if threads[i].ID == threadID {
+			thread = &threads[i]
+			break
+		}
+	}
+	if thread == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	allFacts, err := h.memoryRepo.ListFactsByThreadID(r.Context(), threadID)
+	if err != nil {
+		slog.Error("thread similarity list facts", "error", err)
+		http.Error(w, "failed to load facts", http.StatusInternalServerError)
+		return
+	}
+
+	scores := map[string]float64{}
+	if query != "" {
+		agentID := thread.AgentID
+		tid := thread.ID
+		scored, err := h.engine.SearchWithScores(r.Context(), query, memoryrepo.SearchByEmbeddingParams{
+			AccountID:     thread.AccountID,
+			AgentID:       &agentID,
+			ThreadID:      &tid,
+			MinSimilarity: 0,
+			Limit:         200,
+		})
+		if err != nil {
+			slog.Error("thread similarity search", "error", err)
+		} else {
+			for _, fs := range scored {
+				scores[fs.ID] = fs.Score
+			}
+		}
+	}
+
+	// Build rows sorted by score desc (scored facts first, then unsuperseded, then superseded).
+	rows := make([]factRow, 0, len(allFacts))
+	for _, f := range allFacts {
+		row := factRow{Fact: f}
+		if s, ok := scores[f.ID]; ok {
+			row.Score = fmt.Sprintf("%.4f", s)
+		}
+		rows = append(rows, row)
+	}
+	if len(scores) > 0 {
+		// Sort: scored facts by score desc, unscored at bottom.
+		sortFactRows(rows)
+	}
+
+	h.renderFactsSection(w, thread, rows, query)
+}
+
+func sortFactRows(rows []factRow) {
+	scoreVal := func(r factRow) float64 {
+		if r.Score == "" {
+			return -1
+		}
+		var v float64
+		fmt.Sscanf(r.Score, "%f", &v)
+		return v
+	}
+	for i := 0; i < len(rows); i++ {
+		for j := i + 1; j < len(rows); j++ {
+			if scoreVal(rows[j]) > scoreVal(rows[i]) {
+				rows[i], rows[j] = rows[j], rows[i]
+			}
+		}
+	}
+}
+
+func (h *Handler) renderFactsSection(w http.ResponseWriter, thread *models.Thread, rows []factRow, query string) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	tmplStr := `{{define "facts-section"}}
+<div id="facts-section">
+  <div class="flex items-center justify-between mb-3">
+    <h3 class="text-md font-semibold text-gray-800">Facts ({{len .Rows}})</h3>
+    <form hx-post="/admin/threads/{{.ThreadID}}/similarity"
+          hx-target="#facts-section"
+          hx-swap="outerHTML"
+          hx-indicator="#spinner-sim"
+          class="flex gap-2 items-center">
+      <input name="query" type="text" value="{{.Query}}" placeholder="Similarity check…"
+             class="w-64 border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <button type="submit"
+              class="inline-flex items-center gap-1.5 bg-blue-600 text-white text-sm font-medium px-3 py-1.5 rounded-md hover:bg-blue-700 transition-colors whitespace-nowrap">
+        <span id="spinner-sim" class="htmx-indicator">
+          <svg class="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+          </svg>
+        </span>
+        Check
+      </button>
+    </form>
+  </div>
+  {{if .Rows}}
+  <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b border-gray-200">
+        <tr>
+          <th class="text-left px-4 py-2 font-medium text-gray-500">ID</th>
+          <th class="text-left px-4 py-2 font-medium text-gray-500">Kind</th>
+          <th class="text-left px-4 py-2 font-medium text-gray-500 w-1/2">Text</th>
+          <th class="text-left px-4 py-2 font-medium text-gray-500">Status</th>
+          <th class="text-left px-4 py-2 font-medium text-gray-500">Created</th>
+          <th class="text-right px-4 py-2 font-medium text-gray-500">Score</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {{range .Rows}}
+        <tr class="{{if .SupersededAt}}opacity-50{{end}}">
+          <td class="px-4 py-2 font-mono text-xs text-gray-600">{{.ID}}</td>
+          <td class="px-4 py-2">
+            <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-full
+              {{if eq (printf "%s" .Kind) "KNOWLEDGE"}}bg-blue-100 text-blue-700
+              {{else if eq (printf "%s" .Kind) "RULE"}}bg-purple-100 text-purple-700
+              {{else}}bg-amber-100 text-amber-700{{end}}">{{.Kind}}</span>
+          </td>
+          <td class="px-4 py-2 text-gray-900 max-w-md truncate">{{.Text}}</td>
+          <td class="px-4 py-2 text-xs">
+            {{if .SupersededAt}}<span class="text-orange-600">Superseded</span>
+            {{else}}<span class="text-green-600">Active</span>{{end}}
+          </td>
+          <td class="px-4 py-2 text-gray-500 text-xs">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
+          <td class="px-4 py-2 text-right font-mono text-xs text-gray-600">{{.Score}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <p class="text-sm text-gray-400">No facts</p>
+  {{end}}
+</div>
+{{end}}`
+	type data struct {
+		ThreadID string
+		Query    string
+		Rows     []factRow
+	}
+	t := template.Must(template.New("facts-section").Parse(tmplStr))
+	_ = t.ExecuteTemplate(w, "facts-section", data{ThreadID: thread.ID, Query: query, Rows: rows})
+}
+
 func (h *Handler) listUsers(w http.ResponseWriter, r *http.Request) {
 	users, err := h.userRepo.ListAll(r.Context())
 	if err != nil {
@@ -444,9 +609,17 @@ func isHTMX(r *http.Request) bool {
 // --- Playground ---
 
 type PlaygroundResult struct {
-	Op    string
-	Facts []models.ReturnedFact
-	Error string
+	Op          string
+	Facts       []models.ReturnedFact
+	Error       string
+	NewThreadID string
+}
+
+type DecomposeResult struct {
+	Mode    string
+	Facts   []models.ExtractedFact
+	Queries []models.ExtractedQuery
+	Error   string
 }
 
 func (h *Handler) playgroundPage(w http.ResponseWriter, r *http.Request) {
@@ -472,7 +645,7 @@ func (h *Handler) playgroundThreads(w http.ResponseWriter, r *http.Request) {
 	threads, _ := h.agentRepo.ListAllThreads(r.Context(), "", agentIDPtr)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	t := template.Must(template.New("opts").Parse(
-		`<option value="">— no thread —</option>{{range .}}<option value="{{.ID}}">{{.ID}} ({{.CreatedAt.Format "Jan 2 15:04"}})</option>{{end}}`,
+		`<option value="__new__">✦ New thread</option><option value="">— no thread —</option>{{range .}}<option value="{{.ID}}">{{.ID}} ({{.CreatedAt.Format "Jan 2 15:04"}})</option>{{end}}`,
 	))
 	_ = t.Execute(w, threads)
 }
@@ -500,10 +673,26 @@ func parseInputItems(r *http.Request) []models.InputItem {
 	return items
 }
 
+func (h *Handler) resolveThreadID(ctx context.Context, threadID, accountID, agentID string) (string, string, error) {
+	if threadID != "__new__" {
+		return threadID, "", nil
+	}
+	t, err := h.agentRepo.CreateThread(ctx, accountID, agentID)
+	if err != nil {
+		return "", "", err
+	}
+	return t.ID, t.ID, nil
+}
+
 func (h *Handler) playgroundContextual(w http.ResponseWriter, r *http.Request) {
 	accountID := strings.TrimSpace(r.FormValue("account_id"))
 	agentID := strings.TrimSpace(r.FormValue("agent_id"))
-	threadID := strings.TrimSpace(r.FormValue("thread_id"))
+	threadID, newThreadID, err := h.resolveThreadID(r.Context(), strings.TrimSpace(r.FormValue("thread_id")), accountID, agentID)
+	if err != nil {
+		slog.Error("playground create thread", "error", err)
+		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Contextual", Error: fmt.Sprintf("failed to create thread: %v", err)})
+		return
+	}
 	inputs := parseInputItems(r)
 
 	if accountID == "" || agentID == "" || len(inputs) == 0 {
@@ -523,13 +712,18 @@ func (h *Handler) playgroundContextual(w http.ResponseWriter, r *http.Request) {
 		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Contextual", Error: fmt.Sprintf("engine error: %v", err)})
 		return
 	}
-	h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Contextual", Facts: out.Facts})
+	h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Contextual", Facts: out.Facts, NewThreadID: newThreadID})
 }
 
 func (h *Handler) playgroundFactual(w http.ResponseWriter, r *http.Request) {
 	accountID := strings.TrimSpace(r.FormValue("account_id"))
 	agentID := strings.TrimSpace(r.FormValue("agent_id"))
-	threadID := strings.TrimSpace(r.FormValue("thread_id"))
+	threadID, newThreadID, err := h.resolveThreadID(r.Context(), strings.TrimSpace(r.FormValue("thread_id")), accountID, agentID)
+	if err != nil {
+		slog.Error("playground create thread", "error", err)
+		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Factual", Error: fmt.Sprintf("failed to create thread: %v", err)})
+		return
+	}
 	inputs := parseInputItems(r)
 
 	if accountID == "" || agentID == "" || len(inputs) == 0 {
@@ -549,7 +743,7 @@ func (h *Handler) playgroundFactual(w http.ResponseWriter, r *http.Request) {
 		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Factual", Error: fmt.Sprintf("engine error: %v", err)})
 		return
 	}
-	h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Factual", Facts: out.Facts})
+	h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Factual", Facts: out.Facts, NewThreadID: newThreadID})
 }
 
 func (h *Handler) playgroundRecall(w http.ResponseWriter, r *http.Request) {
@@ -601,6 +795,9 @@ func (h *Handler) renderPlaygroundResult(w http.ResponseWriter, result *Playgrou
   <div class="rounded-lg border border-gray-200 bg-white overflow-hidden">
     <div class="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
       <span class="text-xs font-medium text-gray-600">{{.Op}} — {{len .Facts}} fact(s) returned</span>
+      {{if .NewThreadID}}
+      <span class="text-xs text-indigo-600 font-medium font-mono">new thread: {{.NewThreadID}}</span>
+      {{end}}
     </div>
     {{if .Facts}}
     <ul class="divide-y divide-gray-100">
@@ -630,7 +827,150 @@ func (h *Handler) renderPlaygroundResult(w http.ResponseWriter, result *Playgrou
   </div>
   {{end}}
 </div>
+{{if .NewThreadID}}
+<input id="ctx-thread-search" type="text" value="{{.NewThreadID}}"
+       oninput="filterCombo('ctx-thread-select', this.value)"
+       onfocus="document.getElementById('ctx-thread-dropdown').classList.remove('hidden')"
+       placeholder="Search threads…"
+       class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+       hx-swap-oob="true">
+<input id="ctx-thread-value" type="hidden" value="{{.NewThreadID}}" hx-swap-oob="true">
+{{end}}
 {{end}}`
 	t := template.Must(template.New("result").Parse(tmplStr))
 	_ = t.ExecuteTemplate(w, "result", result)
+}
+
+func (h *Handler) playgroundDecompose(w http.ResponseWriter, r *http.Request) {
+	text := strings.TrimSpace(r.FormValue("text"))
+	mode := strings.TrimSpace(r.FormValue("mode"))
+
+	if text == "" {
+		h.renderDecomposeResult(w, &DecomposeResult{Mode: mode, Error: "text is required"})
+		return
+	}
+
+	var result DecomposeResult
+	result.Mode = mode
+
+	switch mode {
+	case "recall":
+		decomp, err := h.engine.DecomposeRecall(r.Context(), text)
+		if err != nil {
+			slog.Error("playground decompose recall", "error", err)
+			result.Error = fmt.Sprintf("engine error: %v", err)
+		} else {
+			result.Queries = decomp.Queries
+		}
+	case "conversational":
+		decomp, err := h.engine.Decompose(r.Context(), engine.DecomposeRequest{
+			SourceKind: models.SOURCE_USER,
+			Content:    text,
+		})
+		if err != nil {
+			slog.Error("playground decompose conversational", "error", err)
+			result.Error = fmt.Sprintf("engine error: %v", err)
+		} else {
+			result.Facts = decomp.Facts
+			result.Queries = decomp.Queries
+		}
+	default: // "content"
+		decomp, err := h.engine.Decompose(r.Context(), engine.DecomposeRequest{
+			SourceKind: models.SOURCE_DOCUMENT,
+			Content:    text,
+		})
+		if err != nil {
+			slog.Error("playground decompose content", "error", err)
+			result.Error = fmt.Sprintf("engine error: %v", err)
+		} else {
+			result.Facts = decomp.Facts
+			result.Queries = decomp.Queries
+		}
+	}
+
+	h.renderDecomposeResult(w, &result)
+}
+
+func (h *Handler) renderDecomposeResult(w http.ResponseWriter, result *DecomposeResult) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	tmplStr := `{{define "decompose"}}
+<div id="playground-result" class="mt-6">
+  {{if .Error}}
+  <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    <span class="font-medium">Error:</span> {{.Error}}
+  </div>
+  {{else}}
+  <div class="rounded-lg border border-gray-200 bg-white overflow-hidden">
+    <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
+      <span class="text-xs font-medium text-gray-600">Decompose ({{.Mode}}) — {{len .Facts}} fact(s), {{len .Queries}} quer(ies)</span>
+    </div>
+    {{if .Facts}}
+    <div class="px-4 py-3 border-b border-gray-100">
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Facts</p>
+      <ul class="space-y-2">
+        {{range .Facts}}
+        <li class="flex items-start gap-2">
+          <span class="inline-flex shrink-0 px-2 py-0.5 text-xs font-medium rounded-full mt-0.5
+            {{if eq (printf "%s" .Kind) "KNOWLEDGE"}}bg-blue-100 text-blue-700
+            {{else if eq (printf "%s" .Kind) "RULE"}}bg-purple-100 text-purple-700
+            {{else}}bg-amber-100 text-amber-700{{end}}">{{.Kind}}</span>
+          <span class="text-sm text-gray-900">{{.Text}}</span>
+        </li>
+        {{end}}
+      </ul>
+    </div>
+    {{end}}
+    {{if .Queries}}
+    <div class="px-4 py-3">
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Search Queries</p>
+      <ul class="space-y-1">
+        {{range .Queries}}
+        <li class="text-sm text-gray-700 flex items-center gap-2 group">
+          <span class="text-gray-400">›</span>
+          <span class="flex-1">{{.Text}}</span>
+          <button type="button" onclick="copyText(this, {{.Text | js}})"
+                  title="Copy"
+                  class="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-gray-700 shrink-0">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+            </svg>
+          </button>
+        </li>
+        {{end}}
+      </ul>
+      <script>
+      function copyText(btn, text) {
+        navigator.clipboard.writeText(text).then(() => {
+          const svg = btn.querySelector('svg');
+          svg.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>';
+          btn.classList.add('text-green-500');
+          setTimeout(() => {
+            svg.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>';
+            btn.classList.remove('text-green-500');
+          }, 1500);
+        });
+      }
+      </script>
+    </div>
+    {{end}}
+    {{if and (not .Facts) (not .Queries)}}
+    <p class="px-4 py-3 text-sm text-gray-400">No output.</p>
+    {{end}}
+  </div>
+  {{end}}
+</div>
+{{end}}`
+	t := template.Must(template.New("decompose").Funcs(template.FuncMap{
+		"not": func(v interface{}) bool {
+			switch val := v.(type) {
+			case []models.ExtractedFact:
+				return len(val) == 0
+			case []models.ExtractedQuery:
+				return len(val) == 0
+			}
+			return true
+		},
+	}).Parse(tmplStr))
+	_ = t.ExecuteTemplate(w, "decompose", result)
 }

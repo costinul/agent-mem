@@ -21,6 +21,7 @@ type Repository interface {
 	ListFactsFiltered(ctx context.Context, params ListFactsParams) ([]models.Fact, int, error)
 	GetFactByID(ctx context.Context, factID string) (*models.Fact, error)
 	SearchFactsByEmbedding(ctx context.Context, params SearchByEmbeddingParams) ([]models.Fact, error)
+	SearchFactsByEmbeddingWithScores(ctx context.Context, params SearchByEmbeddingParams) ([]FactWithScore, error)
 	UpdateFact(ctx context.Context, fact models.Fact) error
 	DeleteFact(ctx context.Context, factID string) error
 	SupersedeFact(ctx context.Context, oldFactID string, newFact models.Fact) (*models.Fact, error)
@@ -33,6 +34,11 @@ type ListFactsParams struct {
 	Kind      *models.FactKind
 	Limit     int
 	Offset    int
+}
+
+type FactWithScore struct {
+	models.Fact
+	Score float64
 }
 
 type SearchByEmbeddingParams struct {

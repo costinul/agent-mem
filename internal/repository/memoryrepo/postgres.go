@@ -544,6 +544,65 @@ func (r *PostgresRepository) SearchFactsByEmbedding(ctx context.Context, params 
 	return facts, rows.Err()
 }
 
+func (r *PostgresRepository) SearchFactsByEmbeddingWithScores(ctx context.Context, params SearchByEmbeddingParams) ([]FactWithScore, error) {
+	if len(params.Embedding) == 0 {
+		return nil, nil
+	}
+	if params.Limit <= 0 {
+		params.Limit = 20
+	}
+
+	rows, err := r.db.QueryContext(
+		ctx,
+		`SELECT id, account_id, agent_id, thread_id, source_id, kind, text, created_at, updated_at,
+		        1 - (embedding <=> $4::vector) AS score
+		 FROM facts
+		 WHERE account_id = $1
+		   AND ($2::uuid IS NULL OR agent_id = $2)
+		   AND ($3::uuid IS NULL OR thread_id = $3)
+		   AND embedding IS NOT NULL
+		   AND superseded_at IS NULL
+		 ORDER BY embedding <=> $4::vector ASC
+		 LIMIT $5`,
+		params.AccountID,
+		params.AgentID,
+		params.ThreadID,
+		vectorLiteral(params.Embedding),
+		params.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	results := make([]FactWithScore, 0)
+	for rows.Next() {
+		var (
+			fs     FactWithScore
+			agent  sql.NullString
+			thread sql.NullString
+		)
+		if err := rows.Scan(
+			&fs.ID,
+			&fs.AccountID,
+			&agent,
+			&thread,
+			&fs.SourceID,
+			&fs.Kind,
+			&fs.Text,
+			&fs.CreatedAt,
+			&fs.UpdatedAt,
+			&fs.Score,
+		); err != nil {
+			return nil, err
+		}
+		fs.AgentID = nullStringPtr(agent)
+		fs.ThreadID = nullStringPtr(thread)
+		results = append(results, fs)
+	}
+	return results, rows.Err()
+}
+
 func (r *PostgresRepository) DeleteFact(ctx context.Context, factID string) error {
 	_, err := r.db.ExecContext(ctx, `DELETE FROM facts WHERE id = $1`, factID)
 	return err
