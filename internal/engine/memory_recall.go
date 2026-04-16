@@ -27,20 +27,25 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 		return models.RecallOutput{}, fmt.Errorf("decompose recall query: %w", err)
 	}
 
-	searchPhrases := make([]string, 0, len(decomposition.Queries))
+	phrases := make([]string, 0, len(decomposition.Queries))
 	for _, q := range decomposition.Queries {
-		searchPhrases = append(searchPhrases, q.Text)
+		phrases = append(phrases, q.Text)
 	}
-	if len(searchPhrases) == 0 {
-		searchPhrases = []string{input.Query}
+	if len(phrases) == 0 {
+		phrases = []string{input.Query}
 	}
 
-	embeddings, err := e.ai.Embed(ctx, searchPhrases)
+	embeddings, err := e.ai.Embed(ctx, phrases)
 	if err != nil {
 		return models.RecallOutput{}, fmt.Errorf("embed recall search phrases: %w", err)
 	}
 
-	retrieved, err := e.retrieveFactsWithLimit(ctx, input.AccountID, input.AgentID, input.ThreadID, embeddings, limit)
+	queries := make([]searchQuery, len(phrases))
+	for i := range phrases {
+		queries[i] = searchQuery{Text: phrases[i], Embedding: embeddings[i]}
+	}
+
+	retrieved, err := e.retrieveFactsWithLimit(ctx, input.AccountID, input.AgentID, input.ThreadID, queries, limit)
 	if err != nil {
 		return models.RecallOutput{}, err
 	}

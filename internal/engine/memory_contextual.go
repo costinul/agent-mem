@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 
 	"agentmem/internal/errs"
@@ -32,12 +33,12 @@ func (e *MemoryEngine) ProcessContextual(ctx context.Context, input models.Memor
 		return models.WriteOutput{}, err
 	}
 
-	queryEmbeddings, err := e.buildSearchEmbeddings(ctx, decompositions)
+	queries, err := e.buildSearchQueries(ctx, decompositions)
 	if err != nil {
 		return models.WriteOutput{}, err
 	}
 
-	retrieved, err := e.retrieveFacts(ctx, input.AccountID, input.AgentID, input.ThreadID, queryEmbeddings)
+	retrieved, err := e.retrieveFacts(ctx, input.AccountID, input.AgentID, input.ThreadID, queries)
 	if err != nil {
 		return models.WriteOutput{}, err
 	}
@@ -88,70 +89,103 @@ func validateContextualInput(input models.MemoryInput) error {
 	return nil
 }
 
-func (e *MemoryEngine) buildSearchEmbeddings(ctx context.Context, decompositions []models.Decomposition) ([][]float64, error) {
-	queries := make([]string, 0)
+type searchQuery struct {
+	Text      string
+	Embedding []float64
+}
+
+func (e *MemoryEngine) buildSearchQueries(ctx context.Context, decompositions []models.Decomposition) ([]searchQuery, error) {
+	texts := make([]string, 0)
 	for _, decomposition := range decompositions {
 		for _, fact := range decomposition.Facts {
-			queries = append(queries, fact.Text)
+			texts = append(texts, fact.Text)
 		}
 		for _, query := range decomposition.Queries {
-			queries = append(queries, query.Text)
+			texts = append(texts, query.Text)
 		}
 	}
-	if len(queries) == 0 {
+	if len(texts) == 0 {
 		return nil, nil
 	}
-	embeddings, err := e.ai.Embed(ctx, queries)
+	embeddings, err := e.ai.Embed(ctx, texts)
 	if err != nil {
 		return nil, fmt.Errorf("embed search queries: %w", err)
 	}
-	return embeddings, nil
+	queries := make([]searchQuery, len(texts))
+	for i := range texts {
+		queries[i] = searchQuery{Text: texts[i], Embedding: embeddings[i]}
+	}
+	return queries, nil
 }
 
-func (e *MemoryEngine) retrieveFacts(ctx context.Context, accountID, agentID, threadID string, embeddings [][]float64) ([]models.Fact, error) {
-	return e.retrieveFactsWithLimit(ctx, accountID, agentID, threadID, embeddings, 10)
+func (e *MemoryEngine) retrieveFacts(ctx context.Context, accountID, agentID, threadID string, queries []searchQuery) ([]models.Fact, error) {
+	return e.retrieveFactsWithLimit(ctx, accountID, agentID, threadID, queries, 10)
 }
 
-func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, agentID, threadID string, embeddings [][]float64, limit int) ([]models.Fact, error) {
+func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, agentID, threadID string, queries []searchQuery, limit int) ([]models.Fact, error) {
 	if limit <= 0 {
 		limit = 10
 	}
 	aid := ptrString(agentID)
 	tid := ptrString(threadID)
-	seen := map[string]struct{}{}
-	facts := make([]models.Fact, 0)
+	scored := map[string]memoryrepo.FactWithScore{}
 
-	for _, emb := range embeddings {
-		threadFacts, err := e.repo.SearchFactsByEmbedding(ctx, memoryrepo.SearchByEmbeddingParams{
-			AccountID: accountID,
-			AgentID:   aid,
-			ThreadID:  tid,
-			Embedding: emb,
-			Limit:     limit,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("search thread facts: %w", err)
+	collect := func(results []memoryrepo.FactWithScore) {
+		for _, r := range results {
+			if r.Fact.ID == "" {
+				continue
+			}
+			if existing, ok := scored[r.Fact.ID]; !ok || r.Score > existing.Score {
+				scored[r.Fact.ID] = r
+			}
 		}
-		agentFacts, err := e.repo.SearchFactsByEmbedding(ctx, memoryrepo.SearchByEmbeddingParams{
-			AccountID: accountID,
-			AgentID:   aid,
-			Embedding: emb,
-			Limit:     limit,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("search agent facts: %w", err)
+	}
+
+	for _, q := range queries {
+		params := memoryrepo.HybridSearchParams{
+			AccountID:  accountID,
+			Embedding:  q.Embedding,
+			SearchText: q.Text,
+			Limit:      limit,
 		}
-		accountFacts, err := e.repo.SearchFactsByEmbedding(ctx, memoryrepo.SearchByEmbeddingParams{
-			AccountID: accountID,
-			Embedding: emb,
-			Limit:     limit,
-		})
+
+		params.AgentID = aid
+		params.ThreadID = tid
+		threadResults, err := e.repo.HybridSearch(ctx, params)
 		if err != nil {
-			return nil, fmt.Errorf("search account facts: %w", err)
+			return nil, fmt.Errorf("hybrid search thread facts: %w", err)
 		}
-		facts = appendUniqueFacts(facts, seen, threadFacts...)
-		facts = appendUniqueFacts(facts, seen, agentFacts...)
-		facts = appendUniqueFacts(facts, seen, accountFacts...)
+		collect(threadResults)
+
+		params.ThreadID = nil
+		agentResults, err := e.repo.HybridSearch(ctx, params)
+		if err != nil {
+			return nil, fmt.Errorf("hybrid search agent facts: %w", err)
+		}
+		collect(agentResults)
+
+		params.AgentID = nil
+		accountResults, err := e.repo.HybridSearch(ctx, params)
+		if err != nil {
+			return nil, fmt.Errorf("hybrid search account facts: %w", err)
+		}
+		collect(accountResults)
+	}
+
+	sorted := make([]memoryrepo.FactWithScore, 0, len(scored))
+	for _, fs := range scored {
+		sorted = append(sorted, fs)
+	}
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].Score > sorted[j].Score
+	})
+	if len(sorted) > limit {
+		sorted = sorted[:limit]
+	}
+
+	facts := make([]models.Fact, len(sorted))
+	for i, fs := range sorted {
+		facts[i] = fs.Fact
 	}
 	return facts, nil
 }
@@ -262,15 +296,3 @@ func (e *MemoryEngine) applyEvaluateResult(
 	return stored, nil
 }
 
-func appendUniqueFacts(target []models.Fact, seen map[string]struct{}, facts ...models.Fact) []models.Fact {
-	for _, fact := range facts {
-		if fact.ID != "" {
-			if _, ok := seen[fact.ID]; ok {
-				continue
-			}
-			seen[fact.ID] = struct{}{}
-		}
-		target = append(target, fact)
-	}
-	return target
-}

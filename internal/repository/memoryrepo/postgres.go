@@ -603,6 +603,144 @@ func (r *PostgresRepository) SearchFactsByEmbeddingWithScores(ctx context.Contex
 	return results, rows.Err()
 }
 
+func (r *PostgresRepository) HybridSearch(ctx context.Context, params HybridSearchParams) ([]FactWithScore, error) {
+	if len(params.Embedding) == 0 && params.SearchText == "" {
+		return nil, nil
+	}
+	if params.Limit <= 0 {
+		params.Limit = 20
+	}
+
+	// Vector-only fallback when no search text is provided.
+	if params.SearchText == "" {
+		return r.SearchFactsByEmbeddingWithScores(ctx, SearchByEmbeddingParams{
+			AccountID: params.AccountID,
+			AgentID:   params.AgentID,
+			ThreadID:  params.ThreadID,
+			Embedding: params.Embedding,
+			Limit:     params.Limit,
+		})
+	}
+
+	// Text-only fallback when no embedding is provided.
+	if len(params.Embedding) == 0 {
+		return r.textOnlySearch(ctx, params)
+	}
+
+	candidateLimit := params.Limit * 3
+
+	rows, err := r.db.QueryContext(ctx,
+		`WITH vector_ranked AS (
+		    SELECT id, ROW_NUMBER() OVER (ORDER BY embedding <=> $4::vector ASC) AS vrank
+		    FROM facts
+		    WHERE account_id = $1
+		      AND ($2::uuid IS NULL OR agent_id = $2)
+		      AND ($3::uuid IS NULL OR thread_id = $3)
+		      AND embedding IS NOT NULL
+		      AND superseded_at IS NULL
+		    LIMIT $6
+		),
+		text_ranked AS (
+		    SELECT id, ROW_NUMBER() OVER (ORDER BY ts_rank(text_search, query) DESC) AS trank
+		    FROM facts, websearch_to_tsquery('english', $5) query
+		    WHERE account_id = $1
+		      AND ($2::uuid IS NULL OR agent_id = $2)
+		      AND ($3::uuid IS NULL OR thread_id = $3)
+		      AND superseded_at IS NULL
+		      AND text_search @@ query
+		    LIMIT $6
+		),
+		combined AS (
+		    SELECT COALESCE(v.id, t.id) AS id,
+		           1.0/(60+COALESCE(v.vrank,1000)) + 1.0/(60+COALESCE(t.trank,1000)) AS rrf_score
+		    FROM vector_ranked v
+		    FULL OUTER JOIN text_ranked t ON v.id = t.id
+		    ORDER BY rrf_score DESC
+		    LIMIT $7
+		)
+		SELECT f.id, f.account_id, f.agent_id, f.thread_id, f.source_id, f.kind, f.text,
+		       f.created_at, f.updated_at, c.rrf_score
+		FROM facts f
+		JOIN combined c ON f.id = c.id
+		ORDER BY c.rrf_score DESC`,
+		params.AccountID,
+		params.AgentID,
+		params.ThreadID,
+		vectorLiteral(params.Embedding),
+		params.SearchText,
+		candidateLimit,
+		params.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	results := make([]FactWithScore, 0)
+	for rows.Next() {
+		var (
+			fs     FactWithScore
+			agent  sql.NullString
+			thread sql.NullString
+		)
+		if err := rows.Scan(
+			&fs.ID, &fs.AccountID, &agent, &thread,
+			&fs.SourceID, &fs.Kind, &fs.Text,
+			&fs.CreatedAt, &fs.UpdatedAt, &fs.Score,
+		); err != nil {
+			return nil, err
+		}
+		fs.AgentID = nullStringPtr(agent)
+		fs.ThreadID = nullStringPtr(thread)
+		results = append(results, fs)
+	}
+	return results, rows.Err()
+}
+
+func (r *PostgresRepository) textOnlySearch(ctx context.Context, params HybridSearchParams) ([]FactWithScore, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, account_id, agent_id, thread_id, source_id, kind, text,
+		        created_at, updated_at, ts_rank(text_search, query) AS score
+		 FROM facts, websearch_to_tsquery('english', $4) query
+		 WHERE account_id = $1
+		   AND ($2::uuid IS NULL OR agent_id = $2)
+		   AND ($3::uuid IS NULL OR thread_id = $3)
+		   AND superseded_at IS NULL
+		   AND text_search @@ query
+		 ORDER BY score DESC
+		 LIMIT $5`,
+		params.AccountID,
+		params.AgentID,
+		params.ThreadID,
+		params.SearchText,
+		params.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	results := make([]FactWithScore, 0)
+	for rows.Next() {
+		var (
+			fs     FactWithScore
+			agent  sql.NullString
+			thread sql.NullString
+		)
+		if err := rows.Scan(
+			&fs.ID, &fs.AccountID, &agent, &thread,
+			&fs.SourceID, &fs.Kind, &fs.Text,
+			&fs.CreatedAt, &fs.UpdatedAt, &fs.Score,
+		); err != nil {
+			return nil, err
+		}
+		fs.AgentID = nullStringPtr(agent)
+		fs.ThreadID = nullStringPtr(thread)
+		results = append(results, fs)
+	}
+	return results, rows.Err()
+}
+
 func (r *PostgresRepository) DeleteFact(ctx context.Context, factID string) error {
 	_, err := r.db.ExecContext(ctx, `DELETE FROM facts WHERE id = $1`, factID)
 	return err

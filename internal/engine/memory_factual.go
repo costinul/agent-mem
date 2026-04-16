@@ -31,12 +31,12 @@ func (e *MemoryEngine) AddFactual(ctx context.Context, input models.FactualInput
 		return models.WriteOutput{}, err
 	}
 
-	queryEmbeddings, err := e.buildSearchEmbeddings(ctx, decompositions)
+	queries, err := e.buildSearchQueries(ctx, decompositions)
 	if err != nil {
 		return models.WriteOutput{}, err
 	}
 
-	retrieved, err := e.retrieveFacts(ctx, input.AccountID, input.AgentID, threadID, queryEmbeddings)
+	retrieved, err := e.retrieveFacts(ctx, input.AccountID, input.AgentID, threadID, queries)
 	if err != nil {
 		return models.WriteOutput{}, err
 	}

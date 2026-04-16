@@ -4,8 +4,10 @@ import (
 	"context"
 	"math"
 	"sort"
+	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	models "agentmem/internal/models"
 
@@ -424,6 +426,137 @@ func (r *InMemoryRepository) SupersedeFact(_ context.Context, oldFactID string, 
 
 	stored := newFact
 	return &stored, nil
+}
+
+func (r *InMemoryRepository) HybridSearch(_ context.Context, params HybridSearchParams) ([]FactWithScore, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	if len(params.Embedding) == 0 && params.SearchText == "" {
+		return nil, nil
+	}
+	if params.Limit <= 0 {
+		params.Limit = 20
+	}
+
+	searchWords := tokenize(params.SearchText)
+
+	type ranked struct {
+		fact      models.Fact
+		vrank     int
+		trank     int
+		textScore float64
+	}
+
+	candidates := make(map[string]*ranked)
+	var vectorSorted []string
+	var textSorted []string
+
+	for _, fact := range r.facts {
+		if fact.SupersededAt != nil || fact.AccountID != params.AccountID {
+			continue
+		}
+		if params.AgentID != nil && (fact.AgentID == nil || *fact.AgentID != *params.AgentID) {
+			continue
+		}
+		if params.ThreadID != nil && (fact.ThreadID == nil || *fact.ThreadID != *params.ThreadID) {
+			continue
+		}
+
+		r := &ranked{fact: fact, vrank: -1, trank: -1}
+
+		if len(params.Embedding) > 0 && len(fact.Embedding) > 0 {
+			r.vrank = 0 // placeholder, will be set after sorting
+			vectorSorted = append(vectorSorted, fact.ID)
+		}
+		if len(searchWords) > 0 {
+			factWords := tokenize(fact.Text)
+			overlap := wordOverlap(searchWords, factWords)
+			if overlap > 0 {
+				r.textScore = overlap
+				textSorted = append(textSorted, fact.ID)
+			}
+		}
+
+		if r.vrank == 0 || r.textScore > 0 {
+			candidates[fact.ID] = r
+		}
+	}
+
+	// Assign vector ranks by sorting on cosine similarity.
+	sort.Slice(vectorSorted, func(i, j int) bool {
+		si := cosineSimilarity(params.Embedding, candidates[vectorSorted[i]].fact.Embedding)
+		sj := cosineSimilarity(params.Embedding, candidates[vectorSorted[j]].fact.Embedding)
+		return si > sj
+	})
+	for i, id := range vectorSorted {
+		candidates[id].vrank = i + 1
+	}
+
+	// Assign text ranks by sorting on word overlap score.
+	sort.Slice(textSorted, func(i, j int) bool {
+		return candidates[textSorted[i]].textScore > candidates[textSorted[j]].textScore
+	})
+	for i, id := range textSorted {
+		candidates[id].trank = i + 1
+	}
+
+	// Compute RRF scores.
+	type result struct {
+		fact  models.Fact
+		score float64
+	}
+	results := make([]result, 0, len(candidates))
+	for _, r := range candidates {
+		vr := 1000
+		if r.vrank > 0 {
+			vr = r.vrank
+		}
+		tr := 1000
+		if r.trank > 0 {
+			tr = r.trank
+		}
+		rrf := 1.0/float64(60+vr) + 1.0/float64(60+tr)
+		results = append(results, result{fact: r.fact, score: rrf})
+	}
+
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].score > results[j].score
+	})
+	if len(results) > params.Limit {
+		results = results[:params.Limit]
+	}
+
+	out := make([]FactWithScore, 0, len(results))
+	for _, r := range results {
+		out = append(out, FactWithScore{Fact: r.fact, Score: r.score})
+	}
+	return out, nil
+}
+
+func tokenize(text string) map[string]struct{} {
+	words := make(map[string]struct{})
+	for _, w := range strings.FieldsFunc(strings.ToLower(text), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	}) {
+		if len(w) > 1 {
+			words[w] = struct{}{}
+		}
+	}
+	return words
+}
+
+func wordOverlap(query, doc map[string]struct{}) float64 {
+	if len(query) == 0 {
+		return 0
+	}
+	count := 0
+	for w := range query {
+		if _, ok := doc[w]; ok {
+			count++
+		}
+	}
+	return float64(count) / float64(len(query))
 }
 
 func cosineSimilarity(a, b []float64) float64 {
