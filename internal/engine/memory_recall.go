@@ -9,17 +9,14 @@ import (
 	models "agentmem/internal/models"
 )
 
+const recallCandidateK = 25
+
 func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (models.RecallOutput, error) {
 	if strings.TrimSpace(input.AccountID) == "" {
 		return models.RecallOutput{}, errs.NewValidation("account_id is required")
 	}
 	if strings.TrimSpace(input.Query) == "" {
 		return models.RecallOutput{}, errs.NewValidation("query is required")
-	}
-
-	limit := input.Limit
-	if limit <= 0 {
-		limit = 10
 	}
 
 	decomposition, err := e.ai.DecomposeRecall(ctx, input.Query)
@@ -40,17 +37,24 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 		return models.RecallOutput{}, fmt.Errorf("embed recall search phrases: %w", err)
 	}
 
-	queries := make([]searchQuery, len(phrases))
-	for i := range phrases {
-		queries[i] = searchQuery{Text: phrases[i], Embedding: embeddings[i]}
-	}
-
-	retrieved, err := e.retrieveFactsWithLimit(ctx, input.AccountID, input.AgentID, input.ThreadID, queries, limit)
+	candidates, err := e.retrieveFactsWithLimit(ctx, input.AccountID, input.AgentID, input.ThreadID, embeddings, recallCandidateK)
 	if err != nil {
 		return models.RecallOutput{}, err
 	}
 
-	return e.buildRecallOutput(ctx, input, retrieved)
+	selected, err := e.ai.SelectFacts(ctx, SelectFactsRequest{
+		Query:      input.Query,
+		Candidates: candidates,
+	})
+	if err != nil {
+		return models.RecallOutput{}, fmt.Errorf("select facts: %w", err)
+	}
+
+	if input.Limit > 0 && len(selected) > input.Limit {
+		selected = selected[:input.Limit]
+	}
+
+	return e.buildRecallOutput(ctx, input, selected)
 }
 
 func (e *MemoryEngine) ListThreadMessages(ctx context.Context, threadID string, limit int) ([]models.ConversationMessage, error) {

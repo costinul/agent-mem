@@ -22,7 +22,6 @@ type Repository interface {
 	GetFactByID(ctx context.Context, factID string) (*models.Fact, error)
 	SearchFactsByEmbedding(ctx context.Context, params SearchByEmbeddingParams) ([]models.Fact, error)
 	SearchFactsByEmbeddingWithScores(ctx context.Context, params SearchByEmbeddingParams) ([]FactWithScore, error)
-	HybridSearch(ctx context.Context, params HybridSearchParams) ([]FactWithScore, error)
 	UpdateFact(ctx context.Context, fact models.Fact) error
 	DeleteFact(ctx context.Context, factID string) error
 	SupersedeFact(ctx context.Context, oldFactID string, newFact models.Fact) (*models.Fact, error)
@@ -49,13 +48,4 @@ type SearchByEmbeddingParams struct {
 	Embedding     []float64
 	MinSimilarity float64
 	Limit         int
-}
-
-type HybridSearchParams struct {
-	AccountID  string
-	AgentID    *string
-	ThreadID   *string
-	Embedding  []float64
-	SearchText string
-	Limit      int
 }

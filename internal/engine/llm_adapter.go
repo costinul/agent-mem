@@ -31,6 +31,12 @@ type EvaluateRequest struct {
 	RetrievedFacts []models.Fact
 }
 
+// SelectFactsRequest is the input for the fact selection step.
+type SelectFactsRequest struct {
+	Query      string
+	Candidates []models.Fact
+}
+
 // LLMAdapter wraps the bwai client and exposes the three LLM operations the engine needs.
 type LLMAdapter struct {
 	client         *bwaiclient.BWAIClient
@@ -150,6 +156,40 @@ func (a *LLMAdapter) Evaluate(ctx context.Context, req EvaluateRequest) (models.
 	}, nil
 }
 
+// SelectFacts uses the LLM to filter and rank candidate facts by relevance to the query.
+// Returned facts preserve the order produced by the model.
+func (a *LLMAdapter) SelectFacts(ctx context.Context, req SelectFactsRequest) ([]models.Fact, error) {
+	if len(req.Candidates) == 0 {
+		return nil, nil
+	}
+
+	out := &selectFactsOutput{}
+	err := a.client.ExecuteAs(ctx, uuid.New(), "select_facts", a.schemaModel, &bwai.PromptData{
+		Data: req,
+	}, out)
+	if err != nil {
+		return nil, fmt.Errorf("select facts: %w", err)
+	}
+
+	byID := make(map[string]models.Fact, len(req.Candidates))
+	for _, f := range req.Candidates {
+		byID[f.ID] = f
+	}
+
+	selected := make([]models.Fact, 0, len(out.FactIDs))
+	seen := make(map[string]struct{}, len(out.FactIDs))
+	for _, id := range out.FactIDs {
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		if f, ok := byID[id]; ok {
+			selected = append(selected, f)
+			seen[id] = struct{}{}
+		}
+	}
+	return selected, nil
+}
+
 // ──────────────────────────────────────────────
 // Structured output types
 // ──────────────────────────────────────────────
@@ -207,5 +247,23 @@ func (o *evaluateOutput) Validate() error {
 }
 
 func (o *evaluateOutput) Unmarshal(data []byte) error {
+	return json.Unmarshal(data, o)
+}
+
+// ──────────────────────────────────────────────
+
+type selectFactsOutput struct {
+	FactIDs []string `json:"fact_ids"`
+}
+
+func (o *selectFactsOutput) SchemaDescription() string {
+	return "IDs of the candidate facts that are relevant to the query, ordered most-relevant first."
+}
+
+func (o *selectFactsOutput) Validate() error {
+	return nil
+}
+
+func (o *selectFactsOutput) Unmarshal(data []byte) error {
 	return json.Unmarshal(data, o)
 }

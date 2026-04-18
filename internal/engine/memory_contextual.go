@@ -33,12 +33,12 @@ func (e *MemoryEngine) ProcessContextual(ctx context.Context, input models.Memor
 		return models.WriteOutput{}, err
 	}
 
-	queries, err := e.buildSearchQueries(ctx, decompositions)
+	embeddings, err := e.buildSearchEmbeddings(ctx, decompositions)
 	if err != nil {
 		return models.WriteOutput{}, err
 	}
 
-	retrieved, err := e.retrieveFacts(ctx, input.AccountID, input.AgentID, input.ThreadID, queries)
+	retrieved, err := e.retrieveFacts(ctx, input.AccountID, input.AgentID, input.ThreadID, embeddings)
 	if err != nil {
 		return models.WriteOutput{}, err
 	}
@@ -89,12 +89,7 @@ func validateContextualInput(input models.MemoryInput) error {
 	return nil
 }
 
-type searchQuery struct {
-	Text      string
-	Embedding []float64
-}
-
-func (e *MemoryEngine) buildSearchQueries(ctx context.Context, decompositions []models.Decomposition) ([]searchQuery, error) {
+func (e *MemoryEngine) buildSearchEmbeddings(ctx context.Context, decompositions []models.Decomposition) ([][]float64, error) {
 	texts := make([]string, 0)
 	for _, decomposition := range decompositions {
 		for _, fact := range decomposition.Facts {
@@ -111,18 +106,14 @@ func (e *MemoryEngine) buildSearchQueries(ctx context.Context, decompositions []
 	if err != nil {
 		return nil, fmt.Errorf("embed search queries: %w", err)
 	}
-	queries := make([]searchQuery, len(texts))
-	for i := range texts {
-		queries[i] = searchQuery{Text: texts[i], Embedding: embeddings[i]}
-	}
-	return queries, nil
+	return embeddings, nil
 }
 
-func (e *MemoryEngine) retrieveFacts(ctx context.Context, accountID, agentID, threadID string, queries []searchQuery) ([]models.Fact, error) {
-	return e.retrieveFactsWithLimit(ctx, accountID, agentID, threadID, queries, 10)
+func (e *MemoryEngine) retrieveFacts(ctx context.Context, accountID, agentID, threadID string, embeddings [][]float64) ([]models.Fact, error) {
+	return e.retrieveFactsWithLimit(ctx, accountID, agentID, threadID, embeddings, 10)
 }
 
-func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, agentID, threadID string, queries []searchQuery, limit int) ([]models.Fact, error) {
+func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, agentID, threadID string, embeddings [][]float64, limit int) ([]models.Fact, error) {
 	if limit <= 0 {
 		limit = 10
 	}
@@ -141,33 +132,35 @@ func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, ag
 		}
 	}
 
-	for _, q := range queries {
-		params := memoryrepo.HybridSearchParams{
-			AccountID:  accountID,
-			Embedding:  q.Embedding,
-			SearchText: q.Text,
-			Limit:      limit,
+	for _, emb := range embeddings {
+		if len(emb) == 0 {
+			continue
+		}
+		params := memoryrepo.SearchByEmbeddingParams{
+			AccountID: accountID,
+			Embedding: emb,
+			Limit:     limit,
 		}
 
 		params.AgentID = aid
 		params.ThreadID = tid
-		threadResults, err := e.repo.HybridSearch(ctx, params)
+		threadResults, err := e.repo.SearchFactsByEmbeddingWithScores(ctx, params)
 		if err != nil {
-			return nil, fmt.Errorf("hybrid search thread facts: %w", err)
+			return nil, fmt.Errorf("search thread facts: %w", err)
 		}
 		collect(threadResults)
 
 		params.ThreadID = nil
-		agentResults, err := e.repo.HybridSearch(ctx, params)
+		agentResults, err := e.repo.SearchFactsByEmbeddingWithScores(ctx, params)
 		if err != nil {
-			return nil, fmt.Errorf("hybrid search agent facts: %w", err)
+			return nil, fmt.Errorf("search agent facts: %w", err)
 		}
 		collect(agentResults)
 
 		params.AgentID = nil
-		accountResults, err := e.repo.HybridSearch(ctx, params)
+		accountResults, err := e.repo.SearchFactsByEmbeddingWithScores(ctx, params)
 		if err != nil {
-			return nil, fmt.Errorf("hybrid search account facts: %w", err)
+			return nil, fmt.Errorf("search account facts: %w", err)
 		}
 		collect(accountResults)
 	}
