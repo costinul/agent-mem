@@ -69,6 +69,7 @@ func (r *PostgresRepository) ListEventsByThreadID(ctx context.Context, threadID 
 func (r *PostgresRepository) InsertSource(ctx context.Context, source models.Source) (*models.Source, error) {
 	var (
 		stored     models.Source
+		author     sql.NullString
 		content    sql.NullString
 		bucketPath sql.NullString
 		sizeBytes  sql.NullInt64
@@ -77,11 +78,12 @@ func (r *PostgresRepository) InsertSource(ctx context.Context, source models.Sou
 
 	err := r.db.QueryRowContext(
 		ctx,
-		`INSERT INTO sources (event_id, kind, content, content_type, bucket_path, size_bytes)
-		 VALUES ($1, $2, $3, $4, $5, $6)
-		 RETURNING id, event_id, kind, content, content_type, bucket_path, size_bytes, created_at`,
+		`INSERT INTO sources (event_id, kind, author, content, content_type, bucket_path, size_bytes)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+		 RETURNING id, event_id, kind, author, content, content_type, bucket_path, size_bytes, created_at`,
 		source.EventID,
 		source.Kind,
+		source.Author,
 		source.Content,
 		source.ContentType,
 		source.BucketPath,
@@ -90,6 +92,7 @@ func (r *PostgresRepository) InsertSource(ctx context.Context, source models.Sou
 		&stored.ID,
 		&stored.EventID,
 		&stored.Kind,
+		&author,
 		&content,
 		&stored.ContentType,
 		&bucketPath,
@@ -100,6 +103,7 @@ func (r *PostgresRepository) InsertSource(ctx context.Context, source models.Sou
 		return nil, err
 	}
 
+	stored.Author = nullStringPtr(author)
 	stored.Content = nullStringPtr(content)
 	stored.BucketPath = nullStringPtr(bucketPath)
 	stored.SizeBytes = nullInt64Ptr(sizeBytes)
@@ -110,6 +114,7 @@ func (r *PostgresRepository) InsertSource(ctx context.Context, source models.Sou
 func (r *PostgresRepository) GetSourceByID(ctx context.Context, sourceID string) (*models.Source, error) {
 	var (
 		source     models.Source
+		author     sql.NullString
 		content    sql.NullString
 		bucketPath sql.NullString
 		sizeBytes  sql.NullInt64
@@ -117,7 +122,7 @@ func (r *PostgresRepository) GetSourceByID(ctx context.Context, sourceID string)
 
 	err := r.db.QueryRowContext(
 		ctx,
-		`SELECT id, event_id, kind, content, content_type, bucket_path, size_bytes, created_at
+		`SELECT id, event_id, kind, author, content, content_type, bucket_path, size_bytes, created_at
 		 FROM sources
 		 WHERE id = $1`,
 		sourceID,
@@ -125,6 +130,7 @@ func (r *PostgresRepository) GetSourceByID(ctx context.Context, sourceID string)
 		&source.ID,
 		&source.EventID,
 		&source.Kind,
+		&author,
 		&content,
 		&source.ContentType,
 		&bucketPath,
@@ -138,6 +144,7 @@ func (r *PostgresRepository) GetSourceByID(ctx context.Context, sourceID string)
 		return nil, err
 	}
 
+	source.Author = nullStringPtr(author)
 	source.Content = nullStringPtr(content)
 	source.BucketPath = nullStringPtr(bucketPath)
 	source.SizeBytes = nullInt64Ptr(sizeBytes)
@@ -147,7 +154,7 @@ func (r *PostgresRepository) GetSourceByID(ctx context.Context, sourceID string)
 func (r *PostgresRepository) ListSourcesByEventID(ctx context.Context, eventID string) ([]models.Source, error) {
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT id, event_id, kind, content, content_type, bucket_path, size_bytes, created_at
+		`SELECT id, event_id, kind, author, content, content_type, bucket_path, size_bytes, created_at
 		 FROM sources
 		 WHERE event_id = $1
 		 ORDER BY created_at ASC`,
@@ -162,6 +169,7 @@ func (r *PostgresRepository) ListSourcesByEventID(ctx context.Context, eventID s
 	for rows.Next() {
 		var (
 			source     models.Source
+			author     sql.NullString
 			content    sql.NullString
 			bucketPath sql.NullString
 			sizeBytes  sql.NullInt64
@@ -170,6 +178,7 @@ func (r *PostgresRepository) ListSourcesByEventID(ctx context.Context, eventID s
 			&source.ID,
 			&source.EventID,
 			&source.Kind,
+			&author,
 			&content,
 			&source.ContentType,
 			&bucketPath,
@@ -178,6 +187,7 @@ func (r *PostgresRepository) ListSourcesByEventID(ctx context.Context, eventID s
 		); err != nil {
 			return nil, err
 		}
+		source.Author = nullStringPtr(author)
 		source.Content = nullStringPtr(content)
 		source.BucketPath = nullStringPtr(bucketPath)
 		source.SizeBytes = nullInt64Ptr(sizeBytes)
@@ -193,7 +203,7 @@ func (r *PostgresRepository) ListConversationSourcesByThreadID(ctx context.Conte
 
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT s.id, s.event_id, s.kind, s.content, s.content_type, s.bucket_path, s.size_bytes, s.created_at
+		`SELECT s.id, s.event_id, s.kind, s.author, s.content, s.content_type, s.bucket_path, s.size_bytes, s.created_at
 		 FROM sources s
 		 JOIN events e ON e.id = s.event_id
 		 WHERE e.thread_id = $1
@@ -212,6 +222,7 @@ func (r *PostgresRepository) ListConversationSourcesByThreadID(ctx context.Conte
 	for rows.Next() {
 		var (
 			source     models.Source
+			author     sql.NullString
 			content    sql.NullString
 			bucketPath sql.NullString
 			sizeBytes  sql.NullInt64
@@ -220,6 +231,7 @@ func (r *PostgresRepository) ListConversationSourcesByThreadID(ctx context.Conte
 			&source.ID,
 			&source.EventID,
 			&source.Kind,
+			&author,
 			&content,
 			&source.ContentType,
 			&bucketPath,
@@ -228,6 +240,7 @@ func (r *PostgresRepository) ListConversationSourcesByThreadID(ctx context.Conte
 		); err != nil {
 			return nil, err
 		}
+		source.Author = nullStringPtr(author)
 		source.Content = nullStringPtr(content)
 		source.BucketPath = nullStringPtr(bucketPath)
 		source.SizeBytes = nullInt64Ptr(sizeBytes)

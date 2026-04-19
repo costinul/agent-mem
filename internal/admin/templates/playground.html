@@ -107,13 +107,17 @@
             <div id="inputs-contextual" class="space-y-3 mb-4">
                 <!-- first item -->
                 <div class="input-item flex gap-3 items-start p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <select name="kind" class="shrink-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="USER">USER</option>
-                        <option value="AGENT">AGENT</option>
-                        <option value="TOOL">TOOL</option>
-                        <option value="DOCUMENT">DOCUMENT</option>
-                        <option value="SYSTEM">SYSTEM</option>
-                    </select>
+                    <div class="shrink-0 flex flex-col gap-1.5">
+                        <select name="kind" class="border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="USER">USER</option>
+                            <option value="AGENT">AGENT</option>
+                            <option value="TOOL">TOOL</option>
+                            <option value="DOCUMENT">DOCUMENT</option>
+                            <option value="SYSTEM">SYSTEM</option>
+                        </select>
+                        <input type="text" name="author" placeholder="Author (optional)"
+                               class="border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
                     <textarea name="content" rows="3" placeholder="Enter message content…"
                               class="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
                     <button type="button" onclick="removeInput(this)"
@@ -156,13 +160,17 @@
             <input type="hidden" name="thread_id">
             <div id="inputs-factual" class="space-y-3 mb-4">
                 <div class="input-item flex gap-3 items-start p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <select name="kind" class="shrink-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="USER">USER</option>
-                        <option value="AGENT">AGENT</option>
-                        <option value="TOOL">TOOL</option>
-                        <option value="DOCUMENT">DOCUMENT</option>
-                        <option value="SYSTEM">SYSTEM</option>
-                    </select>
+                    <div class="shrink-0 flex flex-col gap-1.5">
+                        <select name="kind" class="border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="USER">USER</option>
+                            <option value="AGENT">AGENT</option>
+                            <option value="TOOL">TOOL</option>
+                            <option value="DOCUMENT">DOCUMENT</option>
+                            <option value="SYSTEM">SYSTEM</option>
+                        </select>
+                        <input type="text" name="author" placeholder="Author (optional)"
+                               class="border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
                     <textarea name="content" rows="3" placeholder="Enter factual statement…"
                               class="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
                     <button type="button" onclick="removeInput(this)"
@@ -324,13 +332,17 @@ function injectContext(form) {
 // --- Dynamic input items ---
 const inputItemHTML = `
 <div class="input-item flex gap-3 items-start p-3 bg-gray-50 rounded-lg border border-gray-200">
-    <select name="kind" class="shrink-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-        <option value="USER">USER</option>
-        <option value="AGENT">AGENT</option>
-        <option value="TOOL">TOOL</option>
-        <option value="DOCUMENT">DOCUMENT</option>
-        <option value="SYSTEM">SYSTEM</option>
-    </select>
+    <div class="shrink-0 flex flex-col gap-1.5">
+        <select name="kind" class="border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="USER">USER</option>
+            <option value="AGENT">AGENT</option>
+            <option value="TOOL">TOOL</option>
+            <option value="DOCUMENT">DOCUMENT</option>
+            <option value="SYSTEM">SYSTEM</option>
+        </select>
+        <input type="text" name="author" placeholder="Author (optional)"
+               class="border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+    </div>
     <textarea name="content" rows="3" placeholder="Enter content…"
               class="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"></textarea>
     <button type="button" onclick="removeInput(this)"

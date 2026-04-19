@@ -933,6 +933,10 @@ const docTemplate = `{
         "memory.ConversationMessage": {
             "type": "object",
             "properties": {
+                "author": {
+                    "description": "Set when the original input carried an author.",
+                    "type": "string"
+                },
                 "content": {
                     "type": "string"
                 },
@@ -1072,6 +1076,10 @@ const docTemplate = `{
         "memory.InputItem": {
             "type": "object",
             "properties": {
+                "author": {
+                    "description": "Optional name of the person or entity that produced this turn (e.g. \"Alex\").",
+                    "type": "string"
+                },
                 "content": {
                     "description": "Text as string, files as base64.",
                     "type": "string"

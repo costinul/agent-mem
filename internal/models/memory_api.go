@@ -18,8 +18,9 @@ type MemoryInput struct {
 // Text inputs set Content. File inputs set Content as base64 and ContentType accordingly.
 type InputItem struct {
 	Kind        SourceKind `json:"kind"`
-	Content     string     `json:"content"`      // Text as string, files as base64.
-	ContentType string     `json:"content_type"` // MIME type: text/plain, application/pdf, image/png, etc.
+	Author      *string    `json:"author,omitempty"` // Optional: name of the person or entity that produced this turn (e.g. "Alex").
+	Content     string     `json:"content"`          // Text as string, files as base64.
+	ContentType string     `json:"content_type"`     // MIME type: text/plain, application/pdf, image/png, etc.
 }
 
 // =====================
@@ -57,6 +58,7 @@ type ConversationMessage struct {
 	EventID   string     `json:"event_id"`
 	ThreadID  string     `json:"thread_id"`
 	Kind      SourceKind `json:"kind"`
+	Author    *string    `json:"author,omitempty"` // Set when the original input carried an author.
 	Content   string     `json:"content"`
 	CreatedAt time.Time  `json:"created_at"`
 }

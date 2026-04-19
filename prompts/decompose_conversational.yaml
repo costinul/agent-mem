@@ -12,6 +12,9 @@ system_prompt: |
   Queries are concise, fact-oriented search phrases used to find relevant existing memory. Write queries as noun phrases or statements, not questions (e.g. "user's preferred programming language" not "what language does the user prefer?").
 prompt: |
   Source type: {{.SourceKind}}
+  {{- if .Author}}
+  Author: {{.Author}}
+  {{- end}}
   {{- if .MessageHistory}}
 
   Recent conversation:
@@ -27,6 +30,10 @@ prompt: |
 
   Message to process:
   {{.Content}}
+  {{- if .Author}}
+
+  When writing facts, refer to the author by name ("{{.Author}}") rather than "the user" or "the agent" (e.g. "{{.Author}} works at TechCorp" not "The user works at TechCorp").
+  {{- end}}
 temperature: 0.0
 max_tokens: 4096
 requirements:

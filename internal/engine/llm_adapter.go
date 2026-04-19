@@ -15,6 +15,7 @@ import (
 // DecomposeRequest is the input for decomposing a single source.
 type DecomposeRequest struct {
 	SourceKind     models.SourceKind
+	Author         *string
 	Content        string
 	ContextHeader  string
 	MessageHistory []string

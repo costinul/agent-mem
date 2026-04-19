@@ -12,6 +12,9 @@ system_prompt: |
   Do not extract queries — return an empty queries array.
 prompt: |
   Source type: {{.SourceKind}}
+  {{- if .Author}}
+  Author: {{.Author}}
+  {{- end}}
   {{- if .ContextHeader}}
 
   Context:
@@ -20,6 +23,10 @@ prompt: |
 
   Content:
   {{.Content}}
+  {{- if .Author}}
+
+  When writing facts, refer to the author by name ("{{.Author}}") rather than generic pronouns (e.g. "{{.Author}} prefers Python" not "The user prefers Python").
+  {{- end}}
 temperature: 0.0
 max_tokens: 4096
 requirements:

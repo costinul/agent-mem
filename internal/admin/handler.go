@@ -655,6 +655,7 @@ func parseInputItems(r *http.Request) []models.InputItem {
 		return nil
 	}
 	kinds := r.Form["kind"]
+	authors := r.Form["author"]
 	contents := r.Form["content"]
 	var items []models.InputItem
 	for i, c := range contents {
@@ -668,7 +669,13 @@ func parseInputItems(r *http.Request) []models.InputItem {
 				kind = k
 			}
 		}
-		items = append(items, models.InputItem{Kind: kind, Content: c, ContentType: "text/plain"})
+		item := models.InputItem{Kind: kind, Content: c, ContentType: "text/plain"}
+		if i < len(authors) {
+			if a := strings.TrimSpace(authors[i]); a != "" {
+				item.Author = &a
+			}
+		}
+		items = append(items, item)
 	}
 	return items
 }

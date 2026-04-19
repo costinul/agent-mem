@@ -265,3 +265,53 @@ func TestInMemorySearchFactsByEmbedding(t *testing.T) {
 		t.Fatalf("SearchFactsByEmbedding() text = %q", results[0].Text)
 	}
 }
+
+func TestInMemorySourceAuthor(t *testing.T) {
+	repo := NewInMemory()
+	ctx := context.Background()
+
+	event, err := repo.InsertEvent(ctx, models.Event{AccountID: "acct-1", AgentID: "agent-1"})
+	if err != nil {
+		t.Fatalf("InsertEvent() error = %v", err)
+	}
+
+	authorName := "Alex"
+	content := "I just started at TechCorp"
+
+	// Source with author set.
+	src, err := repo.InsertSource(ctx, models.Source{
+		EventID:     event.ID,
+		Kind:        models.SOURCE_USER,
+		Author:      &authorName,
+		Content:     &content,
+		ContentType: "text/plain",
+	})
+	if err != nil {
+		t.Fatalf("InsertSource(with author) error = %v", err)
+	}
+	if src.Author == nil || *src.Author != authorName {
+		t.Fatalf("InsertSource(with author) Author = %v, want %q", src.Author, authorName)
+	}
+
+	got, err := repo.GetSourceByID(ctx, src.ID)
+	if err != nil {
+		t.Fatalf("GetSourceByID() error = %v", err)
+	}
+	if got == nil || got.Author == nil || *got.Author != authorName {
+		t.Fatalf("GetSourceByID() Author = %v, want %q", got.Author, authorName)
+	}
+
+	// Source without author — should be nil.
+	srcNoAuthor, err := repo.InsertSource(ctx, models.Source{
+		EventID:     event.ID,
+		Kind:        models.SOURCE_AGENT,
+		Content:     &content,
+		ContentType: "text/plain",
+	})
+	if err != nil {
+		t.Fatalf("InsertSource(no author) error = %v", err)
+	}
+	if srcNoAuthor.Author != nil {
+		t.Fatalf("InsertSource(no author) Author = %v, want nil", srcNoAuthor.Author)
+	}
+}

@@ -47,12 +47,17 @@ func setupEngine(t *testing.T) (*engine.MemoryEngine, *memoryrepo.InMemoryReposi
 
 func sendMessage(t *testing.T, eng *engine.MemoryEngine, content string) {
 	t.Helper()
+	sendMessageAs(t, eng, content, nil)
+}
+
+func sendMessageAs(t *testing.T, eng *engine.MemoryEngine, content string, author *string) {
+	t.Helper()
 	if _, err := eng.ProcessContextual(context.Background(), models.MemoryInput{
 		AccountID: "eval-account",
 		AgentID:   "eval-agent",
 		ThreadID:  "eval-thread",
 		Inputs: []models.InputItem{
-			{Kind: models.SOURCE_USER, Content: content},
+			{Kind: models.SOURCE_USER, Author: author, Content: content},
 		},
 	}); err != nil {
 		t.Fatalf("ProcessContextual(%q) error = %v", content, err)

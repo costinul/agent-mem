@@ -140,7 +140,7 @@ async def evaluate_sample(
                     flush=True,
                 )
                 try:
-                    await client.ingest(thread_id, role, text)
+                    await client.ingest(thread_id, role, text, author=turn.get("speaker") or None)
                 except Exception as exc:
                     print(f"  [WARN] ingest error in sample {sample_id}: {exc}", flush=True)
 

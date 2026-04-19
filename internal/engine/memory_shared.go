@@ -24,7 +24,11 @@ func (e *MemoryEngine) persistAndDecomposeSources(ctx context.Context, eventID, 
 		}
 		for _, src := range recent {
 			if src.Content != nil {
-				msgHistory = append(msgHistory, fmt.Sprintf("[%s] %s", src.Kind, *src.Content))
+				if src.Author != nil {
+					msgHistory = append(msgHistory, fmt.Sprintf("%s: %s", *src.Author, *src.Content))
+				} else {
+					msgHistory = append(msgHistory, fmt.Sprintf("[%s] %s", src.Kind, *src.Content))
+				}
 			}
 		}
 	}
@@ -38,6 +42,7 @@ func (e *MemoryEngine) persistAndDecomposeSources(ctx context.Context, eventID, 
 		source := models.Source{
 			EventID:     eventID,
 			Kind:        item.Kind,
+			Author:      item.Author,
 			Content:     contentPtr,
 			ContentType: defaultContentType(item.ContentType),
 		}
@@ -49,6 +54,7 @@ func (e *MemoryEngine) persistAndDecomposeSources(ctx context.Context, eventID, 
 
 		req := DecomposeRequest{
 			SourceKind:    item.Kind,
+			Author:        item.Author,
 			Content:       item.Content,
 			ContextHeader: contextHeader,
 		}
@@ -68,13 +74,18 @@ func (e *MemoryEngine) persistAndDecomposeSources(ctx context.Context, eventID, 
 
 // buildEventContextHeader concatenates the content of USER and AGENT inputs
 // into a single string passed to the LLM as context for the decomposition step.
+// Lines are prefixed with the author name when available, falling back to the role tag.
 func buildEventContextHeader(inputs []models.InputItem) string {
 	parts := make([]string, 0, len(inputs))
 	for _, input := range inputs {
 		if input.Kind != models.SOURCE_USER && input.Kind != models.SOURCE_AGENT {
 			continue
 		}
-		parts = append(parts, strings.TrimSpace(input.Content))
+		if input.Author != nil {
+			parts = append(parts, fmt.Sprintf("%s: %s", *input.Author, strings.TrimSpace(input.Content)))
+		} else {
+			parts = append(parts, strings.TrimSpace(input.Content))
+		}
 	}
 	return strings.TrimSpace(strings.Join(parts, "\n"))
 }

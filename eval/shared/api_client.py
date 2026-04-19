@@ -45,12 +45,15 @@ class MemoryAPIClient:
         resp.raise_for_status()
         return resp.json()
 
-    async def ingest(self, thread_id: str, role: str, content: str) -> dict:
+    async def ingest(self, thread_id: str, role: str, content: str, author: str | None = None) -> dict:
         """Send a single conversation turn to /memory/contextual for ingestion."""
         kind = _ROLE_TO_KIND.get(role.lower(), role.upper())
+        item: dict = {"kind": kind, "content": content, "content_type": "text/plain"}
+        if author:
+            item["author"] = author
         payload = {
             "thread_id": thread_id,
-            "inputs": [{"kind": kind, "content": content, "content_type": "text/plain"}],
+            "inputs": [item],
         }
         resp = await self._client_or_raise().post(f"{self.base_url}/memory/contextual", json=payload)
         resp.raise_for_status()

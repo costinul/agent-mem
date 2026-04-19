@@ -83,6 +83,7 @@ func (e *MemoryEngine) ListThreadMessages(ctx context.Context, threadID string, 
 			EventID:   source.EventID,
 			ThreadID:  threadID,
 			Kind:      source.Kind,
+			Author:    source.Author,
 			Content:   content,
 			CreatedAt: source.CreatedAt,
 		})
