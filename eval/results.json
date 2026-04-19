@@ -1,10 +1,10 @@
 {
   "dataset": "warmup_small",
-  "elapsed_seconds": 33.6,
+  "elapsed_seconds": 41.7,
   "conversations": [
     {
       "sample_id": "warmup-small-1",
-      "thread_id": "6226d285-5a1e-4281-8369-8cf1f488292f",
+      "thread_id": "458765dd-a043-44d7-bd1a-cde41d09aa5a",
       "qa": [
         {
           "question": "What is Alex's job title and company?",
@@ -19,20 +19,21 @@
           "ground_truth": "Bob, who has been at TechCorp for six years.",
           "category": "single-hop",
           "facts_returned": [
-            "The user's manager is Bob, who has been at TechCorp for six years."
+            "The user's manager is Bob, who has been at TechCorp for six years and manages twelve people across two squads."
           ],
           "score": "pass",
-          "reason": "The facts clearly state that Alex's manager is Bob and he has been at TechCorp for six years."
+          "reason": "The facts clearly state that Alex's manager is Bob and that he has been at TechCorp for six years."
         },
         {
           "question": "What is the main perk Alex enjoys near the TechCorp office?",
           "ground_truth": "A food cart pod on Alder Street in downtown Portland.",
           "category": "single-hop",
           "facts_returned": [
-            "The agent considers the food cart pod next to the office a solid perk."
+            "The agent considers the food cart pod next to the office a solid perk.",
+            "The agent considers the food cart pod a solid perk."
           ],
           "score": "partial",
-          "reason": "The facts mention a food cart pod next to the office as a perk but do not specify its location on Alder Street in downtown Portland."
+          "reason": "The facts mention a food cart pod as a perk but do not specify its location on Alder Street in downtown Portland."
         }
       ]
     }
