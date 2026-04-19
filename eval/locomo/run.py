@@ -10,7 +10,7 @@ Usage:
 
 Environment variables:
     MEMORY_API_URL      Base URL of the memory API  (default: http://localhost:8080)
-    MEMORY_ACCOUNT_ID   Account ID for test runs    (required)
+    MEMORY_API_KEY      API key for the account     (required)
     MEMORY_AGENT_ID     Agent ID for test runs      (required)
     OPENAI_API_KEY      OpenAI key for the judge    (required)
 
@@ -115,7 +115,7 @@ async def evaluate_sample(
                 continue
 
             try:
-                memory_output = await client.query(thread_id, question)
+                memory_output = await client.recall(thread_id, question)
                 facts = [f["text"] for f in memory_output.get("facts", [])]
             except Exception as exc:
                 print(f"  [WARN] query error in sample {sample_id}: {exc}")
@@ -192,7 +192,7 @@ async def main() -> None:
     args = parse_args()
 
     api_url = os.environ.get("MEMORY_API_URL", "http://localhost:8080")
-    account_id = os.environ["MEMORY_ACCOUNT_ID"]
+    api_key = os.environ["MEMORY_API_KEY"]
     agent_id = os.environ["MEMORY_AGENT_ID"]
     openai_key = os.environ["OPENAI_API_KEY"]
 
@@ -201,13 +201,13 @@ async def main() -> None:
         samples = samples[: args.limit]
 
     print(f"Running LoCoMo eval: {len(samples)} conversations, concurrency={args.concurrency}")
-    print(f"  API: {api_url}  account={account_id}  agent={agent_id}\n")
+    print(f"  API: {api_url}  agent={agent_id}\n")
 
     semaphore = asyncio.Semaphore(args.concurrency)
     evaluator = Evaluator(api_key=openai_key)
 
     start = time.time()
-    async with MemoryAPIClient(api_url, account_id, agent_id) as client:
+    async with MemoryAPIClient(api_url, api_key, agent_id) as client:
         tasks = [
             evaluate_sample(sample, client, evaluator, semaphore) for sample in samples
         ]

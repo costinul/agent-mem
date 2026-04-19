@@ -1,0 +1,30 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "API: agent-mem server",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/api",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "name": "Eval: LoCoMo (1 conversation)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "locomo.run",
+            "cwd": "${workspaceFolder}/eval",
+            "args": ["--limit", "1", "--out", "smoke_results.json"],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "MEMORY_API_URL": "http://localhost:8080",
+                "MEMORY_API_KEY": "${env:MEMORY_API_KEY}",
+                "MEMORY_AGENT_ID": "${env:MEMORY_AGENT_ID}",
+                "OPENAI_API_KEY": "${env:OPENAI_API_KEY}"
+            }
+        }
+    ]
+}

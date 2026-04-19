@@ -5,16 +5,28 @@ import httpx
 
 DEFAULT_TIMEOUT = 60.0
 
+_ROLE_TO_KIND = {
+    "user": "USER",
+    "agent": "AGENT",
+    "system": "SYSTEM",
+    "tool": "TOOL",
+    "document": "DOCUMENT",
+    "code": "CODE",
+}
+
 
 class MemoryAPIClient:
-    def __init__(self, base_url: str, account_id: str, agent_id: str):
+    def __init__(self, base_url: str, api_key: str, agent_id: str):
         self.base_url = base_url.rstrip("/")
-        self.account_id = account_id
+        self.api_key = api_key
         self.agent_id = agent_id
         self._client: httpx.AsyncClient | None = None
 
     async def __aenter__(self):
-        self._client = httpx.AsyncClient(timeout=DEFAULT_TIMEOUT)
+        self._client = httpx.AsyncClient(
+            timeout=DEFAULT_TIMEOUT,
+            headers={"Authorization": f"Bearer {self.api_key}"},
+        )
         return self
 
     async def __aexit__(self, *_):
@@ -35,22 +47,22 @@ class MemoryAPIClient:
 
     async def ingest(self, thread_id: str, role: str, content: str) -> dict:
         """Send a single conversation turn to /memory/contextual for ingestion."""
+        kind = _ROLE_TO_KIND.get(role.lower(), role.upper())
         payload = {
             "thread_id": thread_id,
-            "message_history": 0,
-            "inputs": [{"kind": role, "content": content, "content_type": "text/plain"}],
+            "inputs": [{"kind": kind, "content": content, "content_type": "text/plain"}],
         }
         resp = await self._client_or_raise().post(f"{self.base_url}/memory/contextual", json=payload)
         resp.raise_for_status()
         return resp.json()
 
-    async def query(self, thread_id: str, question: str) -> dict:
-        """Query memory with a question and return the response (facts + messages)."""
+    async def recall(self, thread_id: str, question: str) -> dict:
+        """Read-only retrieval of facts relevant to the question."""
         payload = {
             "thread_id": thread_id,
-            "message_history": 0,
-            "inputs": [{"kind": "user", "content": question, "content_type": "text/plain"}],
+            "agent_id": self.agent_id,
+            "query": question,
         }
-        resp = await self._client_or_raise().post(f"{self.base_url}/memory/contextual", json=payload)
+        resp = await self._client_or_raise().post(f"{self.base_url}/memory/recall", json=payload)
         resp.raise_for_status()
         return resp.json()

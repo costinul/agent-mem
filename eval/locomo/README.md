@@ -21,18 +21,30 @@ curl -o data/locomo10.json \
 
 ## Run
 
+See [eval/README.md](../README.md) for one-time setup (create account, API key,
+and agent).
+
 ```bash
 # From the eval/ directory:
 cd eval
 
 # Required environment variables
-export MEMORY_ACCOUNT_ID=<your-test-account-id>
-export MEMORY_AGENT_ID=<your-test-agent-id>
+export MEMORY_API_KEY=<your-api-key>          # amk_... from `create-api-key`
+export MEMORY_AGENT_ID=<your-test-agent-id>   # id from POST /agents
 export OPENAI_API_KEY=<your-openai-key>
 
 # Optional
 export MEMORY_API_URL=http://localhost:8080   # default
 
+python locomo/run.py
+```
+
+On Windows PowerShell:
+
+```powershell
+$env:MEMORY_API_KEY = "amk_..."
+$env:MEMORY_AGENT_ID = "<agent-id>"
+$env:OPENAI_API_KEY = "sk-..."
 python locomo/run.py
 ```
 
@@ -51,6 +63,25 @@ python locomo/run.py
 ```bash
 python locomo/run.py --limit 1 --out smoke_results.json
 ```
+
+## Debug in VS Code (with breakpoints)
+
+A debug configuration is provided in [.vscode/launch.json](../../.vscode/launch.json):
+**Eval: LoCoMo (1 conversation)**.
+
+1. Install the **Python** extension and `pip install debugpy` (usually already
+   bundled with the extension).
+2. Set `MEMORY_API_KEY`, `MEMORY_AGENT_ID`, and `OPENAI_API_KEY` in the shell
+   you launch VS Code from (the launch config inherits them via `${env:...}`),
+   or hard-code them in the `env` block of `launch.json`.
+3. Set breakpoints anywhere in `locomo/run.py`, `shared/api_client.py`, or
+   `shared/evaluator.py`.
+4. Open the **Run and Debug** panel and start **Eval: LoCoMo (1 conversation)**.
+   Execution will pause at your breakpoints; you can inspect `facts`,
+   `result.score`, `qa_results`, etc. in the Variables panel.
+
+The launch config runs with `--limit 1 --out smoke_results.json` and
+`justMyCode: false` so you can also step into `httpx` / `openai` if needed.
 
 ## Output
 
