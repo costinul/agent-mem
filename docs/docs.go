@@ -1223,15 +1223,7 @@ const docTemplate = `{
             }
         },
         "memory.WriteOutput": {
-            "type": "object",
-            "properties": {
-                "facts": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/memory.ReturnedFact"
-                    }
-                }
-            }
+            "type": "object"
         }
     },
     "securityDefinitions": {

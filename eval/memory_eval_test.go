@@ -45,20 +45,18 @@ func setupEngine(t *testing.T) (*engine.MemoryEngine, *memoryrepo.InMemoryReposi
 	return eng, repo
 }
 
-func sendMessage(t *testing.T, eng *engine.MemoryEngine, content string) models.WriteOutput {
+func sendMessage(t *testing.T, eng *engine.MemoryEngine, content string) {
 	t.Helper()
-	output, err := eng.ProcessContextual(context.Background(), models.MemoryInput{
+	if _, err := eng.ProcessContextual(context.Background(), models.MemoryInput{
 		AccountID: "eval-account",
 		AgentID:   "eval-agent",
 		ThreadID:  "eval-thread",
 		Inputs: []models.InputItem{
 			{Kind: models.SOURCE_USER, Content: content},
 		},
-	})
-	if err != nil {
+	}); err != nil {
 		t.Fatalf("ProcessContextual(%q) error = %v", content, err)
 	}
-	return output
 }
 
 func logFacts(t *testing.T, label string, facts []models.Fact) {
@@ -89,12 +87,7 @@ func activeFacts(t *testing.T, repo *memoryrepo.InMemoryRepository) []models.Fac
 func TestEval_FactCreation(t *testing.T) {
 	eng, repo := setupEngine(t)
 
-	output := sendMessage(t, eng, "I just bought a blue car last week. It's a BMW 3 Series.")
-
-	fmt.Printf("Output returned %d facts\n", len(output.Facts))
-	for _, f := range output.Facts {
-		fmt.Printf("  returned: kind=%s text=%q\n", f.Kind, f.Text)
-	}
+	sendMessage(t, eng, "I just bought a blue car last week. It's a BMW 3 Series.")
 
 	facts := activeFacts(t, repo)
 	logFacts(t, "active facts after creation", facts)

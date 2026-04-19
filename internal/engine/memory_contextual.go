@@ -57,12 +57,8 @@ func (e *MemoryEngine) ProcessContextual(ctx context.Context, input models.Memor
 		return models.WriteOutput{}, err
 	}
 
-	output, err := e.buildWriteOutput(ctx, append(evalResult.FactsToReturn, storedFacts...))
-	if err != nil {
-		return models.WriteOutput{}, err
-	}
-	log.Printf("contextual pipeline completed event=%s returned_facts=%d", event.ID, len(output.Facts))
-	return output, nil
+	log.Printf("contextual pipeline completed event=%s stored_facts=%d", event.ID, len(storedFacts))
+	return models.WriteOutput{}, nil
 }
 
 func validateContextualInput(input models.MemoryInput) error {

@@ -60,12 +60,8 @@ func (e *MemoryEngine) AddFactual(ctx context.Context, input models.FactualInput
 		return models.WriteOutput{}, err
 	}
 
-	output, err := e.buildWriteOutput(ctx, append(evalResult.FactsToReturn, storedFacts...))
-	if err != nil {
-		return models.WriteOutput{}, err
-	}
-	log.Printf("factual pipeline completed event=%s returned_facts=%d", event.ID, len(output.Facts))
-	return output, nil
+	log.Printf("factual pipeline completed event=%s stored_facts=%d", event.ID, len(storedFacts))
+	return models.WriteOutput{}, nil
 }
 
 func validateFactualInput(input models.FactualInput) error {

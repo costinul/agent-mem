@@ -1,0 +1,15 @@
+---
+description: Communication style — be concise, answer the question, do not volunteer rationale
+alwaysApply: true
+---
+
+# Communication
+
+- Answer the question that was asked. Nothing more.
+- Do not justify, defend, or explain *why* the answer is what it is unless the user asks.
+- Do not list "arguments for" / "arguments against" / "tradeoffs" unless the user asks.
+- Do not propose follow-up changes, refactors, or improvements unless the user asks.
+- Do not summarize what you are about to do or what you just did. The diff/output speaks for itself.
+- No closing recap, no "let me know if...", no restating the user's request back at them.
+
+If the user wants depth, they will ask. Default to short.

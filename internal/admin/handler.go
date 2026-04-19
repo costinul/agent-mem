@@ -712,7 +712,8 @@ func (h *Handler) playgroundContextual(w http.ResponseWriter, r *http.Request) {
 		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Contextual", Error: fmt.Sprintf("engine error: %v", err)})
 		return
 	}
-	h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Contextual", Facts: out.Facts, NewThreadID: newThreadID})
+	_ = out
+	h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Contextual", NewThreadID: newThreadID})
 }
 
 func (h *Handler) playgroundFactual(w http.ResponseWriter, r *http.Request) {
@@ -743,7 +744,8 @@ func (h *Handler) playgroundFactual(w http.ResponseWriter, r *http.Request) {
 		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Factual", Error: fmt.Sprintf("engine error: %v", err)})
 		return
 	}
-	h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Factual", Facts: out.Facts, NewThreadID: newThreadID})
+	_ = out
+	h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Factual", NewThreadID: newThreadID})
 }
 
 func (h *Handler) playgroundRecall(w http.ResponseWriter, r *http.Request) {
@@ -794,7 +796,9 @@ func (h *Handler) renderPlaygroundResult(w http.ResponseWriter, result *Playgrou
   {{else}}
   <div class="rounded-lg border border-gray-200 bg-white overflow-hidden">
     <div class="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
-      <span class="text-xs font-medium text-gray-600">{{.Op}} — {{len .Facts}} fact(s) returned</span>
+      <span class="text-xs font-medium text-gray-600">
+        {{if eq .Op "Recall"}}{{.Op}} — {{len .Facts}} fact(s) returned{{else}}{{.Op}} — written{{end}}
+      </span>
       {{if .NewThreadID}}
       <span class="text-xs text-indigo-600 font-medium font-mono">new thread: {{.NewThreadID}}</span>
       {{end}}
@@ -821,7 +825,7 @@ func (h *Handler) renderPlaygroundResult(w http.ResponseWriter, result *Playgrou
       </li>
       {{end}}
     </ul>
-    {{else}}
+    {{else if eq .Op "Recall"}}
     <p class="px-4 py-3 text-sm text-gray-400">No facts returned.</p>
     {{end}}
   </div>

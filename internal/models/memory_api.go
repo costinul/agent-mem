@@ -26,10 +26,11 @@ type InputItem struct {
 // API — Output
 // =====================
 
-// WriteOutput is the response from contextual/factual write pipelines.
-type WriteOutput struct {
-	Facts []ReturnedFact `json:"facts"`
-}
+// WriteOutput is the acknowledgement returned by contextual/factual write pipelines.
+// Writes are fire-and-forget: the caller delegates fact extraction/storage to the
+// memory manager and does not receive the resulting facts. Use the recall or
+// fact-listing endpoints to inspect what is stored.
+type WriteOutput struct{}
 
 // RecallOutput is the response from the recall (read-only retrieval) endpoint.
 type RecallOutput struct {

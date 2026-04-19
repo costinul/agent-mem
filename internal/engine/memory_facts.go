@@ -100,29 +100,6 @@ func (e *MemoryEngine) DeleteFactForAccount(ctx context.Context, accountID, fact
 	return e.repo.DeleteFact(ctx, factID)
 }
 
-func (e *MemoryEngine) buildWriteOutput(ctx context.Context, facts []models.Fact) (models.WriteOutput, error) {
-	output := models.WriteOutput{
-		Facts: make([]models.ReturnedFact, 0, len(facts)),
-	}
-	seen := map[string]struct{}{}
-	for _, fact := range facts {
-		key := fact.ID
-		if key == "" {
-			key = strings.ToLower(strings.TrimSpace(fmt.Sprintf("%s|%s", fact.Kind, fact.Text)))
-		}
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = struct{}{}
-		mapped, err := e.mapFactForOutput(ctx, fact, false)
-		if err != nil {
-			return models.WriteOutput{}, err
-		}
-		output.Facts = append(output.Facts, mapped)
-	}
-	return output, nil
-}
-
 func (e *MemoryEngine) buildRecallOutput(ctx context.Context, input models.RecallInput, facts []models.Fact) (models.RecallOutput, error) {
 	output := models.RecallOutput{
 		Facts: make([]models.ReturnedFact, 0, len(facts)),

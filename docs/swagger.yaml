@@ -232,11 +232,6 @@ definitions:
         type: array
     type: object
   memory.WriteOutput:
-    properties:
-      facts:
-        items:
-          $ref: '#/definitions/memory.ReturnedFact'
-        type: array
     type: object
 host: localhost:8080
 info:
