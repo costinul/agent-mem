@@ -33,6 +33,11 @@ import time
 import urllib.request
 from collections import defaultdict
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load .env from the repository root
+env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -194,7 +199,8 @@ async def main() -> None:
     api_url = os.environ.get("MEMORY_API_URL", "http://localhost:8080")
     api_key = os.environ["MEMORY_API_KEY"]
     agent_id = os.environ["MEMORY_AGENT_ID"]
-    openai_key = os.environ["OPENAI_API_KEY"]
+    openai_key = os.environ["AZURE_OPENAI_API_KEY"]
+    openai_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT", "https://cchat-ai.cognitiveservices.azure.com/")
 
     samples = load_dataset(Path(args.data))
     if args.limit:
@@ -204,7 +210,7 @@ async def main() -> None:
     print(f"  API: {api_url}  agent={agent_id}\n")
 
     semaphore = asyncio.Semaphore(args.concurrency)
-    evaluator = Evaluator(api_key=openai_key)
+    evaluator = Evaluator(api_key=openai_key, endpoint=openai_endpoint)
 
     start = time.time()
     async with MemoryAPIClient(api_url, api_key, agent_id) as client:

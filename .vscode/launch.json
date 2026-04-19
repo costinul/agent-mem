@@ -19,12 +19,7 @@
             "args": ["--limit", "1", "--out", "smoke_results.json"],
             "console": "integratedTerminal",
             "justMyCode": false,
-            "env": {
-                "MEMORY_API_URL": "http://localhost:8080",
-                "MEMORY_API_KEY": "${env:MEMORY_API_KEY}",
-                "MEMORY_AGENT_ID": "${env:MEMORY_AGENT_ID}",
-                "OPENAI_API_KEY": "${env:OPENAI_API_KEY}"
-            }
+            "envFile": "${workspaceFolder}/.env"
         }
     ]
 }

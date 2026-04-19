@@ -24,29 +24,19 @@ curl -o data/locomo10.json \
 See [eval/README.md](../README.md) for one-time setup (create account, API key,
 and agent).
 
-```bash
-# From the eval/ directory:
-cd eval
+1. Ensure your `.env` file at the root of the repository contains the required variables:
+   ```env
+   MEMORY_API_KEY=amk_...
+   MEMORY_AGENT_ID=<your-test-agent-id>
+   AZURE_OPENAI_API_KEY=sk-...
+   MEMORY_API_URL=http://localhost:8080
+   ```
 
-# Required environment variables
-export MEMORY_API_KEY=<your-api-key>          # amk_... from `create-api-key`
-export MEMORY_AGENT_ID=<your-test-agent-id>   # id from POST /agents
-export OPENAI_API_KEY=<your-openai-key>
-
-# Optional
-export MEMORY_API_URL=http://localhost:8080   # default
-
-python locomo/run.py
-```
-
-On Windows PowerShell:
-
-```powershell
-$env:MEMORY_API_KEY = "amk_..."
-$env:MEMORY_AGENT_ID = "<agent-id>"
-$env:OPENAI_API_KEY = "sk-..."
-python locomo/run.py
-```
+2. Run the evaluation script:
+   ```bash
+   cd eval
+   python locomo/run.py
+   ```
 
 ## Options
 
@@ -71,9 +61,9 @@ A debug configuration is provided in [.vscode/launch.json](../../.vscode/launch.
 
 1. Install the **Python** extension and `pip install debugpy` (usually already
    bundled with the extension).
-2. Set `MEMORY_API_KEY`, `MEMORY_AGENT_ID`, and `OPENAI_API_KEY` in the shell
-   you launch VS Code from (the launch config inherits them via `${env:...}`),
-   or hard-code them in the `env` block of `launch.json`.
+2. Ensure your `.env` file at the root of the repository contains `MEMORY_API_KEY`,
+   `MEMORY_AGENT_ID`, and `AZURE_OPENAI_API_KEY`. The launch config automatically
+   loads these variables using `"envFile": "${workspaceFolder}/.env"`.
 3. Set breakpoints anywhere in `locomo/run.py`, `shared/api_client.py`, or
    `shared/evaluator.py`.
 4. Open the **Run and Debug** panel and start **Eval: LoCoMo (1 conversation)**.

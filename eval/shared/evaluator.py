@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from openai import AsyncOpenAI
+from openai import AsyncAzureOpenAI
 
 Score = Literal["pass", "partial", "fail"]
 
@@ -49,8 +49,12 @@ class JudgeResult:
 
 
 class Evaluator:
-    def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
-        self._client = AsyncOpenAI(api_key=api_key)
+    def __init__(self, api_key: str, endpoint: str, model: str = "gpt-4.1-mini"):
+        self._client = AsyncAzureOpenAI(
+            api_key=api_key,
+            azure_endpoint=endpoint,
+            api_version="2024-02-15-preview"
+        )
         self.model = model
 
     async def judge(self, question: str, ground_truth: str, facts: list[str]) -> JudgeResult:

@@ -47,12 +47,14 @@ curl -s -X POST http://localhost:8080/agents \
 
 ## Environment Variables
 
+Add these variables to the `.env` file at the root of the repository:
+
 | Variable | Description | Required |
 |---|---|---|
 | `MEMORY_API_URL` | Base URL of a running API instance | No (default: `http://localhost:8080`) |
 | `MEMORY_API_KEY` | API key from `create-api-key` (Bearer token) | Yes |
 | `MEMORY_AGENT_ID` | Agent ID created via `POST /agents` | Yes |
-| `OPENAI_API_KEY` | OpenAI key for the LLM judge | Yes |
+| `AZURE_OPENAI_API_KEY` | Azure OpenAI key for the LLM judge | Yes |
 
 > Always use a dedicated test account/agent so you can cleanly inspect or delete results afterward.
 
