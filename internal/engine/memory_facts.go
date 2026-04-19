@@ -100,6 +100,7 @@ func (e *MemoryEngine) DeleteFactForAccount(ctx context.Context, accountID, fact
 	return e.repo.DeleteFact(ctx, factID)
 }
 
+// buildRecallOutput maps a list of selected facts to ReturnedFact, deduplicating by ID (or text when ID is absent).
 func (e *MemoryEngine) buildRecallOutput(ctx context.Context, input models.RecallInput, facts []models.Fact) (models.RecallOutput, error) {
 	output := models.RecallOutput{
 		Facts: make([]models.ReturnedFact, 0, len(facts)),
@@ -124,6 +125,8 @@ func (e *MemoryEngine) buildRecallOutput(ctx context.Context, input models.Recal
 	return output, nil
 }
 
+// mapFactForOutput converts a stored Fact to the API-facing ReturnedFact,
+// optionally loading the original source content.
 func (e *MemoryEngine) mapFactForOutput(ctx context.Context, fact models.Fact, includeSource bool) (models.ReturnedFact, error) {
 	source, err := e.repo.GetSourceByID(ctx, fact.SourceID)
 	if err != nil {
@@ -144,6 +147,8 @@ func (e *MemoryEngine) mapFactForOutput(ctx context.Context, fact models.Fact, i
 	return returned, nil
 }
 
+// ensureSourceCanMutateFact enforces the trust hierarchy: the calling source kind must have
+// equal or higher trust than the source that originally created the fact, and system facts are immutable.
 func (e *MemoryEngine) ensureSourceCanMutateFact(ctx context.Context, source models.SourceKind, fact models.Fact) error {
 	targetSource, err := e.repo.GetSourceByID(ctx, fact.SourceID)
 	if err != nil {

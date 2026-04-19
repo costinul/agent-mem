@@ -289,8 +289,8 @@ func (r *PostgresRepository) ListFactsByScope(ctx context.Context, accountID str
 		`SELECT id, account_id, agent_id, thread_id, source_id, kind, text, created_at, updated_at
 		 FROM facts
 		 WHERE account_id = $1
-		   AND ($2::uuid IS NULL OR agent_id = $2)
-		   AND ($3::uuid IS NULL OR thread_id = $3)
+		   AND (($2::uuid IS NULL AND agent_id IS NULL) OR agent_id = $2)
+		   AND (($3::uuid IS NULL AND thread_id IS NULL) OR thread_id = $3)
 		   AND superseded_at IS NULL
 		 ORDER BY created_at ASC`,
 		accountID,
@@ -379,8 +379,8 @@ func (r *PostgresRepository) ListFactsFiltered(ctx context.Context, params ListF
 	}
 
 	baseWhere := `WHERE account_id = $1
-		   AND ($2::uuid IS NULL OR agent_id = $2)
-		   AND ($3::uuid IS NULL OR thread_id = $3)
+		   AND (($2::uuid IS NULL AND agent_id IS NULL) OR agent_id = $2)
+		   AND (($3::uuid IS NULL AND thread_id IS NULL) OR thread_id = $3)
 		   AND ($4::text IS NULL OR kind = $4)
 		   AND superseded_at IS NULL`
 
@@ -498,8 +498,8 @@ func (r *PostgresRepository) SearchFactsByEmbedding(ctx context.Context, params 
 		`SELECT id, account_id, agent_id, thread_id, source_id, kind, text, created_at, updated_at
 		 FROM facts
 		 WHERE account_id = $1
-		   AND ($2::uuid IS NULL OR agent_id = $2)
-		   AND ($3::uuid IS NULL OR thread_id = $3)
+		   AND (($2::uuid IS NULL AND agent_id IS NULL) OR agent_id = $2)
+		   AND (($3::uuid IS NULL AND thread_id IS NULL) OR thread_id = $3)
 		   AND embedding IS NOT NULL
 		   AND superseded_at IS NULL
 		   AND (1 - (embedding <=> $4::vector)) >= $5
@@ -558,8 +558,8 @@ func (r *PostgresRepository) SearchFactsByEmbeddingWithScores(ctx context.Contex
 		        1 - (embedding <=> $4::vector) AS score
 		 FROM facts
 		 WHERE account_id = $1
-		   AND ($2::uuid IS NULL OR agent_id = $2)
-		   AND ($3::uuid IS NULL OR thread_id = $3)
+		   AND (($2::uuid IS NULL AND agent_id IS NULL) OR agent_id = $2)
+		   AND (($3::uuid IS NULL AND thread_id IS NULL) OR thread_id = $3)
 		   AND embedding IS NOT NULL
 		   AND superseded_at IS NULL
 		 ORDER BY embedding <=> $4::vector ASC

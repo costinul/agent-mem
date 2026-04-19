@@ -64,6 +64,7 @@ func (e *MemoryEngine) AddFactual(ctx context.Context, input models.FactualInput
 	return models.WriteOutput{}, nil
 }
 
+// validateFactualInput ensures all required fields for a factual memory write are present.
 func validateFactualInput(input models.FactualInput) error {
 	if strings.TrimSpace(input.AccountID) == "" {
 		return errs.NewValidation("account_id is required")

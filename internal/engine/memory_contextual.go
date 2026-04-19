@@ -12,6 +12,9 @@ import (
 	"agentmem/internal/repository/memoryrepo"
 )
 
+// ProcessContextual runs the full write pipeline for a conversational (thread-scoped) memory input:
+// it inserts an event, decomposes sources into facts, retrieves similar existing facts,
+// evaluates what to store/update/evolve, and persists the result.
 func (e *MemoryEngine) ProcessContextual(ctx context.Context, input models.MemoryInput) (models.WriteOutput, error) {
 	if err := validateContextualInput(input); err != nil {
 		return models.WriteOutput{}, err
@@ -61,6 +64,7 @@ func (e *MemoryEngine) ProcessContextual(ctx context.Context, input models.Memor
 	return models.WriteOutput{}, nil
 }
 
+// validateContextualInput ensures all required fields for a contextual memory write are present.
 func validateContextualInput(input models.MemoryInput) error {
 	if strings.TrimSpace(input.AccountID) == "" {
 		return errs.NewValidation("account_id is required")
@@ -85,6 +89,8 @@ func validateContextualInput(input models.MemoryInput) error {
 	return nil
 }
 
+// buildSearchEmbeddings produces embeddings for all extracted facts and search queries
+// across the given decompositions, used to find similar existing facts.
 func (e *MemoryEngine) buildSearchEmbeddings(ctx context.Context, decompositions []models.Decomposition) ([][]float64, error) {
 	texts := make([]string, 0)
 	for _, decomposition := range decompositions {
@@ -105,10 +111,14 @@ func (e *MemoryEngine) buildSearchEmbeddings(ctx context.Context, decompositions
 	return embeddings, nil
 }
 
+// retrieveFacts searches the thread, agent, and account scopes for facts similar to the given embeddings,
+// returning up to 10 top-scored results deduplicated across scopes.
 func (e *MemoryEngine) retrieveFacts(ctx context.Context, accountID, agentID, threadID string, embeddings [][]float64) ([]models.Fact, error) {
 	return e.retrieveFactsWithLimit(ctx, accountID, agentID, threadID, embeddings, 10)
 }
 
+// retrieveFactsWithLimit is the same as retrieveFacts but with a configurable result cap.
+// It queries three scopes in order (thread → agent → account) and deduplicates by highest score.
 func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, agentID, threadID string, embeddings [][]float64, limit int) ([]models.Fact, error) {
 	if limit <= 0 {
 		limit = 10
@@ -179,6 +189,8 @@ func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, ag
 	return facts, nil
 }
 
+// applyEvaluateResult persists the LLM evaluation decision: inserts new facts,
+// updates existing ones in-place, and supersedes evolved facts with a new version.
 func (e *MemoryEngine) applyEvaluateResult(
 	ctx context.Context,
 	input models.MemoryInput,

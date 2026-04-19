@@ -11,6 +11,8 @@ import (
 
 const recallCandidateK = 25
 
+// Recall answers a free-text query by decomposing it into search phrases, retrieving
+// candidate facts across all scopes, then asking the LLM to select the most relevant ones.
 func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (models.RecallOutput, error) {
 	if strings.TrimSpace(input.AccountID) == "" {
 		return models.RecallOutput{}, errs.NewValidation("account_id is required")

@@ -8,6 +8,9 @@ import (
 	models "agentmem/internal/models"
 )
 
+// persistAndDecomposeSources saves each input as a Source record, then calls the LLM
+// to decompose it into extracted facts and search queries. Optionally loads recent
+// conversation history from the thread to provide context to the decomposer.
 func (e *MemoryEngine) persistAndDecomposeSources(ctx context.Context, eventID, threadID string, inputs []models.InputItem, withMessageHistory bool) ([]models.Source, []models.Decomposition, error) {
 	storedSources := make([]models.Source, 0, len(inputs))
 	contextHeader := buildEventContextHeader(inputs)
@@ -63,6 +66,8 @@ func (e *MemoryEngine) persistAndDecomposeSources(ctx context.Context, eventID, 
 	return storedSources, decompositions, nil
 }
 
+// buildEventContextHeader concatenates the content of USER and AGENT inputs
+// into a single string passed to the LLM as context for the decomposition step.
 func buildEventContextHeader(inputs []models.InputItem) string {
 	parts := make([]string, 0, len(inputs))
 	for _, input := range inputs {
@@ -74,6 +79,7 @@ func buildEventContextHeader(inputs []models.InputItem) string {
 	return strings.TrimSpace(strings.Join(parts, "\n"))
 }
 
+// flattenExtractedFacts collects all ExtractedFact entries from a slice of decompositions into a single flat slice.
 func flattenExtractedFacts(decompositions []models.Decomposition) []models.ExtractedFact {
 	facts := make([]models.ExtractedFact, 0)
 	for _, decomposition := range decompositions {
@@ -82,6 +88,8 @@ func flattenExtractedFacts(decompositions []models.Decomposition) []models.Extra
 	return facts
 }
 
+// selectSourceIDForExtractedFact maps an extracted-fact index back to its originating source ID.
+// Falls back to the last source when the index exceeds the sources slice.
 func selectSourceIDForExtractedFact(sources []models.Source, idx int) string {
 	if len(sources) == 0 {
 		return ""
@@ -92,6 +100,7 @@ func selectSourceIDForExtractedFact(sources []models.Source, idx int) string {
 	return sources[len(sources)-1].ID
 }
 
+// defaultContentType returns the given content type or "text/plain" when it is empty.
 func defaultContentType(contentType string) string {
 	trimmed := strings.TrimSpace(contentType)
 	if trimmed == "" {
@@ -100,6 +109,7 @@ func defaultContentType(contentType string) string {
 	return trimmed
 }
 
+// ptrString trims s and returns a pointer to it, or nil when the trimmed value is empty.
 func ptrString(value string) *string {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
