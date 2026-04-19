@@ -1,0 +1,52 @@
+[
+  {
+    "sample_id": "warmup-small-1",
+    "conversation": {
+      "speaker_a": "Alex",
+      "speaker_b": "Sam",
+      "session_1": [
+        {
+          "speaker": "Alex",
+          "text": "I just started at TechCorp three weeks ago as a Junior Developer on the payments team. My manager is Bob — he has been here six years and manages twelve people across two squads. The office is in downtown Portland."
+        },
+        {
+          "speaker": "Sam",
+          "text": "Sounds like a good start! What's the tech stack like?"
+        },
+        {
+          "speaker": "Alex",
+          "text": "Mostly Go and React. There's some internal tooling with basically zero documentation. Bob said he'd pair with me next week to walk through the deployment pipeline."
+        },
+        {
+          "speaker": "Sam",
+          "text": "Nice. Any perks worth mentioning?"
+        },
+        {
+          "speaker": "Alex",
+          "text": "There's a food cart pod right next to the office on Alder Street. I've been eating lunch there almost every day."
+        },
+        {
+          "speaker": "Sam",
+          "text": "That's a solid perk. Keep me posted on how the pairing session goes."
+        }
+      ]
+    },
+    "qa": [
+      {
+        "question": "What is Alex's job title and company?",
+        "answer": "Junior Developer at TechCorp.",
+        "category": "single-hop"
+      },
+      {
+        "question": "Who is Alex's manager and how long has he been at the company?",
+        "answer": "Bob, who has been at TechCorp for six years.",
+        "category": "single-hop"
+      },
+      {
+        "question": "What is the main perk Alex enjoys near the TechCorp office?",
+        "answer": "A food cart pod on Alder Street in downtown Portland.",
+        "category": "single-hop"
+      }
+    ]
+  }
+]

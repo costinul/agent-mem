@@ -15,8 +15,9 @@ Environment variables:
     OPENAI_API_KEY      OpenAI key for the judge    (required)
 
 Options:
-    --concurrency N     Max parallel conversations  (default: 3)
+    --concurrency N     Max parallel conversations  (default: 1)
     --limit N           Only evaluate first N conversations
+    --no-judge          Skip LLM judge; record facts only (score="skipped")
     --cleanup           Delete ingested facts after the run
     --out FILE          Output file path            (default: results.json)
     --data FILE         Path to locomo10.json       (default: ./data/locomo10.json,
@@ -48,6 +49,8 @@ LOCOMO_DATA_URL = (
     "https://raw.githubusercontent.com/snap-research/locomo/main/data/locomo10.json"
 )
 DATA_DEFAULT = Path(__file__).parent / "data" / "locomo10.json"
+
+_PREVIEW_LEN = 80
 
 
 # ── dataset helpers ────────────────────────────────────────────────────────────
@@ -82,36 +85,77 @@ def _speaker_to_role(speaker_name: str, conversation: dict) -> str:
     return "agent"
 
 
+def _count_turns(samples: list[dict]) -> int:
+    total = 0
+    for s in samples:
+        for _key, turns in _sessions_in_order(s["conversation"]):
+            total += sum(1 for t in turns if t.get("text", "").strip())
+    return total
+
+
+def _count_qa(samples: list[dict]) -> int:
+    return sum(len(s.get("qa", [])) for s in samples)
+
+
+def _preview(text: str) -> str:
+    text = text.replace("\n", " ")
+    return text[:_PREVIEW_LEN] + "…" if len(text) > _PREVIEW_LEN else text
+
+
 # ── evaluation logic ───────────────────────────────────────────────────────────
 
 async def evaluate_sample(
     sample: dict,
     client: MemoryAPIClient,
-    evaluator: Evaluator,
+    evaluator: Evaluator | None,
     semaphore: asyncio.Semaphore,
 ) -> dict:
     sample_id = str(sample["sample_id"])
     thread = await client.create_thread()
     thread_id = thread["id"]
+    short_tid = thread_id[:8]
+    print(f"[sample={sample_id}] created thread={thread_id}", flush=True)
+
     conversation = sample["conversation"]
     qa_pairs = sample.get("qa", [])
 
     async with semaphore:
         # 1. Ingest all turns in chronological order (sequential within a sample)
-        for _session_key, turns in _sessions_in_order(conversation):
+        ingest_start = time.time()
+        sessions = _sessions_in_order(conversation)
+        total_turns = sum(
+            1 for _k, turns in sessions for t in turns if t.get("text", "").strip()
+        )
+        ingested = 0
+        for session_key, turns in sessions:
             for turn in turns:
                 text = turn.get("text", "").strip()
                 if not text:
                     continue
+                ingested += 1
                 role = _speaker_to_role(turn.get("speaker", ""), conversation)
+                print(
+                    f"  [{sample_id} {short_tid} {session_key} turn {ingested}/{total_turns}]"
+                    f" {role}: \"{_preview(text)}\"",
+                    flush=True,
+                )
                 try:
                     await client.ingest(thread_id, role, text)
                 except Exception as exc:
-                    print(f"  [WARN] ingest error in sample {sample_id}: {exc}")
+                    print(f"  [WARN] ingest error in sample {sample_id}: {exc}", flush=True)
+
+        ingest_elapsed = time.time() - ingest_start
+        print(
+            f"[sample={sample_id}] ingest done: {ingested} turns in {ingest_elapsed:.1f}s",
+            flush=True,
+        )
 
         # 2. Query + judge each QA pair
         qa_results = []
-        for qa in qa_pairs:
+        total_qa = len(qa_pairs)
+        judge_start = time.time()
+
+        for qi, qa in enumerate(qa_pairs, 1):
             question = qa.get("question", "").strip()
             ground_truth = qa.get("answer", "").strip()
             category = qa.get("category", "unknown")
@@ -119,21 +163,37 @@ async def evaluate_sample(
             if not question or not ground_truth:
                 continue
 
+            print(
+                f"  [{sample_id} qa {qi}/{total_qa}] Q: \"{_preview(question)}\" → recalling…",
+                flush=True,
+            )
+            qa_t0 = time.time()
+
             try:
                 memory_output = await client.recall(thread_id, question)
                 facts = [f["text"] for f in memory_output.get("facts", [])]
             except Exception as exc:
-                print(f"  [WARN] query error in sample {sample_id}: {exc}")
+                print(f"  [WARN] query error in sample {sample_id}: {exc}", flush=True)
                 facts = []
 
-            try:
-                result = await evaluator.judge(question, ground_truth, facts)
-                score = result.score
-                reason = result.reason
-            except Exception as exc:
-                print(f"  [WARN] judge error in sample {sample_id}: {exc}")
-                score = "fail"
-                reason = str(exc)
+            if evaluator is None:
+                score = "skipped"
+                reason = "--no-judge"
+            else:
+                try:
+                    result = await evaluator.judge(question, ground_truth, facts)
+                    score = result.score
+                    reason = result.reason
+                except Exception as exc:
+                    print(f"  [WARN] judge error in sample {sample_id}: {exc}", flush=True)
+                    score = "fail"
+                    reason = str(exc)
+
+            elapsed_qa = time.time() - qa_t0
+            print(
+                f"  [{sample_id} qa {qi}/{total_qa}] score={score} facts={len(facts)} ({elapsed_qa:.1f}s)",
+                flush=True,
+            )
 
             qa_results.append({
                 "question": question,
@@ -144,6 +204,12 @@ async def evaluate_sample(
                 "reason": reason,
             })
 
+        judge_elapsed = time.time() - judge_start
+        print(
+            f"[sample={sample_id}] recall+judge done: {len(qa_results)} QAs in {judge_elapsed:.1f}s",
+            flush=True,
+        )
+
     return {"sample_id": sample_id, "thread_id": thread_id, "qa": qa_results}
 
 
@@ -152,6 +218,7 @@ async def evaluate_sample(
 def print_summary(results: list[dict]) -> None:
     totals: dict[str, int] = defaultdict(int)
     by_category: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    failed_or_partial: list[dict] = []
 
     for sample in results:
         for qa in sample["qa"]:
@@ -159,6 +226,13 @@ def print_summary(results: list[dict]) -> None:
             cat = qa["category"]
             totals[score] += 1
             by_category[cat][score] += 1
+            if score in ("partial", "fail"):
+                failed_or_partial.append({
+                    "sample_id": sample["sample_id"],
+                    "question": qa["question"],
+                    "score": score,
+                    "reason": qa["reason"]
+                })
 
     total = sum(totals.values())
     if total == 0:
@@ -169,15 +243,24 @@ def print_summary(results: list[dict]) -> None:
     print("EVALUATION SUMMARY")
     print("=" * 50)
     print(f"Total questions : {total}")
-    print(f"  pass          : {totals['pass']}  ({100*totals['pass']//total}%)")
-    print(f"  partial       : {totals['partial']}  ({100*totals['partial']//total}%)")
-    print(f"  fail          : {totals['fail']}  ({100*totals['fail']//total}%)")
+    for score_key in ("pass", "partial", "fail", "skipped"):
+        if totals[score_key]:
+            pct = 100 * totals[score_key] // total
+            print(f"  {score_key:<10}: {totals[score_key]}  ({pct}%)")
 
     print("\nBy category:")
     for cat, scores in sorted(by_category.items()):
         cat_total = sum(scores.values())
         pct = 100 * scores["pass"] // cat_total if cat_total else 0
         print(f"  {cat:<30} pass={scores['pass']}/{cat_total} ({pct}%)")
+
+    if failed_or_partial:
+        print("\nFailed or Partial Reasons:")
+        for item in failed_or_partial:
+            print(f"  [{item['sample_id']}] Q: {item['question']}")
+            print(f"    Score: {item['score']}")
+            print(f"    Reason: {item['reason']}")
+
     print("=" * 50 + "\n")
 
 
@@ -185,12 +268,24 @@ def print_summary(results: list[dict]) -> None:
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="LoCoMo memory evaluation")
-    p.add_argument("--concurrency", type=int, default=3, help="Max parallel conversations")
+    p.add_argument("--concurrency", type=int, default=1, help="Max parallel conversations (default: 1)")
     p.add_argument("--limit", type=int, default=None, help="Limit number of conversations")
+    p.add_argument("--no-judge", action="store_true", help="Skip LLM judge; record facts only")
     p.add_argument("--cleanup", action="store_true", help="Delete ingested facts after run")
     p.add_argument("--out", default="results.json", help="Output JSON file")
     p.add_argument("--data", default=str(DATA_DEFAULT), help="Path to locomo10.json")
     return p.parse_args()
+
+
+def _write_output(out_path: str, results: list, elapsed: float, data_path: str) -> None:
+    output = {
+        "dataset": Path(data_path).stem,
+        "elapsed_seconds": round(elapsed, 1),
+        "conversations": list(results),
+    }
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(output, f, indent=2, ensure_ascii=False)
+    print(f"Results written to: {out_path}  (elapsed: {elapsed:.1f}s)")
 
 
 async def main() -> None:
@@ -199,38 +294,51 @@ async def main() -> None:
     api_url = os.environ.get("MEMORY_API_URL", "http://localhost:8080")
     api_key = os.environ["MEMORY_API_KEY"]
     agent_id = os.environ["MEMORY_AGENT_ID"]
-    openai_key = os.environ["AZURE_OPENAI_API_KEY"]
-    openai_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT", "https://cchat-ai.cognitiveservices.azure.com/")
 
     samples = load_dataset(Path(args.data))
     if args.limit:
         samples = samples[: args.limit]
 
-    print(f"Running LoCoMo eval: {len(samples)} conversations, concurrency={args.concurrency}")
-    print(f"  API: {api_url}  agent={agent_id}\n")
+    total_turns = _count_turns(samples)
+    total_qa = _count_qa(samples)
+
+    print("=" * 60)
+    print("LoCoMo Evaluation")
+    print("=" * 60)
+    print(f"  data file   : {args.data}")
+    print(f"  samples     : {len(samples)}")
+    print(f"  total turns : {total_turns}")
+    print(f"  total QAs   : {total_qa}")
+    print(f"  concurrency : {args.concurrency}")
+    print(f"  judge       : {'disabled (--no-judge)' if args.no_judge else 'enabled'}")
+    print(f"  API         : {api_url}  agent={agent_id}")
+    print("=" * 60 + "\n")
+
+    evaluator: Evaluator | None = None
+    if not args.no_judge:
+        openai_key = os.environ["AZURE_OPENAI_API_KEY"]
+        openai_endpoint = os.environ.get(
+            "AZURE_OPENAI_ENDPOINT", "https://cchat-ai.cognitiveservices.azure.com/"
+        )
+        evaluator = Evaluator(api_key=openai_key, endpoint=openai_endpoint)
 
     semaphore = asyncio.Semaphore(args.concurrency)
-    evaluator = Evaluator(api_key=openai_key, endpoint=openai_endpoint)
-
     start = time.time()
-    async with MemoryAPIClient(api_url, api_key, agent_id) as client:
-        tasks = [
-            evaluate_sample(sample, client, evaluator, semaphore) for sample in samples
-        ]
-        results = await asyncio.gather(*tasks)
+    results: list[dict] = []
+
+    try:
+        async with MemoryAPIClient(api_url, api_key, agent_id) as client:
+            tasks = [
+                evaluate_sample(sample, client, evaluator, semaphore)
+                for sample in samples
+            ]
+            results = list(await asyncio.gather(*tasks))
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        print("\n[interrupted] Writing partial results…", flush=True)
 
     elapsed = time.time() - start
-
-    output = {
-        "dataset": "locomo",
-        "elapsed_seconds": round(elapsed, 1),
-        "conversations": list(results),
-    }
-    with open(args.out, "w", encoding="utf-8") as f:
-        json.dump(output, f, indent=2, ensure_ascii=False)
-
-    print_summary(list(results))
-    print(f"Results written to: {args.out}  (elapsed: {elapsed:.1f}s)")
+    _write_output(args.out, results, elapsed, args.data)
+    print_summary(results)
 
     if args.cleanup:
         print("--cleanup: fact deletion is not yet implemented (requires listing facts by agent).")

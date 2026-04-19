@@ -1,0 +1,265 @@
+[
+  {
+    "sample_id": "warmup-medium-1",
+    "conversation": {
+      "speaker_a": "Alex",
+      "speaker_b": "Sam",
+      "session_1": [
+        {
+          "speaker": "Alex",
+          "text": "So I just started at TechCorp about three weeks ago. I'm a Junior Developer on the payments team."
+        },
+        {
+          "speaker": "Sam",
+          "text": "Congrats on the new role! How's it going so far?"
+        },
+        {
+          "speaker": "Alex",
+          "text": "The onboarding was a bit rough — I got a laptop with the wrong OS image, so I spent the first two days just setting up my environment."
+        },
+        {
+          "speaker": "Sam",
+          "text": "That's annoying. What did your manager say?"
+        },
+        {
+          "speaker": "Alex",
+          "text": "My manager is Bob. He's been at TechCorp for six years, started as an intern and worked his way up to Engineering Manager. He manages twelve people across two squads. He was very chill about the whole setup situation."
+        },
+        {
+          "speaker": "Sam",
+          "text": "Good to have a patient manager. Where is the office?"
+        },
+        {
+          "speaker": "Alex",
+          "text": "Downtown Portland, right next to a food cart pod on Alder Street. Honestly that's the best perk so far. I eat there almost every day."
+        },
+        {
+          "speaker": "Sam",
+          "text": "What's the tech stack?"
+        },
+        {
+          "speaker": "Alex",
+          "text": "Mostly Go and React. There's some internal tooling with basically zero documentation. Bob is going to pair with me next week to walk through the custom deployment pipeline."
+        },
+        {
+          "speaker": "Sam",
+          "text": "Sounds like a good environment to grow in. Anything else?"
+        },
+        {
+          "speaker": "Alex",
+          "text": "They use Slack for literally everything — even stuff that should probably be in Jira. But I'm getting used to it."
+        },
+        {
+          "speaker": "Sam",
+          "text": "Classic startup culture. Let me know how the pairing session goes."
+        }
+      ],
+      "session_2": [
+        {
+          "speaker": "Alex",
+          "text": "Big news — I got promoted to Senior Developer! It happened way faster than I expected."
+        },
+        {
+          "speaker": "Sam",
+          "text": "That's amazing! What happened?"
+        },
+        {
+          "speaker": "Alex",
+          "text": "There was a production incident last month. Our payment processing pipeline went down during peak hours. I figured out the root cause — a race condition in the queue consumer that only shows up under high load."
+        },
+        {
+          "speaker": "Sam",
+          "text": "Nice catch. How did you fix it?"
+        },
+        {
+          "speaker": "Alex",
+          "text": "I wrote a detailed post-mortem and proposed switching to a distributed lock pattern. The VP of Engineering read it and was apparently impressed. Bob put me up for the promotion right after."
+        },
+        {
+          "speaker": "Sam",
+          "text": "Well deserved! Any other changes?"
+        },
+        {
+          "speaker": "Alex",
+          "text": "Pay bump — not life-changing, but enough that rent isn't stressful anymore. And I'm now tech lead for the new checkout redesign project."
+        },
+        {
+          "speaker": "Sam",
+          "text": "Tech lead already! Nervous?"
+        },
+        {
+          "speaker": "Alex",
+          "text": "Kind of. I'll be working with the design team directly and I've never done that before. Bob said he'll mentor me through it."
+        },
+        {
+          "speaker": "Sam",
+          "text": "You'll be fine. Anything else change?"
+        },
+        {
+          "speaker": "Alex",
+          "text": "I moved desks. Now I'm sitting next to the window with a view of the West Hills."
+        },
+        {
+          "speaker": "Sam",
+          "text": "Living the dream. Congrats again!"
+        }
+      ],
+      "session_3": [
+        {
+          "speaker": "Alex",
+          "text": "Wild week. TechCorp got acquired by MegaCorp. The announcement came Monday morning in an all-hands that nobody saw coming — even Bob seemed surprised."
+        },
+        {
+          "speaker": "Sam",
+          "text": "Whoa. What's MegaCorp like?"
+        },
+        {
+          "speaker": "Alex",
+          "text": "Massive enterprise software conglomerate based out of Seattle. Twenty thousand employees, fifty countries. The CEO did a video call and said all the usual stuff about preserving culture and synergies."
+        },
+        {
+          "speaker": "Sam",
+          "text": "Does anyone believe that?"
+        },
+        {
+          "speaker": "Alex",
+          "text": "Not really. Immediate changes are mostly administrative — switching to MegaCorp's benefits provider, which actually has better dental coverage, so that's a win. Email domains are migrating too, so I'll be alex@megacorp.com instead of alex@techcorp.com."
+        },
+        {
+          "speaker": "Sam",
+          "text": "What about Bob?"
+        },
+        {
+          "speaker": "Alex",
+          "text": "Bob is moving to HR. MegaCorp has a People Operations division and they wanted someone with deep knowledge of TechCorp's engineering org. He seemed conflicted but said it's a good career opportunity."
+        },
+        {
+          "speaker": "Sam",
+          "text": "So who's your new manager?"
+        },
+        {
+          "speaker": "Alex",
+          "text": "Someone named Diane, transferring from MegaCorp's Seattle office. I haven't met her yet."
+        },
+        {
+          "speaker": "Sam",
+          "text": "And the checkout redesign?"
+        },
+        {
+          "speaker": "Alex",
+          "text": "On hold until the integration settles. Frustrating, but understandable."
+        },
+        {
+          "speaker": "Sam",
+          "text": "Hang in there. Big changes take time."
+        }
+      ],
+      "session_4": [
+        {
+          "speaker": "Alex",
+          "text": "Quick update — Diane has been my manager for about two months now and honestly she's great. Very different from Bob, but in a good way. She's much more structured, does weekly one-on-ones with a proper agenda."
+        },
+        {
+          "speaker": "Sam",
+          "text": "Sounds like a step up in terms of organisation. Any news on the project?"
+        },
+        {
+          "speaker": "Alex",
+          "text": "She pushed hard to get the checkout redesign restarted. I'm grateful because it was just sitting in limbo."
+        },
+        {
+          "speaker": "Sam",
+          "text": "What about the office situation with the acquisition?"
+        },
+        {
+          "speaker": "Alex",
+          "text": "MegaCorp decided to consolidate all Portland engineering teams into their existing Seattle campus. They gave everyone the option to relocate or go fully remote."
+        },
+        {
+          "speaker": "Sam",
+          "text": "What did you choose?"
+        },
+        {
+          "speaker": "Alex",
+          "text": "Remote. My girlfriend just signed a two-year lease on our Portland apartment and we don't want to move. About half the team relocated though, so there's been a lot of turnover."
+        },
+        {
+          "speaker": "Sam",
+          "text": "How's the technical side of things going?"
+        },
+        {
+          "speaker": "Alex",
+          "text": "We're migrating everything to MegaCorp's cloud infrastructure. They use Azure exclusively — new for me since TechCorp was all-in on AWS. Steep learning curve, but Diane has been patient about it."
+        },
+        {
+          "speaker": "Sam",
+          "text": "Anything else going on in life outside work?"
+        },
+        {
+          "speaker": "Alex",
+          "text": "I adopted a dog last weekend! His name is Pixel, he's a two-year-old corgi mix and he is the cutest thing alive."
+        },
+        {
+          "speaker": "Sam",
+          "text": "That's the best update yet. What cloud did TechCorp use before?"
+        },
+        {
+          "speaker": "Alex",
+          "text": "AWS. The move to Azure is a big shift but I'm getting there."
+        }
+      ]
+    },
+    "qa": [
+      {
+        "question": "What was Alex's original job title at TechCorp?",
+        "answer": "Junior Developer.",
+        "category": "single-hop"
+      },
+      {
+        "question": "What is Alex's current job title after the promotion?",
+        "answer": "Senior Developer.",
+        "category": "single-hop"
+      },
+      {
+        "question": "What caused the production incident that led to Alex's promotion?",
+        "answer": "A race condition in the queue consumer that only manifested under high load.",
+        "category": "single-hop"
+      },
+      {
+        "question": "Who was Alex's manager before the MegaCorp acquisition, and what role did that person move to?",
+        "answer": "Bob was the manager; he moved to HR / People Operations after the MegaCorp acquisition.",
+        "category": "multi-hop"
+      },
+      {
+        "question": "Who is Alex's current manager?",
+        "answer": "Diane, who transferred from MegaCorp's Seattle office.",
+        "category": "single-hop"
+      },
+      {
+        "question": "What project was Alex leading that got put on hold and then restarted?",
+        "answer": "The checkout redesign project.",
+        "category": "multi-hop"
+      },
+      {
+        "question": "What cloud platform did TechCorp use, and what platform is MegaCorp migrating to?",
+        "answer": "TechCorp used AWS; MegaCorp uses Azure exclusively.",
+        "category": "multi-hop"
+      },
+      {
+        "question": "What is Alex's current work arrangement after the acquisition?",
+        "answer": "Fully remote from Portland.",
+        "category": "single-hop"
+      },
+      {
+        "question": "Does Alex have any pets, and if so what are the details?",
+        "answer": "Yes, a dog named Pixel, a two-year-old corgi mix.",
+        "category": "single-hop"
+      },
+      {
+        "question": "In what order did Alex's job titles change over time?",
+        "answer": "Junior Developer, then Senior Developer (promoted after the payment pipeline incident).",
+        "category": "temporal"
+      }
+    ]
+  }
+]

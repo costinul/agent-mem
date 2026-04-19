@@ -11,6 +11,28 @@
             "envFile": "${workspaceFolder}/.env"
         },
         {
+            "name": "Eval: LoCoMo (warmup small)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "locomo.run",
+            "cwd": "${workspaceFolder}/eval",
+            "args": ["--data", "locomo/data/warmup_small.json", "--out", "warmup_small_results.json"],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "name": "Eval: LoCoMo (warmup medium)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "locomo.run",
+            "cwd": "${workspaceFolder}/eval",
+            "args": ["--data", "locomo/data/warmup_medium.json", "--out", "warmup_medium_results.json"],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {
             "name": "Eval: LoCoMo (1 conversation)",
             "type": "debugpy",
             "request": "launch",
