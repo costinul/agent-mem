@@ -200,6 +200,9 @@ func (r *InMemoryRepository) ListFactsByScope(_ context.Context, accountID strin
 	return facts, nil
 }
 
+// ListFactsBySourceIDs returns every fact (including superseded ones) for the given
+// source IDs scoped to the account. Superseded facts are intentionally included so
+// callers (e.g. recall sibling expansion) can surface historical context.
 func (r *InMemoryRepository) ListFactsBySourceIDs(_ context.Context, accountID string, sourceIDs []string) ([]models.Fact, error) {
 	if len(sourceIDs) == 0 {
 		return nil, nil
@@ -214,9 +217,6 @@ func (r *InMemoryRepository) ListFactsBySourceIDs(_ context.Context, accountID s
 
 	facts := make([]models.Fact, 0)
 	for _, fact := range r.facts {
-		if fact.SupersededAt != nil {
-			continue
-		}
 		if fact.AccountID != accountID {
 			continue
 		}

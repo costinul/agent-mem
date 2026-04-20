@@ -76,48 +76,61 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 // expandBySource augments the candidate set with facts that share a source_id with any
 // seed fact. Recall queries often embed against a thought that decompose split into
 // multiple atomic facts; pulling in siblings re-glues that context.
-// New facts are appended up to budget; the existing order of seeds is preserved.
+//
+// Siblings are added in seed-rank order: the highest-ranked seed contributes its
+// siblings first, then the next, and so on. This guarantees the most relevant hits'
+// neighborhoods survive the budget cap. Superseded siblings are included so that
+// historical context (e.g. "original job title") is reachable.
 func (e *MemoryEngine) expandBySource(ctx context.Context, accountID string, seeds []models.Fact, budget int) ([]models.Fact, error) {
 	if len(seeds) == 0 || budget <= 0 {
 		return seeds, nil
 	}
 
 	existing := make(map[string]struct{}, len(seeds))
-	sourceSet := make(map[string]struct{}, len(seeds))
+	rankedSourceIDs := make([]string, 0, len(seeds))
+	seenSource := make(map[string]struct{}, len(seeds))
 	for _, f := range seeds {
 		existing[f.ID] = struct{}{}
-		if f.SourceID != "" {
-			sourceSet[f.SourceID] = struct{}{}
+		if f.SourceID == "" {
+			continue
 		}
+		if _, ok := seenSource[f.SourceID]; ok {
+			continue
+		}
+		seenSource[f.SourceID] = struct{}{}
+		rankedSourceIDs = append(rankedSourceIDs, f.SourceID)
 	}
-	if len(sourceSet) == 0 {
+	if len(rankedSourceIDs) == 0 {
 		return seeds, nil
 	}
 
-	sourceIDs := make([]string, 0, len(sourceSet))
-	for id := range sourceSet {
-		sourceIDs = append(sourceIDs, id)
-	}
-
-	siblings, err := e.repo.ListFactsBySourceIDs(ctx, accountID, sourceIDs)
+	siblings, err := e.repo.ListFactsBySourceIDs(ctx, accountID, rankedSourceIDs)
 	if err != nil {
 		return nil, fmt.Errorf("list sibling facts: %w", err)
 	}
 
-	added := 0
+	bySource := make(map[string][]models.Fact, len(rankedSourceIDs))
 	for _, s := range siblings {
-		if _, dup := existing[s.ID]; dup {
-			continue
-		}
-		seeds = append(seeds, s)
-		existing[s.ID] = struct{}{}
-		added++
-		if added >= budget {
-			break
+		bySource[s.SourceID] = append(bySource[s.SourceID], s)
+	}
+
+	added := 0
+outer:
+	for _, sid := range rankedSourceIDs {
+		for _, sib := range bySource[sid] {
+			if _, dup := existing[sib.ID]; dup {
+				continue
+			}
+			seeds = append(seeds, sib)
+			existing[sib.ID] = struct{}{}
+			added++
+			if added >= budget {
+				break outer
+			}
 		}
 	}
 	if added > 0 {
-		log.Printf("recall sibling expansion: added=%d sources=%d total=%d", added, len(sourceSet), len(seeds))
+		log.Printf("recall sibling expansion: added=%d sources=%d total=%d", added, len(rankedSourceIDs), len(seeds))
 	}
 	return seeds, nil
 }

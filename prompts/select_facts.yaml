@@ -8,13 +8,22 @@ system_prompt: |
   - Prefer concise, high-signal selections. If two facts say the same thing, keep the most informative one.
   - If none of the candidates are relevant, return an empty list.
   - Output only the fact IDs. Do not invent IDs that are not in the candidate list.
+
+  Historical facts:
+  - Some candidates are marked HISTORICAL — they are previous versions of a fact that was later replaced by a newer one (the successor ID is shown after the arrow).
+  - HISTORICAL facts are the correct answer for questions about prior, original, former, previous, or earlier states (e.g. "What was X's original title?", "What did Y use to be?", "Where did Z live before?").
+  - For questions about the current state, prefer the successor (non-historical) fact instead.
 prompt: |
   Query:
   {{.Query}}
 
   Candidate facts:
   {{- range .Candidates}}
+  {{- if .SupersededBy}}
+  [{{.ID}}] (HISTORICAL -> {{.SupersededBy}}) {{.Text}}
+  {{- else}}
   [{{.ID}}] ({{.Kind}}) {{.Text}}
+  {{- end}}
   {{- end}}
 temperature: 0.0
 max_tokens: 2048

@@ -447,17 +447,21 @@ func (r *PostgresRepository) ListFactsFiltered(ctx context.Context, params ListF
 	return facts, total, rows.Err()
 }
 
+// ListFactsBySourceIDs returns every fact (including superseded ones) for the given
+// source IDs scoped to the account. Superseded facts are intentionally included so
+// callers (e.g. recall sibling expansion) can surface historical context that answers
+// "original / previous / used to" questions.
 func (r *PostgresRepository) ListFactsBySourceIDs(ctx context.Context, accountID string, sourceIDs []string) ([]models.Fact, error) {
 	if len(sourceIDs) == 0 {
 		return nil, nil
 	}
 
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, account_id, agent_id, thread_id, source_id, kind, text, created_at, updated_at
+		`SELECT id, account_id, agent_id, thread_id, source_id, kind, text,
+		        superseded_at, superseded_by, created_at, updated_at
 		 FROM facts
 		 WHERE account_id = $1
-		   AND source_id = ANY($2)
-		   AND superseded_at IS NULL`,
+		   AND source_id = ANY($2)`,
 		accountID, pq.Array(sourceIDs),
 	)
 	if err != nil {
@@ -468,19 +472,29 @@ func (r *PostgresRepository) ListFactsBySourceIDs(ctx context.Context, accountID
 	facts := make([]models.Fact, 0)
 	for rows.Next() {
 		var (
-			fact   models.Fact
-			agent  sql.NullString
-			thread sql.NullString
+			fact         models.Fact
+			agent        sql.NullString
+			thread       sql.NullString
+			supersededAt sql.NullTime
+			supersededBy sql.NullString
 		)
 		if err := rows.Scan(
 			&fact.ID, &fact.AccountID, &agent, &thread,
 			&fact.SourceID, &fact.Kind, &fact.Text,
+			&supersededAt, &supersededBy,
 			&fact.CreatedAt, &fact.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
 		fact.AgentID = nullStringPtr(agent)
 		fact.ThreadID = nullStringPtr(thread)
+		if supersededAt.Valid {
+			fact.SupersededAt = &supersededAt.Time
+		}
+		if supersededBy.Valid {
+			by := supersededBy.String
+			fact.SupersededBy = &by
+		}
 		facts = append(facts, fact)
 	}
 	return facts, rows.Err()
