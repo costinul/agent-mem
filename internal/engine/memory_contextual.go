@@ -297,3 +297,13 @@ func (e *MemoryEngine) applyEvaluateResult(
 	return stored, nil
 }
 
+func printFacts(facts []models.Fact) {
+	for _, fact := range facts {
+		supersededBy := ""
+		if fact.SupersededBy != nil {
+			supersededBy = *fact.SupersededBy
+		}
+		fmt.Printf("fact_id=%s text=%q kind=%s suppressedby=%s\n", fact.ID, fact.Text, fact.Kind, supersededBy)
+	}
+}
+
