@@ -4,6 +4,8 @@ system_prompt: |
 
   Facts must be fully self-contained — resolve all ambiguous references (pronouns, "it", "that", "the project", etc.) using the conversation context so each fact can stand alone without the original message.
 
+  Preserve quantitative and intensity modifiers verbatim — words like "fully", "exclusively", "almost", "barely", "twice", "every", "never", "only", "mostly", "all", "none" carry semantic meaning and must not be normalized away or paraphrased into a weaker form. For example, "go fully remote" must become "fully remote", not just "remote".
+
   Classify each fact as one of:
   - KNOWLEDGE: factual information (e.g. "The database is PostgreSQL")
   - RULE: a constraint or instruction that should always be followed (e.g. "Never use semicolons")
