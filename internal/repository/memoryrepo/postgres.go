@@ -9,6 +9,8 @@ import (
 
 	"agentmem/internal/database"
 	models "agentmem/internal/models"
+
+	"github.com/lib/pq"
 )
 
 type PostgresRepository struct {
@@ -443,6 +445,45 @@ func (r *PostgresRepository) ListFactsFiltered(ctx context.Context, params ListF
 		facts = append(facts, fact)
 	}
 	return facts, total, rows.Err()
+}
+
+func (r *PostgresRepository) ListFactsBySourceIDs(ctx context.Context, accountID string, sourceIDs []string) ([]models.Fact, error) {
+	if len(sourceIDs) == 0 {
+		return nil, nil
+	}
+
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, account_id, agent_id, thread_id, source_id, kind, text, created_at, updated_at
+		 FROM facts
+		 WHERE account_id = $1
+		   AND source_id = ANY($2)
+		   AND superseded_at IS NULL`,
+		accountID, pq.Array(sourceIDs),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	facts := make([]models.Fact, 0)
+	for rows.Next() {
+		var (
+			fact   models.Fact
+			agent  sql.NullString
+			thread sql.NullString
+		)
+		if err := rows.Scan(
+			&fact.ID, &fact.AccountID, &agent, &thread,
+			&fact.SourceID, &fact.Kind, &fact.Text,
+			&fact.CreatedAt, &fact.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		fact.AgentID = nullStringPtr(agent)
+		fact.ThreadID = nullStringPtr(thread)
+		facts = append(facts, fact)
+	}
+	return facts, rows.Err()
 }
 
 func (r *PostgresRepository) GetFactByID(ctx context.Context, factID string) (*models.Fact, error) {

@@ -200,6 +200,37 @@ func (r *InMemoryRepository) ListFactsByScope(_ context.Context, accountID strin
 	return facts, nil
 }
 
+func (r *InMemoryRepository) ListFactsBySourceIDs(_ context.Context, accountID string, sourceIDs []string) ([]models.Fact, error) {
+	if len(sourceIDs) == 0 {
+		return nil, nil
+	}
+	set := make(map[string]struct{}, len(sourceIDs))
+	for _, id := range sourceIDs {
+		set[id] = struct{}{}
+	}
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	facts := make([]models.Fact, 0)
+	for _, fact := range r.facts {
+		if fact.SupersededAt != nil {
+			continue
+		}
+		if fact.AccountID != accountID {
+			continue
+		}
+		if _, ok := set[fact.SourceID]; !ok {
+			continue
+		}
+		facts = append(facts, fact)
+	}
+	sort.Slice(facts, func(i, j int) bool {
+		return facts[i].CreatedAt.Before(facts[j].CreatedAt)
+	})
+	return facts, nil
+}
+
 func (r *InMemoryRepository) ListFactsByThreadID(_ context.Context, threadID string) ([]models.Fact, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

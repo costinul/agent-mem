@@ -3,13 +3,17 @@ package engine
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 
 	"agentmem/internal/errs"
 	models "agentmem/internal/models"
 )
 
-const recallCandidateK = 25
+const (
+	recallCandidateK    = 25
+	recallSiblingBudget = 15
+)
 
 // Recall answers a free-text query by decomposing it into search phrases, retrieving
 // candidate facts across all scopes, then asking the LLM to select the most relevant ones.
@@ -44,6 +48,16 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 		return models.RecallOutput{}, err
 	}
 
+	printFacts(candidates)
+
+	candidates, err = e.expandBySource(ctx, input.AccountID, candidates, recallSiblingBudget)
+	if err != nil {
+		return models.RecallOutput{}, err
+	}
+
+	fmt.Println("after expand by source")
+	printFacts(candidates)
+
 	selected, err := e.ai.SelectFacts(ctx, SelectFactsRequest{
 		Query:      input.Query,
 		Candidates: candidates,
@@ -57,6 +71,55 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 	}
 
 	return e.buildRecallOutput(ctx, input, selected)
+}
+
+// expandBySource augments the candidate set with facts that share a source_id with any
+// seed fact. Recall queries often embed against a thought that decompose split into
+// multiple atomic facts; pulling in siblings re-glues that context.
+// New facts are appended up to budget; the existing order of seeds is preserved.
+func (e *MemoryEngine) expandBySource(ctx context.Context, accountID string, seeds []models.Fact, budget int) ([]models.Fact, error) {
+	if len(seeds) == 0 || budget <= 0 {
+		return seeds, nil
+	}
+
+	existing := make(map[string]struct{}, len(seeds))
+	sourceSet := make(map[string]struct{}, len(seeds))
+	for _, f := range seeds {
+		existing[f.ID] = struct{}{}
+		if f.SourceID != "" {
+			sourceSet[f.SourceID] = struct{}{}
+		}
+	}
+	if len(sourceSet) == 0 {
+		return seeds, nil
+	}
+
+	sourceIDs := make([]string, 0, len(sourceSet))
+	for id := range sourceSet {
+		sourceIDs = append(sourceIDs, id)
+	}
+
+	siblings, err := e.repo.ListFactsBySourceIDs(ctx, accountID, sourceIDs)
+	if err != nil {
+		return nil, fmt.Errorf("list sibling facts: %w", err)
+	}
+
+	added := 0
+	for _, s := range siblings {
+		if _, dup := existing[s.ID]; dup {
+			continue
+		}
+		seeds = append(seeds, s)
+		existing[s.ID] = struct{}{}
+		added++
+		if added >= budget {
+			break
+		}
+	}
+	if added > 0 {
+		log.Printf("recall sibling expansion: added=%d sources=%d total=%d", added, len(sourceSet), len(seeds))
+	}
+	return seeds, nil
 }
 
 func (e *MemoryEngine) ListThreadMessages(ctx context.Context, threadID string, limit int) ([]models.ConversationMessage, error) {
