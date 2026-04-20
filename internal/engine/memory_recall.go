@@ -48,15 +48,15 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 		return models.RecallOutput{}, err
 	}
 
-	printFacts(candidates)
+	// printFacts(candidates)
 
 	candidates, err = e.expandBySource(ctx, input.AccountID, candidates, recallSiblingBudget)
 	if err != nil {
 		return models.RecallOutput{}, err
 	}
 
-	fmt.Println("after expand by source")
-	printFacts(candidates)
+	// fmt.Println("after expand by source")
+	// printFacts(candidates)
 
 	selected, err := e.ai.SelectFacts(ctx, SelectFactsRequest{
 		Query:      input.Query,

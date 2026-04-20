@@ -16,7 +16,9 @@ Environment variables:
 
 Options:
     --concurrency N     Max parallel conversations  (default: 1)
-    --limit N           Only evaluate first N conversations
+    --start N           Skip the first N conversations (for resuming a partial run)
+    --limit N           Only evaluate first N conversations (applied after --start)
+    --reuse-thread ID   Skip ingest, run QA only against an existing thread (requires single sample in scope)
     --no-judge          Skip LLM judge; record facts only (score="skipped")
     --cleanup           Delete ingested facts after the run
     --out FILE          Output file path            (default: results.json)
@@ -109,46 +111,52 @@ async def evaluate_sample(
     client: MemoryAPIClient,
     evaluator: Evaluator | None,
     semaphore: asyncio.Semaphore,
+    reuse_thread_id: str | None = None,
 ) -> dict:
     sample_id = str(sample["sample_id"])
-    thread = await client.create_thread()
-    thread_id = thread["id"]
+    if reuse_thread_id:
+        thread_id = reuse_thread_id
+        print(f"[sample={sample_id}] reusing thread={thread_id} (skipping ingest)", flush=True)
+    else:
+        thread = await client.create_thread()
+        thread_id = thread["id"]
+        print(f"[sample={sample_id}] created thread={thread_id}", flush=True)
     short_tid = thread_id[:8]
-    print(f"[sample={sample_id}] created thread={thread_id}", flush=True)
 
     conversation = sample["conversation"]
     qa_pairs = sample.get("qa", [])
 
     async with semaphore:
-        # 1. Ingest all turns in chronological order (sequential within a sample)
-        ingest_start = time.time()
-        sessions = _sessions_in_order(conversation)
-        total_turns = sum(
-            1 for _k, turns in sessions for t in turns if t.get("text", "").strip()
-        )
-        ingested = 0
-        for session_key, turns in sessions:
-            for turn in turns:
-                text = turn.get("text", "").strip()
-                if not text:
-                    continue
-                ingested += 1
-                role = _speaker_to_role(turn.get("speaker", ""), conversation)
-                print(
-                    f"  [{sample_id} {short_tid} {session_key} turn {ingested}/{total_turns}]"
-                    f" {role}: \"{_preview(text)}\"",
-                    flush=True,
-                )
-                try:
-                    await client.ingest(thread_id, role, text, author=turn.get("speaker") or None)
-                except Exception as exc:
-                    print(f"  [WARN] ingest error in sample {sample_id}: {exc}", flush=True)
+        if not reuse_thread_id:
+            # 1. Ingest all turns in chronological order (sequential within a sample)
+            ingest_start = time.time()
+            sessions = _sessions_in_order(conversation)
+            total_turns = sum(
+                1 for _k, turns in sessions for t in turns if t.get("text", "").strip()
+            )
+            ingested = 0
+            for session_key, turns in sessions:
+                for turn in turns:
+                    text = turn.get("text", "").strip()
+                    if not text:
+                        continue
+                    ingested += 1
+                    role = _speaker_to_role(turn.get("speaker", ""), conversation)
+                    print(
+                        f"  [{sample_id} {short_tid} {session_key} turn {ingested}/{total_turns}]"
+                        f" {role}: \"{_preview(text)}\"",
+                        flush=True,
+                    )
+                    try:
+                        await client.ingest(thread_id, role, text, author=turn.get("speaker") or None)
+                    except Exception as exc:
+                        print(f"  [WARN] ingest error in sample {sample_id}: {exc}", flush=True)
 
-        ingest_elapsed = time.time() - ingest_start
-        print(
-            f"[sample={sample_id}] ingest done: {ingested} turns in {ingest_elapsed:.1f}s",
-            flush=True,
-        )
+            ingest_elapsed = time.time() - ingest_start
+            print(
+                f"[sample={sample_id}] ingest done: {ingested} turns in {ingest_elapsed:.1f}s",
+                flush=True,
+            )
 
         # 2. Query + judge each QA pair
         qa_results = []
@@ -156,8 +164,8 @@ async def evaluate_sample(
         judge_start = time.time()
 
         for qi, qa in enumerate(qa_pairs, 1):
-            question = qa.get("question", "").strip()
-            ground_truth = qa.get("answer", "").strip()
+            question = str(qa.get("question", "")).strip()
+            ground_truth = str(qa.get("answer", "")).strip()
             category = qa.get("category", "unknown")
 
             if not question or not ground_truth:
@@ -269,7 +277,9 @@ def print_summary(results: list[dict]) -> None:
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="LoCoMo memory evaluation")
     p.add_argument("--concurrency", type=int, default=1, help="Max parallel conversations (default: 1)")
-    p.add_argument("--limit", type=int, default=None, help="Limit number of conversations")
+    p.add_argument("--start", type=int, default=0, help="Skip the first N conversations (resume helper)")
+    p.add_argument("--limit", type=int, default=None, help="Limit number of conversations (applied after --start)")
+    p.add_argument("--reuse-thread", default=None, help="Reuse an existing thread_id, skip ingest, run only QA. Requires --limit 1 (or one sample in scope).")
     p.add_argument("--no-judge", action="store_true", help="Skip LLM judge; record facts only")
     p.add_argument("--cleanup", action="store_true", help="Delete ingested facts after run")
     p.add_argument("--out", default="results.json", help="Output JSON file")
@@ -296,8 +306,13 @@ async def main() -> None:
     agent_id = os.environ["MEMORY_AGENT_ID"]
 
     samples = load_dataset(Path(args.data))
+    if args.start:
+        samples = samples[args.start:]
     if args.limit:
         samples = samples[: args.limit]
+
+    if args.reuse_thread and len(samples) != 1:
+        sys.exit(f"--reuse-thread requires exactly one sample in scope (got {len(samples)}). Use --start/--limit to narrow down.")
 
     total_turns = _count_turns(samples)
     total_qa = _count_qa(samples)
@@ -306,7 +321,7 @@ async def main() -> None:
     print("LoCoMo Evaluation")
     print("=" * 60)
     print(f"  data file   : {args.data}")
-    print(f"  samples     : {len(samples)}")
+    print(f"  samples     : {len(samples)}{f' (skipped first {args.start})' if args.start else ''}")
     print(f"  total turns : {total_turns}")
     print(f"  total QAs   : {total_qa}")
     print(f"  concurrency : {args.concurrency}")
@@ -329,16 +344,23 @@ async def main() -> None:
     try:
         async with MemoryAPIClient(api_url, api_key, agent_id) as client:
             tasks = [
-                evaluate_sample(sample, client, evaluator, semaphore)
+                evaluate_sample(sample, client, evaluator, semaphore, reuse_thread_id=args.reuse_thread)
                 for sample in samples
             ]
-            results = list(await asyncio.gather(*tasks))
+            raw = await asyncio.gather(*tasks, return_exceptions=True)
+            for sample, item in zip(samples, raw):
+                if isinstance(item, BaseException):
+                    print(f"[ERROR] sample {sample.get('sample_id')} crashed: {item!r}", flush=True)
+                    continue
+                results.append(item)
     except (KeyboardInterrupt, asyncio.CancelledError):
         print("\n[interrupted] Writing partial results…", flush=True)
-
-    elapsed = time.time() - start
-    _write_output(args.out, results, elapsed, args.data)
-    print_summary(results)
+    except Exception as exc:
+        print(f"\n[ERROR] run aborted: {exc!r}. Writing partial results…", flush=True)
+    finally:
+        elapsed = time.time() - start
+        _write_output(args.out, results, elapsed, args.data)
+        print_summary(results)
 
     if args.cleanup:
         print("--cleanup: fact deletion is not yet implemented (requires listing facts by agent).")
