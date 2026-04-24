@@ -37,6 +37,7 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 	if len(phrases) == 0 {
 		phrases = []string{input.Query}
 	}
+	log.Printf("recall q=%q phrases=%v", input.Query, phrases)
 
 	embeddings, err := e.ai.Embed(ctx, phrases)
 	if err != nil {
@@ -47,16 +48,13 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 	if err != nil {
 		return models.RecallOutput{}, err
 	}
-
-	// printFacts(candidates)
+	log.Printf("recall retrieved=%d top_texts=%v", len(candidates), recallPreviews(candidates, 5))
 
 	candidates, err = e.expandBySource(ctx, input.AccountID, candidates, recallSiblingBudget)
 	if err != nil {
 		return models.RecallOutput{}, err
 	}
-
-	// fmt.Println("after expand by source")
-	// printFacts(candidates)
+	log.Printf("recall expanded=%d", len(candidates))
 
 	selected, err := e.ai.SelectFacts(ctx, SelectFactsRequest{
 		Query:      input.Query,
@@ -65,6 +63,7 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 	if err != nil {
 		return models.RecallOutput{}, fmt.Errorf("select facts: %w", err)
 	}
+	log.Printf("recall selected=%d ids=%v", len(selected), recallIDs(selected))
 
 	if input.Limit > 0 && len(selected) > input.Limit {
 		selected = selected[:input.Limit]
@@ -133,6 +132,29 @@ outer:
 		log.Printf("recall sibling expansion: added=%d sources=%d total=%d", added, len(rankedSourceIDs), len(seeds))
 	}
 	return seeds, nil
+}
+
+func recallPreviews(facts []models.Fact, n int) []string {
+	out := make([]string, 0, n)
+	for i, f := range facts {
+		if i >= n {
+			break
+		}
+		text := f.Text
+		if len(text) > 60 {
+			text = text[:60] + "…"
+		}
+		out = append(out, text)
+	}
+	return out
+}
+
+func recallIDs(facts []models.Fact) []string {
+	ids := make([]string, len(facts))
+	for i, f := range facts {
+		ids[i] = f.ID
+	}
+	return ids
 }
 
 func (e *MemoryEngine) ListThreadMessages(ctx context.Context, threadID string, limit int) ([]models.ConversationMessage, error) {

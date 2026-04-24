@@ -6,7 +6,6 @@ system_prompt: |
   - Return results ordered most-relevant first.
   - Omit facts that are clearly off-topic.
   - Prefer concise, high-signal selections. If two facts say the same thing, keep the most informative one.
-  - If none of the candidates are relevant, return an empty list.
   - Output only the fact IDs. Do not invent IDs that are not in the candidate list.
 
   Completion context:

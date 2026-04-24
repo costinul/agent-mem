@@ -1,0 +1,2065 @@
+{
+  "dataset": "locomo10",
+  "elapsed_seconds": 694.3,
+  "conversations": [
+    {
+      "sample_id": "conv-26",
+      "thread_id": "8fa46be9-eb4f-475d-b088-ea3d68c746da",
+      "qa": [
+        {
+          "question": "When did Caroline go to the LGBTQ support group?",
+          "ground_truth": "7 May 2023",
+          "category": 2,
+          "facts_returned": [
+            "Caroline went to an LGBTQ support group yesterday and an LGBTQ conference two days ago."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Caroline went to the support group recently but do not specify the exact date of 7 May 2023."
+        },
+        {
+          "question": "When did Melanie paint a sunrise?",
+          "ground_truth": "2022",
+          "category": 2,
+          "facts_returned": [
+            "Melanie painted a lake sunrise last year.",
+            "The lake sunrise painting is special to Melanie."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Melanie painted a sunrise last year but do not specify the exact year 2022."
+        },
+        {
+          "question": "What fields would Caroline be likely to pursue in her educaton?",
+          "ground_truth": "Psychology, counseling certification",
+          "category": 3,
+          "facts_returned": [
+            "Caroline is motivated to pursue counseling and mental health as a career.",
+            "Caroline is keen on counseling or working in mental health.",
+            "Caroline's experience with mental health support motivated her to pursue a career in counseling and mental health to help others.",
+            "Caroline is considering a career in counseling and mental health, focusing on helping trans people accept themselves and support their mental health.",
+            "Caroline wants to use her personal story to help others in the counseling and mental health field.",
+            "Caroline is excited to give back to the community through counseling and mental health work.",
+            "Caroline would love to support those with similar issues in counseling or mental health.",
+            "Caroline is going to continue her education.",
+            "Caroline finds continuing her education and checking out career options pretty exciting."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Caroline's interest in counseling and mental health but do not explicitly mention psychology or counseling certification."
+        },
+        {
+          "question": "What did Caroline research?",
+          "ground_truth": "Adoption agencies",
+          "category": 1,
+          "facts_returned": [
+            "Caroline is researching adoption agencies as part of her dream to have a family and give a loving home to kids who need it.",
+            "Caroline is researching adoption agencies."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Caroline is researching adoption agencies."
+        },
+        {
+          "question": "What is Caroline's identity?",
+          "ground_truth": "Transgender woman",
+          "category": 1,
+          "facts_returned": [
+            "Caroline transitioned and joined the transgender community to find acceptance, love, and support.",
+            "Caroline values being true to herself.",
+            "Caroline wants to live authentically.",
+            "It has taken Caroline a while to be proud of who she is as a trans woman, but she is finally proud.",
+            "Caroline realized she can be herself without fear and had the courage to transition.",
+            "Caroline is helping others after finding her true self.",
+            "Caroline wants to help others live authentically.",
+            "Caroline values having a platform to be herself and support others' rights."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state Caroline is a trans woman and describe her transition and identity."
+        },
+        {
+          "question": "When did Melanie run a charity race?",
+          "ground_truth": "The sunday before 25 May 2023",
+          "category": 2,
+          "facts_returned": [
+            "Melanie ran a charity race for mental health last Saturday."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Melanie ran a charity race last Saturday, which may correspond to the Sunday before 25 May 2023, but the exact date is not explicitly confirmed."
+        },
+        {
+          "question": "When is Melanie planning on going camping?",
+          "ground_truth": "June 2023",
+          "category": 2,
+          "facts_returned": [
+            "Melanie took her family camping in the mountains last week, after previously considering going camping next month.",
+            "Melanie and her family went on a camping trip recently, specifically yesterday.",
+            "Melanie went camping with her family two weekends ago in the mountains.",
+            "Melanie's kids are thinking about going camping next month."
+          ],
+          "score": "partial",
+          "reason": "The facts mention camping plans for next month but do not specify June 2023 explicitly."
+        },
+        {
+          "question": "What is Caroline's relationship status?",
+          "ground_truth": "Single",
+          "category": 1,
+          "facts_returned": [
+            "Caroline's friends have been there for her through everything, providing love and help especially after a tough breakup.",
+            "Caroline's relationships now feel more genuine after her transition.",
+            "Caroline's relationships have definitely changed due to her journey as a trans woman.",
+            "Caroline's journey as a trans woman has changed her relationships; some friends supported her while others did not, leading to more genuine relationships with those who accept and love her.",
+            "Caroline is up for the challenge of being a single parent."
+          ],
+          "score": "pass",
+          "reason": "The facts explicitly state Caroline is a single parent and mention a tough breakup, confirming she is single."
+        },
+        {
+          "question": "When did Caroline give a speech at a school?",
+          "ground_truth": "The week before 9 June 2023",
+          "category": 2,
+          "facts_returned": [
+            "Caroline had a school event last week where she talked about her transgender journey.",
+            "Caroline encouraged students to get involved in the LGBTQ community during her school event.",
+            "Caroline felt super powerful giving her talk about her transgender journey."
+          ],
+          "score": "partial",
+          "reason": "The facts confirm Caroline gave a speech at a school but do not specify the timing as the week before 9 June 2023."
+        },
+        {
+          "question": "When did Caroline meet up with her friends, family, and mentors?",
+          "ground_truth": "The week before 9 June 2023",
+          "category": 2,
+          "facts_returned": [
+            "Caroline met up with her friends, family, and mentors last week and shared a picture from that meeting.",
+            "Caroline and her friends and family had a picnic last week.",
+            "Caroline and her friends went biking last weekend.",
+            "Caroline had a wicked day out with the gang last weekend.",
+            "Caroline joined a mentorship program for LGBTQ youth last weekend."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Caroline met with friends, family, and mentors last week but do not specify that it was the week before 9 June 2023."
+        },
+        {
+          "question": "How long has Caroline had her current group of friends for?",
+          "ground_truth": "4 years",
+          "category": 2,
+          "facts_returned": [
+            "Caroline has known her friends for 4 years since she moved from her home country."
+          ],
+          "score": "pass",
+          "reason": "The fact clearly states Caroline has known her friends for 4 years, matching the expected answer."
+        },
+        {
+          "question": "Where did Caroline move from 4 years ago?",
+          "ground_truth": "Sweden",
+          "category": 1,
+          "facts_returned": [
+            "Caroline has known her friends for 4 years since she moved from her home country."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Caroline moved from her home country 4 years ago but do not specify that the country is Sweden."
+        },
+        {
+          "question": "How long ago was Caroline's 18th birthday?",
+          "ground_truth": "10 years ago",
+          "category": 2,
+          "facts_returned": [
+            "Caroline has sentimental items including a hand-painted bowl made by a friend for her 18th birthday ten years ago.",
+            "A friend made Caroline's hand-painted bowl for her 18th birthday ten years ago."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Caroline's 18th birthday was ten years ago."
+        },
+        {
+          "question": "What career path has Caroline decided to persue?",
+          "ground_truth": "counseling or mental health for Transgender people",
+          "category": 1,
+          "facts_returned": [
+            "Caroline's experience with mental health support motivated her to pursue a career in counseling and mental health to help others.",
+            "Caroline is motivated to pursue counseling and mental health as a career.",
+            "Caroline is keen on counseling or working in mental health.",
+            "Caroline is considering a career in counseling and mental health, focusing on helping trans people accept themselves and support their mental health.",
+            "Caroline started looking into counseling and mental health career options to help other people on their own journeys.",
+            "Caroline wants to use her personal story to help others in the counseling and mental health field.",
+            "Caroline is excited to give back to the community through counseling and mental health work."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state Caroline's motivation to pursue counseling and mental health, specifically focusing on helping trans people, which matches the expected answer."
+        },
+        {
+          "question": "Would Caroline still want to pursue counseling as a career if she hadn't received support growing up?",
+          "ground_truth": "Likely no",
+          "category": 3,
+          "facts_returned": [
+            "Caroline's experience with mental health support motivated her to pursue a career in counseling and mental health to help others.",
+            "Caroline's own journey and the support she received made a huge difference in her life.",
+            "The support Caroline received helped her discover her true self.",
+            "Caroline wants to pass the same support she received to anyone who needs it, bringing comfort and helping others grow.",
+            "Caroline wants to pass on the love and support she received to others.",
+            "Caroline has a support network that has been amazing and has been there for her every step of the way giving her love, guidance, and acceptance.",
+            "Caroline believes having people who back you makes a huge difference."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly indicate that Caroline's support growing up was crucial to her motivation to pursue counseling, implying she likely would not have pursued it without that support."
+        },
+        {
+          "question": "What activities does Melanie partake in?",
+          "ground_truth": "pottery, camping, painting, swimming",
+          "category": 1,
+          "facts_returned": [
+            "Melanie is carving out some me-time each day by running, reading, or playing her violin.",
+            "Melanie's real muses are painting and pottery.",
+            "Melanie plays clarinet.",
+            "Melanie wants to do a family outing this summer.",
+            "Melanie will start thinking about what activities she and Caroline can do for their planned outing.",
+            "Melanie and her family just hung out together, including attending a pottery workshop last Friday.",
+            "Melanie took her kids to a pottery workshop last Friday.",
+            "Melanie and her kids made their own pots at the pottery workshop.",
+            "Melanie finds pottery fun and therapeutic, letting her express herself and get creative.",
+            "Melanie and her family played games together.",
+            "Melanie and her family did an activity yesterday that the kids loved.",
+            "Melanie and her family just hung out together.",
+            "Melanie went to the beach recently.",
+            "Melanie is going swimming with the kids."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly mention Melanie's involvement in pottery, painting, and swimming, and imply camping through family outings and beach visits."
+        },
+        {
+          "question": "When did Melanie sign up for a pottery class?",
+          "ground_truth": "2 July 2023",
+          "category": 2,
+          "facts_returned": [
+            "Melanie signed up for a pottery class yesterday."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Melanie signed up yesterday but do not specify the exact date of 2 July 2023."
+        },
+        {
+          "question": "When is Caroline going to the transgender conference?",
+          "ground_truth": "July 2023",
+          "category": 2,
+          "facts_returned": [
+            "Caroline is going to a transgender conference this month."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Caroline is attending a transgender conference this month but do not specify that it is in July 2023."
+        },
+        {
+          "question": "Where has Melanie camped?",
+          "ground_truth": "beach, mountains, forest",
+          "category": 1,
+          "facts_returned": [
+            "Melanie recently took her family camping in the mountains where they explored nature, roasted marshmallows, and went on a hike with an amazing view.",
+            "Melanie went camping with her family two weekends ago in the mountains.",
+            "Melanie and her family went on another camping trip in the forest."
+          ],
+          "score": "partial",
+          "reason": "The facts mention camping in the mountains and forest but do not mention camping at the beach."
+        },
+        {
+          "question": "What do Melanie's kids like?",
+          "ground_truth": "dinosaurs, nature",
+          "category": 1,
+          "facts_returned": [
+            "Melanie's kids love learning about animals and dinosaur bones.",
+            "Melanie's kids love learning about animals.",
+            "Melanie's kids loved the pottery workshop.",
+            "Melanie's kids were excited about the dinosaur exhibit at the museum.",
+            "Melanie's kids found the dinosaur bones at the museum very cool.",
+            "The two younger kids in Melanie's family love nature.",
+            "Melanie and her kids love painting together lately, especially nature-inspired paintings."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly indicate Melanie's kids like dinosaurs and nature, matching the expected answer."
+        },
+        {
+          "question": "When did Melanie go to the museum?",
+          "ground_truth": "5 July 2023",
+          "category": 2,
+          "facts_returned": [
+            "Melanie took her kids to the museum yesterday, but recently took them to a park yesterday instead.",
+            "Melanie took her kids to the museum to see the dinosaur exhibit."
+          ],
+          "score": "partial",
+          "reason": "The facts mention Melanie going to the museum recently but do not specify the exact date of 5 July 2023."
+        },
+        {
+          "question": "When did Caroline have a picnic?",
+          "ground_truth": "The week before 6 July 2023",
+          "category": 2,
+          "facts_returned": [
+            "Caroline and her friends and family had a picnic last week."
+          ],
+          "score": "partial",
+          "reason": "The facts mention Caroline had a picnic last week but do not specify the exact week relative to 6 July 2023."
+        },
+        {
+          "question": "Would Caroline likely have Dr. Seuss books on her bookshelf?",
+          "ground_truth": "Yes, since she collects classic children's books",
+          "category": 3,
+          "facts_returned": [
+            "Caroline has a collection of kids' books including classics, stories from different cultures, and educational books.",
+            "Caroline is creating a library for when she has kids.",
+            "Caroline is really looking forward to reading to her future kids and opening up their minds."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Caroline collects classic kids' books but do not specifically mention Dr. Seuss books."
+        },
+        {
+          "question": "What books has Melanie read?",
+          "ground_truth": "\"Nothing is Impossible\", \"Charlotte's Web\"",
+          "category": 1,
+          "facts_returned": [
+            "Melanie read a book last year that reminds her to always pursue her dreams.",
+            "Melanie loved reading \"Charlotte's Web\" as a kid.",
+            "Melanie has been reading a book recommended by Caroline a while ago to keep busy."
+          ],
+          "score": "partial",
+          "reason": "The facts confirm Melanie read 'Charlotte's Web' but do not explicitly mention 'Nothing is Impossible'."
+        },
+        {
+          "question": "What does Melanie do to destress?",
+          "ground_truth": "Running, pottery",
+          "category": 1,
+          "facts_returned": [
+            "Melanie has been running longer since the last chat as a way to destress and clear her mind.",
+            "Melanie finds running a great way to destress and clear her mind.",
+            "Melanie is carving out some me-time each day by running, reading, or playing her violin.",
+            "Melanie uses painting as a great way to relax after a long day.",
+            "Melanie finds painting and pottery calming and satisfying.",
+            "Melanie signed up for a pottery class as a form of therapy and creative expression.",
+            "Melanie made a pottery item in pottery class yesterday and finds pottery relaxing and creative.",
+            "Melanie feels that nature helps her reset and recharge."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Melanie uses running and pottery to destress."
+        },
+        {
+          "question": "When did Caroline go to the LGBTQ conference?",
+          "ground_truth": "10 July 2023",
+          "category": 2,
+          "facts_returned": [
+            "Caroline went to an LGBTQ conference two days ago.",
+            "Caroline went to an LGBTQ support group yesterday and an LGBTQ conference two days ago."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Caroline went to the conference two days ago but do not specify the exact date of 10 July 2023."
+        },
+        {
+          "question": "When did Melanie read the book \"nothing is impossible\"?",
+          "ground_truth": "2022",
+          "category": 2,
+          "facts_returned": [
+            "Melanie read a book last year that reminds her to always pursue her dreams."
+          ],
+          "score": "partial",
+          "reason": "The facts imply Melanie read a book recently but do not specify the title or exact year 2022."
+        },
+        {
+          "question": "Would Caroline pursue writing as a career option?",
+          "ground_truth": "LIkely no; though she likes reading, she wants to be a counselor",
+          "category": 3,
+          "facts_returned": [
+            "Caroline is motivated to pursue counseling and mental health as a career.",
+            "Caroline is keen on counseling or working in mental health.",
+            "Caroline's experience with mental health support motivated her to pursue a career in counseling and mental health to help others.",
+            "Caroline is considering a career in counseling and mental health, focusing on helping trans people accept themselves and support their mental health.",
+            "Caroline started looking into counseling and mental health career options to help other people on their own journeys.",
+            "Caroline wants to use her personal story to help others in the counseling and mental health field.",
+            "Caroline is excited to give back to the community through counseling and mental health work.",
+            "Caroline would love to support those with similar issues in counseling or mental health.",
+            "Caroline is looking into counseling and mental health jobs to help people have someone to talk to.",
+            "Caroline is going to check out career options."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly indicate Caroline's strong motivation and focus on pursuing counseling and mental health as a career, implying she is unlikely to pursue writing as a career."
+        },
+        {
+          "question": "When did Caroline go to the adoption meeting?",
+          "ground_truth": "The friday before 15 July 2023",
+          "category": 2,
+          "facts_returned": [
+            "Caroline went to a council meeting for adoption last Friday."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Caroline went to an adoption meeting last Friday but do not specify the date or confirm it was the Friday before 15 July 2023."
+        },
+        {
+          "question": "When did Melanie go to the pottery workshop?",
+          "ground_truth": "The Friday before 15 July 2023",
+          "category": 2,
+          "facts_returned": [
+            "Melanie took her kids to a pottery workshop last Friday.",
+            "Melanie and her family just hung out together, including attending a pottery workshop last Friday."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Melanie went to a pottery workshop last Friday but do not specify the exact date or confirm it was the Friday before 15 July 2023."
+        },
+        {
+          "question": "Would Melanie be considered a member of the LGBTQ community?",
+          "ground_truth": "Likely no, she does not refer to herself as part of it",
+          "category": 3,
+          "facts_returned": [],
+          "score": "fail",
+          "reason": "No facts were provided to determine Melanie's identification with the LGBTQ community."
+        },
+        {
+          "question": "When did Melanie go camping in June?",
+          "ground_truth": "The week before 27 June 2023",
+          "category": 2,
+          "facts_returned": [
+            "Melanie went camping with her family two weekends ago in the mountains.",
+            "Melanie took her family camping in the mountains last week, after previously considering going camping next month."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Melanie went camping recently but do not specify the exact week before 27 June 2023."
+        },
+        {
+          "question": "What LGBTQ+ events has Caroline participated in?",
+          "ground_truth": "Pride parade, school speech, support group",
+          "category": 1,
+          "facts_returned": [
+            "Caroline and the transgender teen had a great time at the LGBT pride event last month.",
+            "Caroline and the transgender teen she mentors attended an LGBT pride event last month, which was encouraging and full of love and acceptance.",
+            "Caroline went to an LGBTQ conference two days ago.",
+            "Caroline attended an LGBTQ+ counseling workshop last Friday.",
+            "Caroline is dedicated to helping others through volunteering at an LGBTQ+ youth center.",
+            "Caroline loved volunteering at the LGBTQ+ youth center.",
+            "Caroline is definitely carrying on volunteering at the LGBTQ+ youth center.",
+            "Caroline plans to continue volunteering at the LGBTQ+ youth center to make a difference and support the community.",
+            "Caroline had the chance to volunteer at an LGBTQ+ youth center."
+          ],
+          "score": "partial",
+          "reason": "The facts confirm Caroline's participation in a pride event and volunteering at an LGBTQ+ youth center but do not mention a school speech or a support group."
+        },
+        {
+          "question": "When did Caroline go to a pride parade during the summer?",
+          "ground_truth": "The week before 3 July 2023",
+          "category": 2,
+          "facts_returned": [
+            "Caroline attended the pride parade in her city last weekend.",
+            "Caroline attended the pride parade last weekend in her city.",
+            "Last weekend, Caroline's city held a pride parade.",
+            "Caroline attended the recent pride parade in her city and found it a powerful reminder of the fight for equality and inclusivity.",
+            "Caroline went to a pride parade last Friday."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Caroline attended a pride parade last weekend and last Friday, but do not specify the exact week or date relative to 3 July 2023."
+        },
+        {
+          "question": "What events has Caroline participated in to help children?",
+          "ground_truth": "Mentoring program, school speech",
+          "category": 1,
+          "facts_returned": [
+            "Caroline and others are organizing a talent show for the kids next month.",
+            "Caroline is dedicated to helping others through volunteering at an LGBTQ+ youth center.",
+            "Caroline loved volunteering at the LGBTQ+ youth center.",
+            "Caroline had the chance to volunteer at an LGBTQ+ youth center.",
+            "Caroline is definitely carrying on volunteering at the LGBTQ+ youth center.",
+            "Caroline plans to continue volunteering at the LGBTQ+ youth center to make a difference and support the community.",
+            "Caroline described her experience volunteering at the LGBTQ+ youth center as powerful and emotional."
+          ],
+          "score": "fail",
+          "reason": "The facts mention volunteering at an LGBTQ+ youth center but do not mention a mentoring program or school speech."
+        },
+        {
+          "question": "When did Melanie go camping in July?",
+          "ground_truth": "two weekends before 17 July 2023",
+          "category": 2,
+          "facts_returned": [
+            "Melanie went camping with her family two weekends ago in the mountains."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Melanie went camping two weekends ago but do not specify the date or that it was in July."
+        },
+        {
+          "question": "When did Caroline join a mentorship program?",
+          "ground_truth": "The weekend before 17 July 2023",
+          "category": 2,
+          "facts_returned": [
+            "Caroline joined a mentorship program for LGBTQ youth last weekend."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Caroline joined a mentorship program last weekend but do not specify the exact date or that it was the weekend before 17 July 2023."
+        },
+        {
+          "question": "What did Melanie paint recently?",
+          "ground_truth": "sunset",
+          "category": 1,
+          "facts_returned": [
+            "Melanie recently did a horse painting.",
+            "Melanie painted a calming painting inspired by sunsets.",
+            "Melanie created a painting last week inspired by sunsets.",
+            "Melanie recently completed a painting of landscapes or still life.",
+            "Melanie and her kids love painting together lately, especially nature-inspired paintings.",
+            "Melanie and her kids created a nature-inspired painting last weekend.",
+            "Melanie and her kids both helped with a nature-inspired painting.",
+            "Melanie and her kids just finished another painting similar to their last one."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state Melanie recently painted a calming painting inspired by sunsets, matching the expected answer."
+        },
+        {
+          "question": "What activities has Melanie done with her family?",
+          "ground_truth": "Pottery, painting, camping, museum, swimming, hiking",
+          "category": 1,
+          "facts_returned": [
+            "Melanie and her family just hung out together, including attending a pottery workshop last Friday.",
+            "Melanie and her family played games together.",
+            "Melanie spent a day volunteering at a homeless shelter with her family.",
+            "Melanie and her family enjoy hiking in the mountains and exploring forests as a way to connect with nature and each other.",
+            "Melanie recently took her family camping in the mountains where they explored nature, roasted marshmallows, and went on a hike with an amazing view.",
+            "Melanie and her family went on a camping trip recently, specifically yesterday.",
+            "Melanie and her family recently went to the beach, which they do only once or twice a year, and the kids had a great time.",
+            "Melanie and her family bond over stories, campfires, and nature during camping trips.",
+            "Melanie and her kids made their own pots at the pottery workshop.",
+            "Melanie had a really nice time together with her family during the camping trip."
+          ],
+          "score": "partial",
+          "reason": "The facts confirm pottery, camping, and hiking but do not mention painting, museum, or swimming."
+        },
+        {
+          "question": "In what ways is Caroline participating in the LGBTQ community?",
+          "ground_truth": "Joining activist group, going to pride parades, participating in an art show, mentoring program",
+          "category": 1,
+          "facts_returned": [
+            "Caroline is giving her voice and making a real difference in LGBTQ rights and community support.",
+            "Caroline is dedicated to helping others through volunteering at an LGBTQ+ youth center.",
+            "Caroline is definitely carrying on volunteering at the LGBTQ+ youth center.",
+            "Caroline loved volunteering at the LGBTQ+ youth center.",
+            "Caroline joined a new LGBTQ activist group last Tuesday.",
+            "Caroline is part of a group called 'Connected LGBTQ Activists'.",
+            "Caroline uses her art to speak up for the LGBTQ+ community and push for acceptance.",
+            "Caroline encouraged students to get involved in the LGBTQ community during her school event.",
+            "Caroline has made strong connections with people at the LGBTQ+ youth center.",
+            "Caroline finds her involvement in the LGBTQ activist group fulfilling in many ways.",
+            "Caroline wants to help make a difference in the LGBTQ community."
+          ],
+          "score": "partial",
+          "reason": "The facts confirm Caroline joined an activist group and is involved in art and mentoring, but do not explicitly mention pride parades or a mentoring program."
+        },
+        {
+          "question": "How many times has Melanie gone to the beach in 2023?",
+          "ground_truth": "2",
+          "category": 1,
+          "facts_returned": [
+            "Melanie and her family recently went to the beach, which they do only once or twice a year, and the kids had a great time.",
+            "Melanie and her kids go to the beach usually only once or twice a year."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Melanie goes to the beach once or twice a year but do not specify the exact number of times in 2023."
+        },
+        {
+          "question": "When did Caroline join a new activist group?",
+          "ground_truth": "The Tuesday before 20 July 2023",
+          "category": 2,
+          "facts_returned": [
+            "Caroline joined a new LGBTQ activist group last Tuesday."
+          ],
+          "score": "partial",
+          "reason": "The facts specify 'last Tuesday' but do not provide the exact date or confirm it was the Tuesday before 20 July 2023."
+        },
+        {
+          "question": "Would Melanie be more interested in going to a national park or a theme park?",
+          "ground_truth": "National park; she likes the outdoors",
+          "category": 3,
+          "facts_returned": [
+            "Melanie finds nature amazing.",
+            "Melanie and her family enjoy hiking in the mountains and exploring forests as a way to connect with nature and each other.",
+            "Melanie considers family camping trips in the forest some of her favorite memories.",
+            "Melanie values camping as a chance to be present and together with her family, bonding over stories, campfires, and nature.",
+            "Melanie finds nature refreshing for the soul.",
+            "Melanie loves camping trips with her family because nature brings peace and serenity.",
+            "Melanie and her family bond over stories, campfires, and nature during camping trips.",
+            "Melanie recently took her family camping in the mountains where they explored nature, roasted marshmallows, and went on a hike with an amazing view.",
+            "Melanie considers nature and quality time with family as a great and unbeatable experience.",
+            "Melanie went camping with her family two weekends ago in the mountains.",
+            "Melanie and her family went on another camping trip in the forest.",
+            "Caroline and Melanie bonded over their love of nature.",
+            "Melanie's kids are thinking about going camping next month.",
+            "Melanie's kids love learning about animals.",
+            "Melanie and her family roasted marshmallows around the campfire during their camping trip.",
+            "The view from the top of the hike was amazing.",
+            "Melanie found the moments spent together as a family during the camping trip very special and unforgettable.",
+            "Melanie believes that family activities bring them together and bring happiness.",
+            "Melanie finds having her family around helps a lot during hard times.",
+            "Melanie and her family went on a camping trip recently, specifically yesterday.",
+            "Melanie's kids loved the camping trip and it was a nice way to relax after a road trip.",
+            "Melanie feels that nature helps her reset and recharge.",
+            "Melanie went camping with her kids a few weeks ago and enjoyed unplugging and spending time with them."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly show Melanie's strong interest in nature and outdoor activities like camping and hiking, supporting that she would prefer a national park over a theme park."
+        },
+        {
+          "question": "What kind of art does Caroline make?",
+          "ground_truth": "abstract art",
+          "category": 1,
+          "facts_returned": [
+            "Caroline's art is about expressing her trans experience.",
+            "Caroline uses art to explore her transition and her changing body.",
+            "Caroline uses her art to show her story and help people understand the trans community.",
+            "Caroline represents inclusivity and diversity in her art.",
+            "Caroline's artwork is a symbol of togetherness, celebrating differences and bringing people closer.",
+            "Caroline uses painting and drawing to express her feelings and explore her gender identity.",
+            "Caroline creates art that shows togetherness and power."
+          ],
+          "score": "partial",
+          "reason": "The facts describe the themes and purposes of Caroline's art but do not explicitly state that she makes abstract art."
+        },
+        {
+          "question": "When is Melanie's daughter's birthday?",
+          "ground_truth": "13 August",
+          "category": 2,
+          "facts_returned": [
+            "Melanie celebrated her daughter's birthday with a concert last night.",
+            "Melanie celebrated her daughter's birthday with a concert surrounded by music, joy, and the warm summer breeze, feeling thankful for the special moments with her kids.",
+            "The concert was surrounded by music, joy, and the warm summer breeze."
+          ],
+          "score": "fail",
+          "reason": "The retrieved facts do not provide any information about the date of Melanie's daughter's birthday."
+        },
+        {
+          "question": "When did Caroline attend a pride parade in August?",
+          "ground_truth": "The Friday before 14 August 2023",
+          "category": 2,
+          "facts_returned": [
+            "Caroline attended the pride parade in her city last weekend.",
+            "Caroline attended the pride parade last weekend in her city.",
+            "Last weekend, Caroline's city held a pride parade."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Caroline attended a pride parade last weekend but do not specify the exact date or that it was the Friday before 14 August 2023."
+        },
+        {
+          "question": "Would Melanie be considered an ally to the transgender community?",
+          "ground_truth": "Yes, she is supportive",
+          "category": 3,
+          "facts_returned": [
+            "Melanie and Caroline discussed LGBTQ advocacy and mentorship.",
+            "Melanie expressed support to Caroline by saying 'I'm here for you.'",
+            "Melanie appreciates Caroline's motivation to contribute to LGBTQ rights and activism.",
+            "Melanie is in awe of Caroline's courage as a trans person.",
+            "Melanie is proud of Caroline for spreading awareness and getting others involved in the LGBTQ community.",
+            "Melanie believes it is great to see the love and support for the LGBTQ+ community at the parade.",
+            "Melanie expressed that strong support really helps in difficult situations.",
+            "Melanie loves how Caroline uses her art to tell stories and teach people about trans folks.",
+            "Melanie finds the posters from the transgender poetry reading event great.",
+            "Melanie expressed that having support is important.",
+            "Melanie thinks attending the LGBTQ support group was cool.",
+            "Melanie is interested in hearing about what happened at the LGBTQ support group.",
+            "Melanie acknowledges that progress has been made in LGBTQ rights but more work remains to be done.",
+            "Melanie thinks it is cool that Caroline found a helpful LGBTQ support group.",
+            "Melanie is glad Caroline got the support she needed.",
+            "Melanie is excited to see Caroline's LGBTQ art show and believes the LGBTQ community needs more platforms like this.",
+            "Melanie acknowledges that Caroline's friends and community really support her.",
+            "Talking about inclusivity and acceptance is crucial according to Melanie.",
+            "Melanie respects Caroline for finding self-acceptance and helping others with her past experiences.",
+            "Melanie believes it feels great to be able to speak one's truth and stand up for what is right.",
+            "Melanie encourages Caroline to have fun and stay safe at the transgender conference.",
+            "Melanie said to Caroline that the LGBTQ support group is really cool and that Caroline has guts.",
+            "Melanie feels it is great to have Caroline as a supporter.",
+            "Melanie believes events like LGBTQ conferences are great for reminding people of how strong community can be.",
+            "Melanie encourages Caroline to keep inspiring people with her strength and courage.",
+            "Melanie thinks the LGBTQ+ pride parade was an awesome experience for Caroline.",
+            "Melanie congratulated Caroline on attending the LGBTQ+ pride parade.",
+            "Melanie apologized to Caroline about the negative experience Caroline had on a hike involving religious conservatives.",
+            "Melanie is interested in knowing what the transgender poetry reading event was like.",
+            "Melanie stated that being yourself is great.",
+            "Melanie wants to know if Caroline heard any inspiring stories at the LGBTQ support group.",
+            "Melanie believes Caroline's experience has brought her to where she needs to be."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly show Melanie's consistent support and positive attitude towards Caroline and the transgender community."
+        },
+        {
+          "question": "Who supports Caroline when she has a negative experience?",
+          "ground_truth": "Her mentors, family, and friends",
+          "category": 1,
+          "facts_returned": [
+            "Caroline has a support network that has been amazing and has been there for her every step of the way giving her love, guidance, and acceptance.",
+            "Caroline's friends, family, and mentors are her rocks who motivate her and give her the strength to push on.",
+            "Caroline received invaluable help from friends, family, and people she looked up to during her tough times.",
+            "Caroline's friends have been there for her through everything, providing love and help especially after a tough breakup.",
+            "Caroline is really thankful for her friends, family, and mentors' support.",
+            "Caroline's friends and family make all the difference during her transition.",
+            "Some close friends of Caroline kept supporting her during her transition.",
+            "Caroline appreciates the support from her friends and family during her transition, describing it as love, guidance, and acceptance.",
+            "Caroline feels really lucky to have her friends' support and is super thankful for it.",
+            "Caroline finds it helpful to have people around her who accept and support her, which makes her feel she will be okay."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Caroline is supported by her mentors, family, and friends during difficult times."
+        },
+        {
+          "question": "What types of pottery have Melanie and her kids made?",
+          "ground_truth": "bowls, cup",
+          "category": 1,
+          "facts_returned": [
+            "Melanie and her kids made their own pots at the pottery workshop.",
+            "Caroline thinks the cup made by Melanie's kids in the pottery workshop is cute."
+          ],
+          "score": "partial",
+          "reason": "The facts mention pots and a cup made by Melanie and her kids but do not explicitly mention bowls."
+        },
+        {
+          "question": "When did Caroline and Melanie go to a pride fesetival together?",
+          "ground_truth": "2022",
+          "category": 2,
+          "facts_returned": [
+            "Melanie and Caroline had a fun experience together at the Pride fest last year with their group of friends.",
+            "Caroline and Melanie had a blast last year at the Pride fest.",
+            "Caroline considers the pride parade a top memory."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Caroline and Melanie attended a Pride festival last year but do not specify the year 2022."
+        },
+        {
+          "question": "What would Caroline's political leaning likely be?",
+          "ground_truth": "Liberal",
+          "category": 3,
+          "facts_returned": [
+            "Caroline values having a platform to be herself and support others' rights.",
+            "Caroline wants to help make a difference in the LGBTQ community.",
+            "Caroline believes that change is possible in the fight for equality and inclusivity.",
+            "Caroline is giving her voice and making a real difference in LGBTQ rights and community support.",
+            "Caroline uses her art to speak up for the LGBTQ+ community and push for acceptance.",
+            "Caroline feels accepted and supported at events that promote LGBTQ rights.",
+            "Caroline is meeting many people who are as passionate as she is about rights and community support.",
+            "Caroline is definitely carrying on volunteering at the LGBTQ+ youth center.",
+            "Caroline is part of a group called 'Connected LGBTQ Activists'.",
+            "'Connected LGBTQ Activists' is made up of all kinds of people investing in positive changes.",
+            "'Connected LGBTQ Activists' has regular meetings.",
+            "'Connected LGBTQ Activists' plans events and campaigns.",
+            "'Connected LGBTQ Activists' aims to get together and support each other.",
+            "Caroline acknowledges that LGBTQ rights have come far but there is still plenty of progress to be made."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly indicate Caroline's active support for LGBTQ rights and progressive change, which aligns with a liberal political leaning."
+        },
+        {
+          "question": "What has Melanie painted?",
+          "ground_truth": "Horse, sunset, sunrise",
+          "category": 1,
+          "facts_returned": [
+            "Melanie recently did a horse painting.",
+            "Melanie recently completed a painting of landscapes or still life.",
+            "Melanie painted a calming painting inspired by sunsets.",
+            "Melanie created a painting last week inspired by sunsets.",
+            "Melanie loves to paint animals, especially horses.",
+            "Melanie has done an abstract painting as a form of self-expression.",
+            "Melanie and her kids love painting together lately, especially nature-inspired paintings.",
+            "Melanie and her kids created a nature-inspired painting last weekend."
+          ],
+          "score": "partial",
+          "reason": "The facts confirm Melanie painted a horse and sunsets but do not explicitly mention a sunrise painting."
+        },
+        {
+          "question": "What are Melanie's pets' names?",
+          "ground_truth": "Oliver, Luna, Bailey",
+          "category": 1,
+          "facts_returned": [
+            "Melanie has three pets named Luna, Oliver, and Bailey.",
+            "Melanie has a cat named Bailey.",
+            "Oliver is Melanie's pet cat."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly list all three pets' names as Oliver, Luna, and Bailey."
+        },
+        {
+          "question": "When did Caroline apply to adoption agencies?",
+          "ground_truth": "The week of 23 August 2023",
+          "category": 2,
+          "facts_returned": [
+            "Caroline took the first step towards becoming a mom by applying to adoption agencies."
+          ],
+          "score": "partial",
+          "reason": "The facts mention Caroline applied to adoption agencies but do not specify the timing as the week of 23 August 2023."
+        },
+        {
+          "question": "When did Caroline draw a self-portrait?",
+          "ground_truth": "The week before 23 August 2023",
+          "category": 2,
+          "facts_returned": [
+            "Caroline made a recent self-portrait last week."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Caroline drew a self-portrait last week but do not specify the exact timing relative to 23 August 2023."
+        },
+        {
+          "question": "What subject have Caroline and Melanie both painted?",
+          "ground_truth": "Sunsets",
+          "category": 1,
+          "facts_returned": [
+            "Melanie painted a calming painting inspired by sunsets.",
+            "Melanie believes that the beach inspired Caroline's painting."
+          ],
+          "score": "partial",
+          "reason": "The facts confirm Melanie painted sunsets but do not explicitly state Caroline painted sunsets, only that her painting was inspired by the beach."
+        },
+        {
+          "question": "What symbols are important to Caroline?",
+          "ground_truth": "Rainbow flag, transgender symbol",
+          "category": 1,
+          "facts_returned": [
+            "The necklace stands for love, faith, and strength.",
+            "The necklace is a reminder of Caroline's roots and the love and support she gets from her family.",
+            "The necklace was a gift from Caroline's grandma in Sweden.",
+            "Caroline's grandma gave her the necklace when she was young.",
+            "Caroline's artwork is a symbol of togetherness, celebrating differences and bringing people closer.",
+            "Caroline creates art that shows togetherness and power.",
+            "The rainbow flag mural is important to Caroline as it reflects the courage and strength of the trans community.",
+            "The red and blue colors in Caroline's painting represent the binary gender system.",
+            "Caroline associates roses with love and beauty.",
+            "Caroline associates sunflowers with warmth and happiness."
+          ],
+          "score": "partial",
+          "reason": "The facts mention the rainbow flag as important to Caroline but do not explicitly mention the transgender symbol."
+        },
+        {
+          "question": "When did Caroline encounter people on a hike and have a negative experience?",
+          "ground_truth": "The week before 25 August 2023",
+          "category": 2,
+          "facts_returned": [
+            "Caroline got into a bad spot with some people during the hike last week.",
+            "Caroline had a not-so-great experience on a hike where she encountered a group of religious conservatives who said something that really upset her.",
+            "Caroline went hiking last week.",
+            "Caroline felt really bugged by the bad spot with some people during the hike."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly indicate Caroline had a negative experience with people during a hike last week, matching the expected timeframe before 25 August 2023."
+        },
+        {
+          "question": "When did Melanie make a plate in pottery class?",
+          "ground_truth": "24 August 2023",
+          "category": 2,
+          "facts_returned": [
+            "Melanie made the plate in pottery class yesterday."
+          ],
+          "score": "partial",
+          "reason": "The fact states Melanie made the plate yesterday but does not specify the exact date of 24 August 2023."
+        },
+        {
+          "question": "Would Caroline be considered religious?",
+          "ground_truth": "Somewhat, but not extremely religious",
+          "category": 3,
+          "facts_returned": [],
+          "score": "fail",
+          "reason": "No facts were provided to determine Caroline's level of religiosity."
+        },
+        {
+          "question": "What instruments does Melanie play?",
+          "ground_truth": "clarinet and violin",
+          "category": 1,
+          "facts_returned": [
+            "Melanie plays the clarinet and started when she was young.",
+            "Melanie plays clarinet.",
+            "Melanie is carving out some me-time each day by playing her violin to refresh herself and stay present for her family.",
+            "Melanie is carving out some me-time each day by running, reading, or playing her violin."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Melanie plays both the clarinet and the violin."
+        },
+        {
+          "question": "What musical artists/bands has Melanie seen?",
+          "ground_truth": "Summer Sounds, Matt Patterson",
+          "category": 1,
+          "facts_returned": [
+            "Melanie attended a concert by Matt Patterson.",
+            "Melanie found Matt Patterson's voice and songs amazing.",
+            "Melanie thinks Matt Patterson is very talented."
+          ],
+          "score": "partial",
+          "reason": "The facts mention Melanie seeing Matt Patterson but do not mention Summer Sounds."
+        },
+        {
+          "question": "When did Melanie go to the park?",
+          "ground_truth": "27 August 2023",
+          "category": 2,
+          "facts_returned": [
+            "Melanie took her kids to a park yesterday.",
+            "Caroline expressed relief that everything worked out and that Melanie had a good time at the park."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Melanie went to the park recently but do not specify the exact date of 27 August 2023."
+        },
+        {
+          "question": "When is Caroline's youth center putting on a talent show?",
+          "ground_truth": "September 2023",
+          "category": 2,
+          "facts_returned": [
+            "Caroline and others are organizing a talent show for the kids next month at the youth center.",
+            "Caroline and others are organizing a talent show for the kids next month.",
+            "The youth center is putting together a talent show for the kids next month."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate the talent show is next month but do not specify that it is in September 2023."
+        },
+        {
+          "question": "Would Melanie likely enjoy the song \"The Four Seasons\" by Vivaldi?",
+          "ground_truth": "Yes; it's classical music",
+          "category": 3,
+          "facts_returned": [
+            "Melanie is a fan of classical music like Bach and Mozart.",
+            "Melanie believes music can be inspiring and uplifting.",
+            "Melanie loves live music."
+          ],
+          "score": "pass",
+          "reason": "The facts show Melanie enjoys classical music, which supports that she would likely enjoy Vivaldi's 'The Four Seasons.'"
+        },
+        {
+          "question": "What are some changes Caroline has faced during her transition journey?",
+          "ground_truth": "Changes to her body, losing unsupportive friends",
+          "category": 1,
+          "facts_returned": [
+            "Caroline's journey as a trans woman has changed her relationships; some friends supported her while others did not, leading to more genuine relationships with those who accept and love her.",
+            "Caroline's relationships have definitely changed due to her journey as a trans woman.",
+            "Caroline experienced a difficult transition and acceptance process.",
+            "Caroline's transition and acceptance process was not easy, but help from friends, family, and role models was invaluable.",
+            "Caroline's friends and family make all the difference during her transition.",
+            "Caroline transitioned and joined the transgender community to find acceptance, love, and support.",
+            "Caroline realized she can be herself without fear and had the courage to transition.",
+            "Caroline's own journey and the support she received made a huge difference in her life.",
+            "Caroline uses art to explore her transition and her changing body."
+          ],
+          "score": "partial",
+          "reason": "The facts mention changes in relationships and support but do not explicitly state changes to her body or losing unsupportive friends."
+        },
+        {
+          "question": "What does Melanie do with her family on hikes?",
+          "ground_truth": "Roast marshmallows, tell stories",
+          "category": 1,
+          "facts_returned": [
+            "Melanie and her family enjoy hiking in the mountains and exploring forests as a way to connect with nature and each other.",
+            "Melanie recently took her family camping in the mountains where they explored nature, roasted marshmallows, and went on a hike with an amazing view.",
+            "The view from the top of the hike was amazing."
+          ],
+          "score": "partial",
+          "reason": "The facts mention roasting marshmallows on a hike but do not mention telling stories."
+        },
+        {
+          "question": "When did Caroline go biking with friends?",
+          "ground_truth": "The weekend before 13 September 2023",
+          "category": 2,
+          "facts_returned": [
+            "Caroline and her friends went biking last weekend.",
+            "Caroline found the biking trip last weekend refreshing.",
+            "Caroline saw some pretty cool stuff during the biking trip last weekend.",
+            "Caroline is sending a stunning picture from the biking trip last weekend.",
+            "Caroline had a wicked day out with the gang last weekend."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Caroline went biking last weekend but do not specify the exact weekend or date relative to 13 September 2023."
+        },
+        {
+          "question": "How long has Melanie been practicing art?",
+          "ground_truth": "Since 2016",
+          "category": 2,
+          "facts_returned": [
+            "Melanie has been into art for seven years."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Melanie has been into art for seven years but do not specify the start year as 2016."
+        },
+        {
+          "question": "What personality traits might Melanie say Caroline has?",
+          "ground_truth": "Thoughtful, authentic, driven",
+          "category": 3,
+          "facts_returned": [
+            "Melanie finds Caroline strong and inspiring.",
+            "Melanie finds Caroline's courage inspiring.",
+            "Melanie respects Caroline for finding self-acceptance and helping others with her past experiences.",
+            "Melanie sees Caroline as someone who is pursuing her dreams.",
+            "Melanie appreciates Caroline's concern and thinks she is thoughtful.",
+            "Melanie thinks Caroline's empathy and understanding will really help the people Caroline works with.",
+            "Melanie thinks Caroline is going to make a huge difference."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly describe Caroline as thoughtful, authentic (self-acceptance and helping others), and driven (pursuing her dreams), matching the expected traits."
+        },
+        {
+          "question": "What transgender-specific events has Caroline attended?",
+          "ground_truth": "Poetry reading, conference",
+          "category": 1,
+          "facts_returned": [
+            "Caroline attended a transgender poetry reading where transgender people shared their stories through poetry.",
+            "Caroline is going to a transgender conference this month."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state Caroline attended a transgender poetry reading and is going to a transgender conference, matching the expected answer."
+        },
+        {
+          "question": "What book did Melanie read from Caroline's suggestion?",
+          "ground_truth": "\"Becoming Nicole\"",
+          "category": 1,
+          "facts_returned": [
+            "Melanie has been reading a book recommended by Caroline a while ago to keep busy."
+          ],
+          "score": "partial",
+          "reason": "The facts mention Melanie reading a book recommended by Caroline but do not specify the book's title as 'Becoming Nicole.'"
+        },
+        {
+          "question": "When did Melanie's friend adopt a child?",
+          "ground_truth": "2022",
+          "category": 2,
+          "facts_returned": [
+            "Melanie has a buddy who adopted a child last year."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate the adoption happened last year but do not specify the exact year 2022."
+        },
+        {
+          "question": "When did Melanie get hurt?",
+          "ground_truth": "September 2023",
+          "category": 2,
+          "facts_returned": [
+            "Melanie had a setback last month due to an injury.",
+            "Melanie had to take a break from pottery last month because of her injury."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Melanie was injured last month but do not specify the exact month or year."
+        },
+        {
+          "question": "When did Melanie's family go on a roadtrip?",
+          "ground_truth": "The weekend before 20 October 2023",
+          "category": 2,
+          "facts_returned": [
+            "Melanie and her family went on a camping trip recently, specifically yesterday.",
+            "Melanie took her family camping in the mountains last week, after previously considering going camping next month.",
+            "Melanie's kids loved the camping trip and it was a nice way to relax after a road trip.",
+            "The activity was a nice way for Melanie and her family to relax after a road trip."
+          ],
+          "score": "fail",
+          "reason": "The facts mention a recent camping trip and a road trip but do not specify when the road trip occurred."
+        },
+        {
+          "question": "How many children does Melanie have?",
+          "ground_truth": "3",
+          "category": 1,
+          "facts_returned": [
+            "Melanie's kids were scared during the accident but were reassured by Melanie and explained that their brother would be OK."
+          ],
+          "score": "partial",
+          "reason": "The facts mention Melanie's kids and a brother, implying multiple children but do not specify the exact number."
+        },
+        {
+          "question": "When did Melanie go on a hike after the roadtrip?",
+          "ground_truth": "19 October 2023",
+          "category": 1,
+          "facts_returned": [
+            "Melanie went camping with her family two weekends ago in the mountains.",
+            "Melanie recently took her family camping in the mountains where they explored nature, roasted marshmallows, and went on a hike with an amazing view.",
+            "Melanie and her family went on a camping trip recently, specifically yesterday.",
+            "Melanie's kids loved the camping trip and it was a nice way to relax after a road trip."
+          ],
+          "score": "fail",
+          "reason": "The facts mention hiking and camping after a road trip but do not provide any specific date, including 19 October 2023."
+        },
+        {
+          "question": "Would Melanie go on another roadtrip soon?",
+          "ground_truth": "Likely no; since this one went badly",
+          "category": 3,
+          "facts_returned": [
+            "Melanie wants to do a family outing this summer.",
+            "Melanie will start thinking about what activities she and Caroline can do for their planned outing.",
+            "Melanie's kids are thinking about going camping next month.",
+            "Melanie and her family always look forward to their family camping trip."
+          ],
+          "score": "partial",
+          "reason": "The facts mention family outings and camping plans but do not address Melanie's feelings about the recent roadtrip or whether she would go on another soon."
+        },
+        {
+          "question": "What items has Melanie bought?",
+          "ground_truth": "Figurines, shoes",
+          "category": 1,
+          "facts_returned": [
+            "Melanie bought figurines yesterday that remind her of family love.",
+            "Melanie recently got new purple running shoes.",
+            "Melanie recently got some new shoes.",
+            "Melanie has new shoes that are for running."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Melanie bought figurines and shoes, matching the expected answer."
+        },
+        {
+          "question": "When did Caroline pass the adoption interview?",
+          "ground_truth": "The Friday before 22 October 2023",
+          "category": 2,
+          "facts_returned": [
+            "Caroline passed the adoption agency interviews last Friday."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Caroline passed the interview last Friday but do not specify the exact date as the Friday before 22 October 2023."
+        },
+        {
+          "question": "When did Melanie buy the figurines?",
+          "ground_truth": "21 October 2023",
+          "category": 2,
+          "facts_returned": [
+            "Melanie bought figurines yesterday that remind her of family love."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Melanie bought figurines recently but do not specify the exact date of 21 October 2023."
+        },
+        {
+          "question": "Would Caroline want to move back to her home country soon?",
+          "ground_truth": "No; she's in the process of adopting children.",
+          "category": 3,
+          "facts_returned": [
+            "Caroline has known her friends for 4 years since she moved from her home country."
+          ],
+          "score": "fail",
+          "reason": "The retrieved fact does not mention Caroline's adoption process or her intentions about moving back."
+        },
+        {
+          "question": "What did the charity race raise awareness for?",
+          "ground_truth": "mental health",
+          "category": 4,
+          "facts_returned": [
+            "Melanie ran a charity race for mental health last Saturday."
+          ],
+          "score": "pass",
+          "reason": "The fact clearly states the charity race was for mental health, matching the expected answer."
+        },
+        {
+          "question": "What did Melanie realize after the charity race?",
+          "ground_truth": "self-care is important",
+          "category": 4,
+          "facts_returned": [
+            "Running the charity race for mental health made Melanie think about taking care of mental health.",
+            "Melanie is starting to realize that self-care is really important.",
+            "Melanie views self-care as a journey for herself.",
+            "When Melanie looks after herself, she is able to better look after her family."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly indicate that Melanie realized the importance of self-care after the charity race."
+        },
+        {
+          "question": "How does Melanie prioritize self-care?",
+          "ground_truth": "by carving out some me-time each day for activities like running, reading, or playing the violin",
+          "category": 4,
+          "facts_returned": [
+            "Melanie's daily me-time activities refresh her and help her stay present for her family.",
+            "Melanie is carving out some me-time each day by playing her violin to refresh herself and stay present for her family.",
+            "Melanie is carving out some me-time each day by running, reading, or playing her violin.",
+            "Melanie finds running a great way to destress and clear her mind.",
+            "Melanie feels that nature helps her reset and recharge.",
+            "Melanie views self-care as a journey for herself.",
+            "When Melanie looks after herself, she is able to better look after her family."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Melanie prioritizes self-care by carving out daily me-time for activities like running, reading, or playing the violin."
+        },
+        {
+          "question": "What are Caroline's plans for the summer?",
+          "ground_truth": "researching adoption agencies",
+          "category": 4,
+          "facts_returned": [
+            "Caroline suggests planning something special for this summer just for her and Melanie.",
+            "Caroline thinks a special outing just for her and Melanie would be a great chance to catch up and explore nature.",
+            "Caroline and Melanie plan to make some awesome memories together.",
+            "Melanie will start thinking about what activities she and Caroline can do for their planned outing.",
+            "Caroline suggests doing a family outing this summer.",
+            "Caroline plans to continue volunteering at the LGBTQ+ youth center to make a difference and support the community."
+          ],
+          "score": "fail",
+          "reason": "The facts do not mention Caroline researching adoption agencies, only planning outings and volunteering."
+        },
+        {
+          "question": "What type of individuals does the adoption agency Caroline is considering support?",
+          "ground_truth": "LGBTQ+ individuals",
+          "category": 4,
+          "facts_returned": [
+            "Caroline chose the adoption agency because they help LGBTQ+ folks with adoption.",
+            "The adoption agency's inclusivity and support really spoke to Caroline.",
+            "Caroline is researching adoption agencies as part of her dream to have a family and give a loving home to kids who need it.",
+            "Caroline has a dream to have a family and give a loving home to kids who need it.",
+            "Caroline hopes to build her own family and provide a home for children who have not had one before.",
+            "Caroline's vision for the future is to build her own family and provide a home for kids who haven't had one before."
+          ],
+          "score": "pass",
+          "reason": "The facts explicitly state the agency helps LGBTQ+ folks with adoption, directly supporting the expected answer."
+        },
+        {
+          "question": "Why did Caroline choose the adoption agency?",
+          "ground_truth": "because of their inclusivity and support for LGBTQ+ individuals",
+          "category": 4,
+          "facts_returned": [
+            "Caroline chose the adoption agency because they help LGBTQ+ folks with adoption.",
+            "The adoption agency's inclusivity and support really spoke to Caroline.",
+            "Caroline is researching adoption agencies as part of her dream to have a family and give a loving home to kids who need it."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Caroline chose the adoption agency due to their inclusivity and support for LGBTQ+ individuals."
+        },
+        {
+          "question": "What is Caroline excited about in the adoption process?",
+          "ground_truth": "creating a family for kids who need one",
+          "category": 4,
+          "facts_returned": [
+            "Caroline is excited and thankful about moving towards her goal of having a family through adoption.",
+            "Caroline is excited and thankful about passing the adoption agency interviews.",
+            "Caroline feels hopeful and optimistic despite the hard work and challenges involved in turning her adoption dream into reality.",
+            "Caroline feels hopeful and optimistic about turning her dream of adopting children into a reality with support from friends and mentors.",
+            "Caroline finds the journey of adoption amazing and feels grateful to share it and help others with their journeys.",
+            "Passing the adoption agency interviews is a big move towards Caroline's goal of having a family."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly show Caroline is excited about creating a family through adoption, which aligns with the expected answer."
+        },
+        {
+          "question": "What does Melanie think about Caroline's decision to adopt?",
+          "ground_truth": "she thinks Caroline is doing something amazing and will be an awesome mom",
+          "category": 4,
+          "facts_returned": [
+            "Melanie is happy for Caroline regarding her adoption progress.",
+            "Melanie is excited for Caroline's new chapter in adopting children and creating a family.",
+            "Melanie congratulated Caroline on her determination to adopt children.",
+            "Melanie thinks it is awesome that Caroline is passionate about helping kids through adoption.",
+            "Melanie believes Caroline has a caring heart that will provide love and stability to the children she adopts.",
+            "Melanie believes Caroline's future family will be lucky to have her.",
+            "Melanie thinks Caroline is kind for taking in kids in need.",
+            "Melanie is encouraging Caroline by saying she is doing something amazing by creating a family for kids in need.",
+            "Melanie believes Caroline will be an awesome mom.",
+            "Melanie thinks Caroline is going to make a huge difference."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly show Melanie thinks Caroline is doing something amazing and will be an awesome mom."
+        },
+        {
+          "question": "How long have Mel and her husband been married?",
+          "ground_truth": "Mel and her husband have been married for 5 years.",
+          "category": 4,
+          "facts_returned": [
+            "Melanie has been married for 5 years."
+          ],
+          "score": "pass",
+          "reason": "The fact clearly states Melanie has been married for 5 years, directly supporting the answer."
+        },
+        {
+          "question": "What does Caroline's necklace symbolize?",
+          "ground_truth": "love, faith, and strength",
+          "category": 4,
+          "facts_returned": [
+            "The necklace stands for love, faith, and strength.",
+            "The necklace is a reminder of Caroline's roots and the love and support she gets from her family.",
+            "The necklace was a gift from Caroline's grandma in Sweden.",
+            "Caroline's grandma gave her the necklace when she was young.",
+            "Caroline has a necklace that is super special to her."
+          ],
+          "score": "pass",
+          "reason": "The facts explicitly state that the necklace stands for love, faith, and strength, matching the expected answer."
+        },
+        {
+          "question": "What country is Caroline's grandma from?",
+          "ground_truth": "Sweden",
+          "category": 4,
+          "facts_returned": [
+            "The necklace was a gift from Caroline's grandma in Sweden."
+          ],
+          "score": "pass",
+          "reason": "The fact explicitly states that Caroline's grandma is in Sweden, supporting the answer."
+        },
+        {
+          "question": "What was grandma's gift to Caroline?",
+          "ground_truth": "necklace",
+          "category": 4,
+          "facts_returned": [
+            "Caroline's grandma gave her the necklace when she was young.",
+            "The necklace was a gift from Caroline's grandma in Sweden."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Caroline's grandma gave her a necklace as a gift."
+        },
+        {
+          "question": "What is Melanie's hand-painted bowl a reminder of?",
+          "ground_truth": "art and self-expression",
+          "category": 4,
+          "facts_returned": [
+            "Flowers represent growth, beauty, and remind Melanie to appreciate the small moments."
+          ],
+          "score": "partial",
+          "reason": "The facts mention flowers reminding Melanie to appreciate small moments but do not explicitly link the hand-painted bowl to art and self-expression."
+        },
+        {
+          "question": "What did Melanie and her family do while camping?",
+          "ground_truth": "explored nature, roasted marshmallows, and went on a hike",
+          "category": 4,
+          "facts_returned": [
+            "During the family camping trip, Melanie and her family roast marshmallows, tell stories around the campfire, and enjoy each other's company.",
+            "Melanie and her family roasted marshmallows around the campfire during their camping trip.",
+            "Melanie recently took her family camping in the mountains where they explored nature, roasted marshmallows, and went on a hike with an amazing view.",
+            "Melanie and her family went on a hike during their camping trip.",
+            "Melanie and her family explored nature during their camping trip.",
+            "Melanie and her family bond over stories, campfires, and nature during camping trips.",
+            "Melanie and her family played games together."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Melanie and her family explored nature, roasted marshmallows, and went on a hike while camping."
+        },
+        {
+          "question": "What kind of counseling and mental health services is Caroline interested in pursuing?",
+          "ground_truth": "working with trans people, helping them accept themselves and supporting their mental health",
+          "category": 4,
+          "facts_returned": [
+            "Caroline is considering a career in counseling and mental health, focusing on helping trans people accept themselves and support their mental health.",
+            "Caroline is thinking of working with trans people, helping them accept themselves and supporting their mental health.",
+            "Caroline is motivated to pursue counseling and mental health as a career.",
+            "Caroline is keen on counseling or working in mental health.",
+            "Caroline's experience with mental health support motivated her to pursue a career in counseling and mental health to help others."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state Caroline's interest in working with trans people to help them accept themselves and support their mental health."
+        },
+        {
+          "question": "What workshop did Caroline attend recently?",
+          "ground_truth": "LGBTQ+ counseling workshop",
+          "category": 4,
+          "facts_returned": [
+            "Caroline attended an LGBTQ+ counseling workshop last Friday that discussed therapeutic methods and creating safe spaces for trans people.",
+            "Caroline attended an LGBTQ+ counseling workshop last Friday.",
+            "The LGBTQ+ counseling workshop Caroline attended was enlightening and covered different therapeutic methods and how to best work with trans people.",
+            "The professionals at the LGBTQ+ counseling workshop were passionate about making a safe space for people like Caroline."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Caroline attended an LGBTQ+ counseling workshop recently."
+        },
+        {
+          "question": "What was discussed in the LGBTQ+ counseling workshop?",
+          "ground_truth": "therapeutic methods and how to best work with trans people",
+          "category": 4,
+          "facts_returned": [
+            "Caroline attended an LGBTQ+ counseling workshop last Friday that discussed therapeutic methods and creating safe spaces for trans people.",
+            "The LGBTQ+ counseling workshop Caroline attended was enlightening and covered different therapeutic methods and how to best work with trans people.",
+            "The professionals at the LGBTQ+ counseling workshop were passionate about making a safe space for people like Caroline."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that the workshop discussed therapeutic methods and how to best work with trans people."
+        },
+        {
+          "question": "What motivated Caroline to pursue counseling?",
+          "ground_truth": "her own journey and the support she received, and how counseling improved her life",
+          "category": 4,
+          "facts_returned": [
+            "Caroline's experience with mental health support motivated her to pursue a career in counseling and mental health to help others.",
+            "Caroline's own journey and the support she received made a huge difference in her life.",
+            "The support Caroline received for her mental health was really helpful.",
+            "Caroline's experience volunteering reminded her of her own past struggles and feelings of loneliness.",
+            "Caroline realized the importance of having a support system for others based on her own experience.",
+            "Caroline wants to use her personal story to help others in the counseling and mental health field."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Caroline's own journey and the support she received motivated her to pursue counseling and help others."
+        },
+        {
+          "question": "What kind of place does Caroline want to create for people?",
+          "ground_truth": "a safe and inviting place for people to grow",
+          "category": 4,
+          "facts_returned": [
+            "Caroline is passionate about creating a safe, inviting place for people to grow.",
+            "Caroline's dream is to create a safe and loving home for adopted kids.",
+            "Caroline believes love and acceptance should be everyone's right and wants adopted kids to experience it.",
+            "Caroline wants kids to experience love and acceptance in her home.",
+            "Caroline has a dream to have a family and give a loving home to kids who need it.",
+            "Caroline wants to build her own family and provide a roof over kids who haven't had that before.",
+            "Caroline hopes to build her own family and provide a home for children who have not had one before."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state Caroline wants to create a safe and inviting place for people to grow, matching the expected answer."
+        },
+        {
+          "question": "Did Melanie make the black and white bowl in the photo?",
+          "ground_truth": "Yes",
+          "category": 4,
+          "facts_returned": [
+            "Melanie made the black and white bowl in her pottery class.",
+            "Caroline is asking Melanie if she made the bowl with the black and white design."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Melanie made the black and white bowl, directly supporting the answer."
+        },
+        {
+          "question": "What kind of books does Caroline have in her library?",
+          "ground_truth": "kids' books - classics, stories from different cultures, educational books",
+          "category": 4,
+          "facts_returned": [
+            "Caroline has a collection of kids' books including classics, stories from different cultures, and educational books."
+          ],
+          "score": "pass",
+          "reason": "The retrieved facts clearly and fully describe the kinds of books Caroline has in her library, matching the expected answer."
+        },
+        {
+          "question": "What was Melanie's favorite book from her childhood?",
+          "ground_truth": "\"Charlotte's Web\"",
+          "category": 4,
+          "facts_returned": [
+            "Melanie's favorite childhood book is \"Charlotte's Web,\" which taught her about friendship and compassion.",
+            "Melanie loved reading \"Charlotte's Web\" as a kid.",
+            "Melanie found it cool seeing how friendship and compassion can make a difference in \"Charlotte's Web\"."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Melanie's favorite childhood book was 'Charlotte's Web' and provide supporting details."
+        },
+        {
+          "question": "What book did Caroline recommend to Melanie?",
+          "ground_truth": "\"Becoming Nicole\"",
+          "category": 4,
+          "facts_returned": [
+            "Melanie has been reading a book recommended by Caroline a while ago to keep busy."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Caroline recommended a book to Melanie but do not specify the book's title as 'Becoming Nicole.'"
+        },
+        {
+          "question": "What did Caroline take away from the book \"Becoming Nicole\"?",
+          "ground_truth": "Lessons on self-acceptance and finding support",
+          "category": 4,
+          "facts_returned": [
+            "Caroline learned self-acceptance, how to find support, and that tough times don't last from the book \"Becoming Nicole.\"",
+            "The book \"Becoming Nicole\" made Caroline feel connected and gave her a lot of hope for her own path.",
+            "Caroline recommends \"Becoming Nicole\" as it made her feel connected and gave her hope for her own path."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state Caroline learned self-acceptance and how to find support from the book."
+        },
+        {
+          "question": "What are the new shoes that Melanie got used for?",
+          "ground_truth": "Running",
+          "category": 4,
+          "facts_returned": [
+            "Melanie has new shoes that are for running.",
+            "Melanie recently got new purple running shoes.",
+            "Melanie recently got some new shoes."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Melanie's new shoes are for running."
+        },
+        {
+          "question": "What is Melanie's reason for getting into running?",
+          "ground_truth": "To de-stress and clear her mind",
+          "category": 4,
+          "facts_returned": [
+            "Melanie finds running a great way to destress and clear her mind.",
+            "Melanie plans to continue running because it benefits her mental health.",
+            "Melanie has been running longer since the last chat as a way to destress and clear her mind.",
+            "Melanie found running the charity race for mental health really rewarding.",
+            "Running the charity race for mental health made Melanie think about taking care of mental health."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Melanie runs to destress and clear her mind, matching the expected answer."
+        },
+        {
+          "question": "What does Melanie say running has been great for?",
+          "ground_truth": "Her mental health",
+          "category": 4,
+          "facts_returned": [
+            "Melanie finds running a great way to destress and clear her mind.",
+            "Melanie has been running longer since the last chat as a way to destress and clear her mind.",
+            "Melanie plans to continue running because it benefits her mental health.",
+            "Running farther has been great for Melanie's headspace."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly indicate that running has been great for Melanie's mental health."
+        },
+        {
+          "question": "What did Mel and her kids make during the pottery workshop?",
+          "ground_truth": "pots",
+          "category": 4,
+          "facts_returned": [
+            "Melanie and her kids made their own pots at the pottery workshop.",
+            "Melanie's kids loved the pottery workshop.",
+            "Melanie's kids were excited to get their hands dirty and make something with clay at the pottery workshop.",
+            "Melanie took her kids to a pottery workshop last Friday."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Melanie and her kids made their own pots at the pottery workshop."
+        },
+        {
+          "question": "What kind of pot did Mel and her kids make with clay?",
+          "ground_truth": "a cup with a dog face on it",
+          "category": 4,
+          "facts_returned": [
+            "Melanie and her kids made their own pots at the pottery workshop.",
+            "Caroline thinks the cup made by Melanie's kids in the pottery workshop is cute."
+          ],
+          "score": "partial",
+          "reason": "The facts mention Melanie and her kids made pots and a cup, but do not specify that the cup had a dog face on it."
+        },
+        {
+          "question": "What creative project do Mel and her kids do together besides pottery?",
+          "ground_truth": "painting",
+          "category": 4,
+          "facts_returned": [
+            "Melanie and her kids love painting together lately, especially nature-inspired paintings.",
+            "Melanie and her kids both helped with a nature-inspired painting.",
+            "Melanie and her kids created a nature-inspired painting last weekend.",
+            "Melanie and her kids found lovely flowers while working on the painting.",
+            "Melanie creates art through painting and pottery."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Mel and her kids do painting together besides pottery."
+        },
+        {
+          "question": "What did Mel and her kids paint in their latest project in July 2023?",
+          "ground_truth": "a sunset with a palm tree",
+          "category": 4,
+          "facts_returned": [
+            "Melanie and her kids created a nature-inspired painting last weekend.",
+            "Melanie and her kids both helped with a nature-inspired painting.",
+            "Melanie and her kids love painting together lately, especially nature-inspired paintings.",
+            "Melanie and her kids found lovely flowers while working on the painting.",
+            "Melanie found bonding over the painting and chatting about nature to be great."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Mel and her kids painted a nature-inspired painting but do not specify a sunset with a palm tree."
+        },
+        {
+          "question": "What did Caroline see at the council meeting for adoption?",
+          "ground_truth": "many people wanting to create loving homes for children in need",
+          "category": 4,
+          "facts_returned": [
+            "The adoption council meeting Caroline attended was inspiring and emotional.",
+            "Many people at the adoption council meeting wanted to create loving homes for children in need.",
+            "Caroline went to a council meeting for adoption last Friday."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that many people at the adoption council meeting wanted to create loving homes for children in need, directly supporting the expected answer."
+        },
+        {
+          "question": "What do sunflowers represent according to Caroline?",
+          "ground_truth": "warmth and happiness",
+          "category": 4,
+          "facts_returned": [
+            "Caroline associates sunflowers with warmth and happiness."
+          ],
+          "score": "pass",
+          "reason": "The retrieved fact directly states that Caroline associates sunflowers with warmth and happiness."
+        },
+        {
+          "question": "Why are flowers important to Melanie?",
+          "ground_truth": "They remind her to appreciate the small moments and were a part of her wedding decor",
+          "category": 4,
+          "facts_returned": [
+            "Melanie said that flowers bring joy and represent growth, beauty, and remind us to appreciate the small moments.",
+            "Flowers represent growth, beauty, and remind Melanie to appreciate the small moments.",
+            "Flowers bring joy to Melanie.",
+            "Flowers always remind Melanie of her wedding day.",
+            "Flowers were an important part of Melanie's wedding decor."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that flowers remind Melanie to appreciate the small moments and were part of her wedding decor."
+        },
+        {
+          "question": "What inspired Caroline's painting for the art show?",
+          "ground_truth": "visiting an LGBTQ center and wanting to capture unity and strength",
+          "category": 4,
+          "facts_returned": [
+            "Caroline has been busy painting and recently finished a painting inspired by a beach sunset she saw last week.",
+            "Caroline's painting was inspired by seeing the sun dip below the horizon with amazing colors.",
+            "Caroline tried to capture the feeling of the sunset in her painting.",
+            "Caroline's painting captures the vivid colors and peaceful feeling of a sunset at the beach.",
+            "Caroline thinks the painting highlights the beauty of nature.",
+            "Melanie believes that the beach inspired Caroline's painting."
+          ],
+          "score": "fail",
+          "reason": "The facts only mention inspiration from a beach sunset, not from visiting an LGBTQ center or themes of unity and strength."
+        },
+        {
+          "question": "How often does Melanie go to the beach with her kids?",
+          "ground_truth": "once or twice a year",
+          "category": 4,
+          "facts_returned": [
+            "Melanie and her family recently went to the beach, which they do only once or twice a year, and the kids had a great time.",
+            "Melanie and her kids go to the beach usually only once or twice a year.",
+            "The times Melanie and her kids spend at the beach are always special for spending time together and chilling.",
+            "Melanie's kids had a blast at the beach."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Melanie and her kids go to the beach once or twice a year."
+        },
+        {
+          "question": "What did Melanie and her family see during their camping trip last year?",
+          "ground_truth": "Perseid meteor shower",
+          "category": 4,
+          "facts_returned": [
+            "Melanie's best camping memory is from last year when they saw the Perseid meteor shower and made wishes while watching the sky light up.",
+            "Melanie recently took her family camping in the mountains where they explored nature, roasted marshmallows, and went on a hike with an amazing view.",
+            "Melanie and her family went on a hike during their camping trip.",
+            "The view from the top of the hike was amazing.",
+            "Melanie and her family roasted marshmallows around the campfire during their camping trip.",
+            "During the family camping trip, Melanie and her family roast marshmallows, tell stories around the campfire, and enjoy each other's company."
+          ],
+          "score": "pass",
+          "reason": "The facts explicitly state that Melanie and her family saw the Perseid meteor shower during their camping trip last year."
+        },
+        {
+          "question": "How did Melanie feel while watching the meteor shower?",
+          "ground_truth": "in awe of the universe",
+          "category": 4,
+          "facts_returned": [
+            "Melanie felt awe and a sense of connection to the universe while watching the Perseid meteor shower with her family.",
+            "Melanie felt like they were part of something huge and awe-inspiring while watching the meteor shower.",
+            "Melanie felt tiny and in awe of the universe during the meteor shower, reminding her how awesome life is.",
+            "Melanie felt tiny and in awe of the universe during the meteor shower, reminding her how awesome life is with many little moments like that.",
+            "Melanie and her family made wishes while watching the Perseid meteor shower and felt at one with the universe."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state Melanie felt awe and a connection to the universe while watching the meteor shower."
+        },
+        {
+          "question": "Whose birthday did Melanie celebrate recently?",
+          "ground_truth": "Melanie's daughter",
+          "category": 4,
+          "facts_returned": [
+            "Melanie celebrated her daughter's birthday with a concert last night.",
+            "Melanie celebrated her daughter's birthday with a concert surrounded by music, joy, and the warm summer breeze, feeling thankful for the special moments with her kids.",
+            "Melanie felt thankful for the special moments she shared with her kids during the celebration."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Melanie celebrated her daughter's birthday."
+        },
+        {
+          "question": "Who performed at the concert at Melanie's daughter's birthday?",
+          "ground_truth": "Matt Patterson",
+          "category": 4,
+          "facts_returned": [
+            "Melanie celebrated her daughter's birthday with a concert last night."
+          ],
+          "score": "fail",
+          "reason": "The retrieved fact does not mention who performed at the concert."
+        },
+        {
+          "question": "Why did Melanie choose to use colors and patterns in her pottery project?",
+          "ground_truth": "She wanted to catch the eye and make people smile.",
+          "category": 4,
+          "facts_returned": [
+            "Melanie made a pottery project designed to catch the eye and make people smile.",
+            "Melanie is obsessed with colorful and patterned pottery projects.",
+            "Melanie finds pottery fun and therapeutic, letting her express herself and get creative."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state Melanie's pottery project was designed to catch the eye and make people smile, matching the expected answer."
+        },
+        {
+          "question": "What pet does Caroline have?",
+          "ground_truth": "guinea pig",
+          "category": 4,
+          "facts_returned": [
+            "Caroline has a pet guinea pig named Oscar.",
+            "Melanie asked Caroline to show a picture of Oscar, Caroline's guinea pig.",
+            "Oscar, Caroline's guinea pig, has been great."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Caroline has a pet guinea pig named Oscar."
+        },
+        {
+          "question": "What pets does Melanie have?",
+          "ground_truth": "Two cats and a dog",
+          "category": 4,
+          "facts_returned": [
+            "Melanie has three pets named Luna, Oliver, and Bailey.",
+            "Melanie has a cat named Bailey.",
+            "Oliver is Melanie's pet cat.",
+            "Luna and Oliver are sweet and playful pets that liven up Melanie's house.",
+            "Melanie's pets Luna and Oliver brighten up their day and always make them smile.",
+            "Melanie has two pets named Luna and Oliver, who are sweet and playful and brighten up their day.",
+            "Melanie has pets and they are doing well."
+          ],
+          "score": "partial",
+          "reason": "The facts confirm Melanie has two cats (Oliver and Bailey) and pets named Luna and Oliver, but do not explicitly mention a dog or confirm the total number of pets as two cats and a dog."
+        },
+        {
+          "question": "Where did Oliver hide his bone once?",
+          "ground_truth": "In Melanie's slipper",
+          "category": 4,
+          "facts_returned": [
+            "Oliver hid his bone in Melanie's slipper once."
+          ],
+          "score": "pass",
+          "reason": "The fact explicitly states that Oliver hid his bone in Melanie's slipper once, fully supporting the answer."
+        },
+        {
+          "question": "What activity did Caroline used to do with her dad?",
+          "ground_truth": "Horseback riding",
+          "category": 4,
+          "facts_returned": [
+            "Caroline used to go horseback riding with her dad when she was a kid.",
+            "Caroline and her dad would go through the fields while horseback riding.",
+            "Caroline felt the wind while horseback riding with her dad, which was a special experience for her."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Caroline used to go horseback riding with her dad."
+        },
+        {
+          "question": "What did Caroline make for a local church?",
+          "ground_truth": "a stained glass window",
+          "category": 4,
+          "facts_returned": [
+            "Caroline made a stained glass window for a local church.",
+            "The stained glass window shows time changing our lives.",
+            "Caroline made the stained glass window to show her own journey as a transgender woman.",
+            "Caroline's stained glass window conveys the message that we should accept growth and change."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Caroline made a stained glass window for a local church."
+        },
+        {
+          "question": "What did Caroline find in her neighborhood during her walk?",
+          "ground_truth": "a rainbow sidewalk",
+          "category": 4,
+          "facts_returned": [
+            "Caroline was out walking in her neighborhood when she came across a cool rainbow sidewalk for Pride Month.",
+            "The rainbow sidewalk for Pride Month was vibrant and welcoming to Caroline.",
+            "Caroline took a picture of the rainbow sidewalk for Pride Month because it was vibrant and welcoming.",
+            "The rainbow sidewalk for Pride Month reminds Caroline that love and acceptance are everywhere, even where we least expect it."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Caroline found a rainbow sidewalk in her neighborhood during her walk."
+        },
+        {
+          "question": "Which song motivates Caroline to be courageous?",
+          "ground_truth": "Brave by Sara Bareilles",
+          "category": 4,
+          "facts_returned": [
+            "Caroline's favorite song with deep meaning is \"Brave\" by Sara Bareilles, which is about being courageous and fighting for what is right.",
+            "\"Brave\" by Sara Bareilles is about being courageous and fighting for what is right.",
+            "\"Brave\" by Sara Bareilles has a lot of significance for Caroline.",
+            "Melanie thinks the song \"Brave\" by Sara Bareilles fits with Caroline's journey and determination to make a difference.",
+            "Whenever Caroline hears \"Brave\" by Sara Bareilles, she thinks about the paths she has taken and the progress she has made."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that 'Brave' by Sara Bareilles motivates Caroline to be courageous."
+        },
+        {
+          "question": "Which  classical musicians does Melanie enjoy listening to?",
+          "ground_truth": "Bach and Mozart",
+          "category": 4,
+          "facts_returned": [
+            "Melanie is a fan of classical music like Bach and Mozart."
+          ],
+          "score": "pass",
+          "reason": "The facts explicitly state that Melanie is a fan of classical music like Bach and Mozart, fully supporting the answer."
+        },
+        {
+          "question": "Who is Melanie a fan of in terms of modern music?",
+          "ground_truth": "Ed Sheeran",
+          "category": 4,
+          "facts_returned": [
+            "Melanie is a fan of modern music like Ed Sheeran's \"Perfect\".",
+            "Melanie thinks Matt Patterson is very talented.",
+            "Melanie found Matt Patterson's voice and songs amazing.",
+            "Melanie attended a concert by Matt Patterson."
+          ],
+          "score": "pass",
+          "reason": "The facts explicitly state Melanie is a fan of modern music like Ed Sheeran's 'Perfect', directly supporting the answer."
+        },
+        {
+          "question": "How long has Melanie been creating art?",
+          "ground_truth": "7 years",
+          "category": 4,
+          "facts_returned": [
+            "Melanie has been into art for seven years.",
+            "Melanie has always felt a strong connection to art.",
+            "Art has been a huge learning experience for Melanie."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Melanie has been into art for seven years, matching the expected answer."
+        },
+        {
+          "question": "What precautionary sign did Melanie see at the café?",
+          "ground_truth": "A sign stating that someone is not being able to leave",
+          "category": 4,
+          "facts_returned": [
+            "The sign at the café was just a precaution."
+          ],
+          "score": "partial",
+          "reason": "The facts mention a precautionary sign at the café but do not specify that it stated someone is not able to leave."
+        },
+        {
+          "question": "What advice does Caroline give for getting started with adoption?",
+          "ground_truth": "Do research, find an adoption agency or lawyer, gather necessary documents, and prepare emotionally.",
+          "category": 4,
+          "facts_returned": [
+            "Caroline advises to do research and find an adoption agency or lawyer to help with the adoption process and provide all necessary information.",
+            "Caroline states that gathering documents like references, financial information, and medical checks is necessary for the adoption process.",
+            "Caroline took the first step towards becoming a mom by applying to adoption agencies.",
+            "Caroline emphasizes the importance of preparing emotionally for the adoption process because the wait can be hard."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly cover all aspects of Caroline's advice: doing research, finding an agency or lawyer, gathering documents, and preparing emotionally."
+        },
+        {
+          "question": "What setback did Melanie face in October 2023?",
+          "ground_truth": "She got hurt and had to take a break from pottery.",
+          "category": 4,
+          "facts_returned": [
+            "Melanie had a setback last month due to an injury.",
+            "Melanie had to take a break from pottery last month because of her injury.",
+            "Melanie has been painting to keep busy during her recovery from the injury."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state Melanie was injured and had to take a break from pottery, matching the expected answer."
+        },
+        {
+          "question": "What does Melanie do to keep herself busy during her pottery break?",
+          "ground_truth": "Read a book and paint.",
+          "category": 4,
+          "facts_returned": [
+            "Melanie had to take a break from pottery last month because of her injury.",
+            "Melanie finds pottery fun and therapeutic, letting her express herself and get creative.",
+            "Melanie finds making pottery to be calming.",
+            "Melanie signed up for a pottery class as a form of therapy and creative expression."
+          ],
+          "score": "fail",
+          "reason": "The facts do not mention Melanie reading a book or painting during her pottery break."
+        },
+        {
+          "question": "What painting did Melanie show to Caroline on October 13, 2023?",
+          "ground_truth": "A painting inspired by sunsets with a pink sky.",
+          "category": 4,
+          "facts_returned": [
+            "Melanie recently did a horse painting."
+          ],
+          "score": "fail",
+          "reason": "The retrieved fact about a horse painting does not mention a painting inspired by sunsets with a pink sky or the date October 13, 2023."
+        },
+        {
+          "question": "What kind of painting did Caroline share with Melanie on October 13, 2023?",
+          "ground_truth": "An abstract painting with blue streaks on a wall.",
+          "category": 4,
+          "facts_returned": [
+            "Caroline has been trying out abstract art recently.",
+            "Caroline finds abstract art freeing because it allows putting feelings on the canvas without too much of a plan.",
+            "Caroline considers abstract art a cool form of self-expression.",
+            "Caroline feels that sharing her art and story with Melanie means a lot to her."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Caroline shares abstract art with Melanie but do not specify the painting's details or the date."
+        },
+        {
+          "question": "What was the poetry reading that Caroline attended about?",
+          "ground_truth": "It was a transgender poetry reading where transgender people shared their stories.",
+          "category": 4,
+          "facts_returned": [
+            "Caroline attended a transgender poetry reading where transgender people shared their stories through poetry.",
+            "The transgender poetry reading was empowering because it allowed people to share and celebrate their identities.",
+            "The transgender poetry reading was a safe place for self-expression.",
+            "The room at the transgender poetry reading was electric with energy and support.",
+            "The posters at the transgender poetry reading were amazing and conveyed much pride and strength."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Caroline attended a transgender poetry reading where transgender people shared their stories through poetry."
+        },
+        {
+          "question": "What did the posters at the poetry reading say?",
+          "ground_truth": "\"Trans Lives Matter\"",
+          "category": 4,
+          "facts_returned": [
+            "The posters at the transgender poetry reading were amazing and conveyed much pride and strength.",
+            "Melanie finds the posters from the transgender poetry reading event great."
+          ],
+          "score": "partial",
+          "reason": "The facts describe the posters positively but do not specify that they said 'Trans Lives Matter.'"
+        },
+        {
+          "question": "What does Caroline's drawing symbolize for her?",
+          "ground_truth": "Freedom and being true to herself.",
+          "category": 4,
+          "facts_returned": [
+            "Caroline's artwork is a symbol of togetherness, celebrating differences and bringing people closer.",
+            "The artwork Caroline drew is a nudge to always stay true to herself and embrace her womanhood.",
+            "Caroline's painting is a reminder to love her authentic self.",
+            "Caroline's aim with the painting 'Embracing Identity' was to show warmth, love, and self-acceptance.",
+            "Caroline drew the artwork that stands for freedom and being real.",
+            "Caroline creates art that shows togetherness and power.",
+            "Caroline's painting aims to capture everyone's unity and strength.",
+            "Caroline made a painting to show her path as a trans woman.",
+            "Caroline made a painting to show her path as a trans woman, using red and blue to represent the binary gender system and mixed colors to symbolize breaking rigid thinking.",
+            "Caroline uses painting and drawing to express her feelings and explore her gender identity.",
+            "Caroline says that art helps her show her feelings.",
+            "Caroline uses her art to show her story and help people understand the trans community."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Caroline's drawing symbolizes freedom and being true to herself, matching the expected answer."
+        },
+        {
+          "question": "How do Melanie and Caroline describe their journey through life together?",
+          "ground_truth": "An ongoing adventure of learning and growing.",
+          "category": 4,
+          "facts_returned": [
+            "Melanie and Caroline appreciate their friendship and support each other through life's struggles.",
+            "Melanie wants to keep motivating and helping Caroline as they journey through life.",
+            "Melanie feels that Caroline has always been there for her.",
+            "Caroline is really glad to have Melanie as a friend to share her journey.",
+            "Caroline believes they can tackle life's challenges together with Melanie.",
+            "Melanie is glad to be on this trip together with Caroline."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate a supportive and shared journey but do not explicitly describe it as an ongoing adventure of learning and growing."
+        },
+        {
+          "question": "What happened to Melanie's son on their road trip?",
+          "ground_truth": "He got into an accident",
+          "category": 4,
+          "facts_returned": [
+            "Melanie's son got into an accident during a roadtrip this past weekend.",
+            "Melanie's son was okay after the accident.",
+            "Melanie and others were very scared during the accident involving her son.",
+            "Caroline expressed relief that Melanie's son was okay after the accident.",
+            "The accident experience was very scary for Melanie and her group.",
+            "The accident is now over and no longer ongoing.",
+            "Melanie's kids were scared during the accident but were reassured by Melanie and explained that their brother would be OK."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Melanie's son got into an accident during the road trip."
+        },
+        {
+          "question": "How did Melanie's son handle the accident?",
+          "ground_truth": "He was scared but reassured by his family",
+          "category": 4,
+          "facts_returned": [
+            "Melanie's son was okay after the accident.",
+            "Melanie's kids were scared during the accident but were reassured by Melanie and explained that their brother would be OK.",
+            "Melanie and others were very scared during the accident involving her son."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Melanie's son was scared but reassured by his family, matching the expected answer."
+        },
+        {
+          "question": "How did Melanie feel about her family after the accident?",
+          "ground_truth": "They are important and mean the world to her",
+          "category": 4,
+          "facts_returned": [
+            "Melanie has thought a lot about how much she needs her family especially after the accident.",
+            "The accident reminded Melanie that life is precious and to cherish family.",
+            "Having Melanie's family around helps her a lot.",
+            "Melanie appreciates having her family around during tough times.",
+            "Melanie finds having her family around helps a lot during hard times.",
+            "Melanie is very thankful to have her family.",
+            "Melanie's family brings her so much joy and love.",
+            "Melanie feels really alive and happy when she spends time with her family.",
+            "Having Melanie's family around makes hard times easier for her.",
+            "Melanie views her family as her biggest motivation and support.",
+            "Caroline stated that Melanie's family really are her rock.",
+            "Melanie wants to be courageous for her family because they motivate her and give her love.",
+            "Melanie appreciates life and feels lucky to be with her family and have their love.",
+            "Melanie considers family to be super important to her."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly show Melanie values her family deeply and considers them very important after the accident."
+        },
+        {
+          "question": "How did Melanie's children handle the accident?",
+          "ground_truth": "They were scared but resilient",
+          "category": 4,
+          "facts_returned": [
+            "Melanie's kids were scared during the accident but were reassured by Melanie and explained that their brother would be OK.",
+            "Melanie's kids are tough kids.",
+            "Caroline asked Melanie how her kids handled the accident."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Melanie's kids were scared but tough (resilient), matching the expected answer."
+        },
+        {
+          "question": "How did Melanie feel after the accident?",
+          "ground_truth": "Grateful and thankful for her family",
+          "category": 4,
+          "facts_returned": [
+            "Melanie and others were very scared during the accident involving her son.",
+            "The accident experience was very scary for Melanie and her group.",
+            "Melanie has thought a lot about how much she needs her family especially after the accident.",
+            "The accident reminded Melanie that life is precious and to cherish family.",
+            "Melanie appreciates life and feels lucky to be with her family and have their love.",
+            "Having Melanie's family around makes hard times easier for her.",
+            "Melanie is very thankful to have her family."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly show Melanie felt grateful and thankful for her family after the accident."
+        },
+        {
+          "question": "What was Melanie's reaction to her children enjoying the Grand Canyon?",
+          "ground_truth": "She was happy and thankful",
+          "category": 4,
+          "facts_returned": [
+            "Melanie enjoyed seeing her kids have a good time outdoors.",
+            "Melanie's family enjoyed the Grand Canyon a lot."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Melanie enjoyed seeing her kids have a good time, implying happiness, but do not explicitly mention her being thankful."
+        },
+        {
+          "question": "What do Melanie's family give her?",
+          "ground_truth": "Strength and motivation",
+          "category": 4,
+          "facts_returned": [
+            "Melanie's family brings her so much joy and love.",
+            "Melanie's family has been awesome, helping out and showing lots of love and support.",
+            "Melanie appreciates special moments with her family and feels lucky to have their love and joy.",
+            "Melanie views her family as her biggest motivation and support.",
+            "Melanie appreciates life and feels lucky to be with her family and have their love.",
+            "Melanie wants to be courageous for her family because they motivate her and give her love."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Melanie's family provides her with motivation, support, and love, which aligns with strength and motivation."
+        },
+        {
+          "question": "How did Melanie feel about her family supporting her?",
+          "ground_truth": "She appreciated them a lot",
+          "category": 4,
+          "facts_returned": [
+            "Melanie views her family as her biggest motivation and support.",
+            "Melanie's family has been awesome, helping out and showing lots of love and support.",
+            "Melanie appreciates having her family around during tough times.",
+            "Having Melanie's family around helps her a lot.",
+            "Melanie is very thankful to have her family.",
+            "Melanie finds having her family around helps a lot during hard times.",
+            "Having Melanie's family around makes hard times easier for her.",
+            "Melanie's family brings her so much joy and love.",
+            "Melanie wants to be courageous for her family because they motivate her and give her love.",
+            "Melanie has thought a lot about how much she needs her family especially after the accident.",
+            "Melanie expressed that having support is important.",
+            "Melanie expressed that strong support really helps in difficult situations."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly show Melanie appreciates and values her family's support a lot."
+        },
+        {
+          "question": "What did Melanie do after the road trip to relax?",
+          "ground_truth": "Went on a nature walk or hike",
+          "category": 4,
+          "facts_returned": [
+            "The activity was a nice way for Melanie and her family to relax after a road trip.",
+            "Melanie's kids loved the camping trip and it was a nice way to relax after a road trip.",
+            "Caroline expressed gladness that Melanie got some rest and relaxation after the drive.",
+            "Melanie and her family played games together.",
+            "Melanie had a really nice time together with her family during the camping trip.",
+            "Melanie enjoyed unplugging and hanging out with the kids during the camping trip."
+          ],
+          "score": "partial",
+          "reason": "The facts indicate Melanie relaxed after the road trip but do not specify that she went on a nature walk or hike."
+        },
+        {
+          "question": "Did Caroline make the black and white bowl in the photo?",
+          "ground_truth": "No",
+          "category": 5,
+          "facts_returned": [
+            "Melanie made the black and white bowl in her pottery class.",
+            "Caroline is asking Melanie if she made the bowl with the black and white design."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly state that Melanie made the black and white bowl, not Caroline."
+        },
+        {
+          "question": "Is Oscar Melanie's pet?",
+          "ground_truth": "No",
+          "category": 5,
+          "facts_returned": [
+            "Caroline has a pet guinea pig named Oscar.",
+            "Oscar, Caroline's guinea pig, has been great.",
+            "Melanie asked Caroline to show a picture of Oscar, Caroline's guinea pig."
+          ],
+          "score": "pass",
+          "reason": "The facts clearly indicate that Oscar is Caroline's pet, not Melanie's."
+        }
+      ]
+    }
+  ]
+}

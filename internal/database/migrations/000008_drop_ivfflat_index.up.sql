@@ -1,0 +1,12 @@
+-- Drop the IVFFlat ANN index on fact embeddings.
+--
+-- Rationale: vector searches are always filtered by thread_id (idx_facts_thread_id
+-- handles the row pruning), so each search inspects at most a few thousand vectors
+-- per thread. Brute-force exact cosine over that set is fast (single-digit ms) and
+-- gives 100% recall, whereas the IVFFlat index with default probes=1 was scanning
+-- only ~1% of the data and silently dropping high-similarity matches.
+--
+-- If/when a single thread grows past ~50k facts, replace this with an HNSW index:
+--   CREATE INDEX idx_facts_embedding_cosine
+--   ON facts USING hnsw (embedding vector_cosine_ops);
+DROP INDEX IF EXISTS idx_facts_embedding_cosine;
