@@ -36,7 +36,14 @@ import time
 import urllib.request
 from collections import defaultdict
 from pathlib import Path
+from datetime import timezone
 from dotenv import load_dotenv
+
+try:
+    from dateutil import parser as _dateutil_parser
+    _HAS_DATEUTIL = True
+except ImportError:
+    _HAS_DATEUTIL = False
 
 # Load .env from the repository root
 env_path = Path(__file__).resolve().parent.parent.parent / ".env"
@@ -53,6 +60,19 @@ LOCOMO_DATA_URL = (
 DATA_DEFAULT = Path(__file__).parent / "data" / "locomo10.json"
 
 _PREVIEW_LEN = 80
+
+
+def _parse_session_datetime(raw: str | None) -> str | None:
+    """Parse a locomo session date string (e.g. '1:56 pm on 8 May, 2023') to ISO 8601."""
+    if not raw:
+        return None
+    if _HAS_DATEUTIL:
+        try:
+            dt = _dateutil_parser.parse(raw, dayfirst=True)
+            return dt.replace(tzinfo=timezone.utc).isoformat()
+        except Exception:
+            return None
+    return None
 
 
 # ── dataset helpers ────────────────────────────────────────────────────────────
@@ -136,6 +156,7 @@ async def evaluate_sample(
             )
             ingested = 0
             for session_key, turns in sessions:
+                session_iso = _parse_session_datetime(conversation.get(f"{session_key}_date_time"))
                 for turn in turns:
                     text = turn.get("text", "").strip()
                     if not text:
@@ -148,7 +169,7 @@ async def evaluate_sample(
                         flush=True,
                     )
                     try:
-                        await client.ingest(thread_id, role, text, author=turn.get("speaker") or None)
+                        await client.ingest(thread_id, role, text, author=turn.get("speaker") or None, when=session_iso)
                     except Exception as exc:
                         print(f"  [WARN] ingest error in sample {sample_id}: {exc}", flush=True)
 

@@ -61,6 +61,9 @@ func (e *MemoryEngine) persistAndDecomposeSources(ctx context.Context, eventID, 
 		if item.Kind == models.SOURCE_USER || item.Kind == models.SOURCE_AGENT {
 			req.MessageHistory = msgHistory
 		}
+		if item.Timestamp != nil {
+			req.Timestamp = item.Timestamp.UTC().Format("2 January 2006, 15:04 UTC")
+		}
 
 		decomposition, err := e.ai.Decompose(ctx, req)
 		if err != nil {

@@ -45,12 +45,19 @@ class MemoryAPIClient:
         resp.raise_for_status()
         return resp.json()
 
-    async def ingest(self, thread_id: str, role: str, content: str, author: str | None = None) -> dict:
-        """Send a single conversation turn to /memory/contextual for ingestion."""
+    async def ingest(self, thread_id: str, role: str, content: str, author: str | None = None, when: str | None = None) -> dict:
+        """Send a single conversation turn to /memory/contextual for ingestion.
+
+        Args:
+            when: ISO 8601 timestamp string for when the message was produced.
+                  Used to resolve relative dates in fact extraction.
+        """
         kind = _ROLE_TO_KIND.get(role.lower(), role.upper())
         item: dict = {"kind": kind, "content": content, "content_type": "text/plain"}
         if author:
             item["author"] = author
+        if when:
+            item["timestamp"] = when
         payload = {
             "thread_id": thread_id,
             "inputs": [item],

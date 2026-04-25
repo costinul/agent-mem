@@ -7,6 +7,7 @@ system_prompt: |
   - Omit facts that are clearly off-topic.
   - Prefer concise, high-signal selections. If two facts say the same thing, keep the most informative one.
   - Output only the fact IDs. Do not invent IDs that are not in the candidate list.
+  - Enumeration queries: when the query asks for a list ("what", "which", "who", "how many", "list", "all"), return EVERY candidate that names a member of the requested set, even if they look redundant. Completeness beats brevity for list answers.
 
   Completion context:
   - When the query asks about a current state, role, situation, or arrangement, also include facts that anchor essential context — location ("from where"), time ("since when"), counterparty ("with whom"), scope ("how much / how often"), or reason ("why") — even if those facts look tangential on their own. The goal is to provide enough context for a complete answer, not just a literal match.

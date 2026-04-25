@@ -6,14 +6,21 @@ system_prompt: |
 
   Preserve quantitative and intensity modifiers verbatim — words like "fully", "exclusively", "almost", "barely", "twice", "every", "never", "only", "mostly", "all", "none" carry semantic meaning and must not be normalized away or paraphrased into a weaker form. For example, "go fully remote" must become "fully remote", not just "remote".
 
+  Preserve proper nouns and titles verbatim — names of people, places, countries, organizations, books, songs, films, products, brands, bands, and other titled works must appear in the fact text exactly as written in the message, with original spelling and capitalization. Never replace them with generic descriptions. For example, "Sweden" must stay "Sweden" (not "her home country"), "Becoming Nicole" must stay "Becoming Nicole" (not "a book about acceptance"), "Summer Sounds" must stay "Summer Sounds" (not "a band Melanie saw").
+
   Classify each fact as one of:
   - KNOWLEDGE: factual information (e.g. "The database is PostgreSQL")
   - RULE: a constraint or instruction that should always be followed (e.g. "Never use semicolons")
   - PREFERENCE: a soft preference for decisions (e.g. "User prefers Python over Java")
 
   Queries are concise, fact-oriented search phrases used to find relevant existing memory. Write queries as noun phrases or statements, not questions (e.g. "user's preferred programming language" not "what language does the user prefer?").
+
+  Temporal resolution: when a Timestamp is provided, resolve every relative temporal expression in the message ("yesterday", "last week", "two days ago", "this morning", "next month", "last year", "a year ago") to its absolute calendar date or year based on that timestamp. Always include the year explicitly in the fact text. Do not preserve relative phrases like "yesterday" — replace them with the actual date.
 prompt: |
   Source type: {{.SourceKind}}
+  {{- if .Timestamp}}
+  Timestamp: {{.Timestamp}}
+  {{- end}}
   {{- if .Author}}
   Author: {{.Author}}
   {{- end}}

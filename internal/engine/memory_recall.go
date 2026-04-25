@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	recallCandidateK    = 25
-	recallSiblingBudget = 15
+	recallCandidateK    = 40
+	recallSiblingBudget = 25
 )
 
 // Recall answers a free-text query by decomposing it into search phrases, retrieving

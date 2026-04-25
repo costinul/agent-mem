@@ -19,6 +19,9 @@ type DecomposeRequest struct {
 	Content        string
 	ContextHeader  string
 	MessageHistory []string
+	// Timestamp is a human-readable date/time string (e.g. "8 May 2023") derived from
+	// the session wall-clock time, used to resolve relative temporal expressions in facts.
+	Timestamp string
 }
 
 // DecomposeRecallRequest is the input for decomposing a recall query into search phrases.

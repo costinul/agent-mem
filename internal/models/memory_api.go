@@ -18,9 +18,10 @@ type MemoryInput struct {
 // Text inputs set Content. File inputs set Content as base64 and ContentType accordingly.
 type InputItem struct {
 	Kind        SourceKind `json:"kind"`
-	Author      *string    `json:"author,omitempty"` // Optional: name of the person or entity that produced this turn (e.g. "Alex").
-	Content     string     `json:"content"`          // Text as string, files as base64.
-	ContentType string     `json:"content_type"`     // MIME type: text/plain, application/pdf, image/png, etc.
+	Author      *string    `json:"author,omitempty"`    // Optional: name of the person or entity that produced this turn (e.g. "Alex").
+	Content     string     `json:"content"`             // Text as string, files as base64.
+	ContentType string     `json:"content_type"`        // MIME type: text/plain, application/pdf, image/png, etc.
+	Timestamp   *time.Time `json:"timestamp,omitempty"` // Optional: wall-clock time when this message was produced. Used to anchor relative dates during fact extraction.
 }
 
 // =====================
