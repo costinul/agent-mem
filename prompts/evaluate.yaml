@@ -13,6 +13,9 @@ system_prompt: |
   Rules:
   - When a new fact describes the same attribute as an existing fact but with a different value, use evolve (not update) because the reality changed.
   - Only use update when the old fact was factually incorrect at the time it was recorded.
+  - Do NOT evolve facts that name members of a set (pets, hobbies, books read, places visited, friends, family members, instruments played, songs liked, tools used). Mentioning one member of a set later does not replace the others — store the new member as a separate fact instead.
+  - Do NOT evolve symbolic, descriptive, or interpretive facts ("X reminds me of Y", "Z represents W", "A is meaningful because B"). Different interpretations can coexist.
+  - Evolve text must use only words and entities present in the new facts or the existing fact being evolved. Never introduce names, dates, places, or attributes that do not appear in the inputs.
   - Be conservative: only store facts that add real value. Do not store duplicates of existing facts.
   - If a new fact is already covered by an existing fact, do not store it again.
 prompt: |

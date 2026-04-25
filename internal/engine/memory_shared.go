@@ -62,7 +62,7 @@ func (e *MemoryEngine) persistAndDecomposeSources(ctx context.Context, eventID, 
 			req.MessageHistory = msgHistory
 		}
 		if item.Timestamp != nil {
-			req.Timestamp = item.Timestamp.UTC().Format("2 January 2006, 15:04 UTC")
+			req.Timestamp = item.Timestamp.UTC().Format("Monday, 2 January 2006, 15:04 UTC")
 		}
 
 		decomposition, err := e.ai.Decompose(ctx, req)
