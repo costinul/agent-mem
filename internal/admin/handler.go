@@ -447,6 +447,7 @@ func (h *Handler) renderFactsSection(w http.ResponseWriter, thread *models.Threa
           <th class="text-left px-4 py-2 font-medium text-gray-500">Kind</th>
           <th class="text-left px-4 py-2 font-medium text-gray-500 w-1/2">Text</th>
           <th class="text-left px-4 py-2 font-medium text-gray-500">Status</th>
+          <th class="text-left px-4 py-2 font-medium text-gray-500">Ref Date</th>
           <th class="text-left px-4 py-2 font-medium text-gray-500">Created</th>
           <th class="text-right px-4 py-2 font-medium text-gray-500">Score</th>
         </tr>
@@ -465,6 +466,9 @@ func (h *Handler) renderFactsSection(w http.ResponseWriter, thread *models.Threa
           <td class="px-4 py-2 text-xs">
             {{if .SupersededAt}}<span class="text-orange-600">Superseded</span>
             {{else}}<span class="text-green-600">Active</span>{{end}}
+          </td>
+          <td class="px-4 py-2 text-xs font-mono text-indigo-600">
+            {{if .ReferencedAt}}{{.ReferencedAt.Format "2006-01-02"}}{{else}}<span class="text-gray-300">—</span>{{end}}
           </td>
           <td class="px-4 py-2 text-gray-500 text-xs">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
           <td class="px-4 py-2 text-right font-mono text-xs text-gray-600">{{.Score}}</td>

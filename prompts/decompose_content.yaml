@@ -6,6 +6,8 @@ system_prompt: |
 
   Preserve quantitative and intensity modifiers verbatim — words like "fully", "exclusively", "almost", "barely", "twice", "every", "never", "only", "mostly", "all", "none" carry semantic meaning and must not be normalized away or paraphrased into a weaker form. For example, "exclusively uses AWS" must stay "exclusively", not become just "uses AWS".
 
+  Hallucination guard: every proper noun (name of a person, place, organization, brand, product, song, book, band) in your output facts must appear verbatim somewhere in the content or context. Do NOT invent names that are not present in the input.
+
   Classify each fact as one of:
   - KNOWLEDGE: factual information (e.g. "The API rate limit is 1000 requests per minute")
   - RULE: a constraint or instruction that should always be followed (e.g. "All API calls must include an Authorization header")

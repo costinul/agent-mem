@@ -82,6 +82,7 @@ type Fact struct {
 	Kind         FactKind   `json:"kind"`
 	Text         string     `json:"text"`
 	Embedding    []float64  `json:"embedding"`
+	ReferencedAt *time.Time `json:"referenced_at,omitempty"` // Calendar date the fact's content refers to, extracted at decompose time.
 	SupersededAt *time.Time `json:"superseded_at"` // Non-nil means this fact has been evolved into a successor.
 	SupersededBy *string    `json:"superseded_by"` // ID of the successor fact.
 	CreatedAt    time.Time  `json:"created_at"`
@@ -94,14 +95,16 @@ type Fact struct {
 
 // Decomposition holds facts and queries extracted from a source by the LLM.
 type Decomposition struct {
-	Facts   []ExtractedFact  `json:"facts"`
-	Queries []ExtractedQuery `json:"queries"`
+	Facts     []ExtractedFact  `json:"facts"`
+	Queries   []ExtractedQuery `json:"queries"`
+	QueryDate *time.Time       `json:"query_date,omitempty"` // Populated by decompose_recall when the query references a specific date.
 }
 
 // ExtractedFact is a fact produced during decomposition, before it is stored.
 type ExtractedFact struct {
-	Text string   `json:"text"`
-	Kind FactKind `json:"kind"`
+	Text         string     `json:"text"`
+	Kind         FactKind   `json:"kind"`
+	ReferencedAt *time.Time `json:"referenced_at,omitempty"`
 }
 
 // ExtractedQuery is a query produced during decomposition, used for vector search only — never stored.

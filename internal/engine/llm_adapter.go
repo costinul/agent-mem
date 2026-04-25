@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	models "agentmem/internal/models"
 
@@ -98,6 +99,7 @@ func (a *LLMAdapter) Decompose(ctx context.Context, req DecomposeRequest) (model
 }
 
 // DecomposeRecall breaks a recall query into atomic search phrases via the LLM.
+// It also parses query_date when the LLM extracts a temporal anchor from the query.
 func (a *LLMAdapter) DecomposeRecall(ctx context.Context, query string) (models.Decomposition, error) {
 	out := &decompositionOutput{}
 	err := a.client.ExecuteAs(ctx, uuid.New(), "decompose_recall", a.schemaModel, &bwai.PromptData{
@@ -107,10 +109,16 @@ func (a *LLMAdapter) DecomposeRecall(ctx context.Context, query string) (models.
 		return models.Decomposition{}, fmt.Errorf("decompose recall query: %w", err)
 	}
 
-	return models.Decomposition{
+	d := models.Decomposition{
 		Facts:   out.Facts,
 		Queries: out.Queries,
-	}, nil
+	}
+	if out.QueryDate != nil && *out.QueryDate != "" {
+		if t, err := time.Parse("2006-01-02", *out.QueryDate); err == nil {
+			d.QueryDate = &t
+		}
+	}
+	return d, nil
 }
 
 // Evaluate determines what to do with new and retrieved facts using the LLM.
@@ -199,8 +207,9 @@ func (a *LLMAdapter) SelectFacts(ctx context.Context, req SelectFactsRequest) ([
 // ──────────────────────────────────────────────
 
 type decompositionOutput struct {
-	Facts   []models.ExtractedFact  `json:"facts"`
-	Queries []models.ExtractedQuery `json:"queries"`
+	Facts     []models.ExtractedFact  `json:"facts"`
+	Queries   []models.ExtractedQuery `json:"queries"`
+	QueryDate *string                 `json:"query_date,omitempty"` // ISO 8601 date string, set by decompose_recall.
 }
 
 func (o *decompositionOutput) SchemaDescription() string {

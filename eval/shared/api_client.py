@@ -38,11 +38,22 @@ class MemoryAPIClient:
             raise RuntimeError("MemoryAPIClient must be used as an async context manager")
         return self._client
 
+    def _raise_with_body(self, resp: httpx.Response) -> None:
+        try:
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            body = resp.text[:500] if resp.text else "<empty>"
+            raise httpx.HTTPStatusError(
+                f"{e.args[0]} | body: {body}",
+                request=e.request,
+                response=e.response,
+            ) from e
+
     async def create_thread(self) -> dict:
         """Create a new thread for the configured agent."""
         payload = {"agent_id": self.agent_id}
         resp = await self._client_or_raise().post(f"{self.base_url}/threads", json=payload)
-        resp.raise_for_status()
+        self._raise_with_body(resp)
         return resp.json()
 
     async def ingest(self, thread_id: str, role: str, content: str, author: str | None = None, when: str | None = None) -> dict:
@@ -63,7 +74,7 @@ class MemoryAPIClient:
             "inputs": [item],
         }
         resp = await self._client_or_raise().post(f"{self.base_url}/memory/contextual", json=payload)
-        resp.raise_for_status()
+        self._raise_with_body(resp)
         return resp.json()
 
     async def recall(self, thread_id: str, question: str) -> dict:
@@ -74,5 +85,5 @@ class MemoryAPIClient:
             "query": question,
         }
         resp = await self._client_or_raise().post(f"{self.base_url}/memory/recall", json=payload)
-        resp.raise_for_status()
+        self._raise_with_body(resp)
         return resp.json()

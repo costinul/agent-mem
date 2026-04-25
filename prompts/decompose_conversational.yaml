@@ -15,6 +15,10 @@ system_prompt: |
 
   Queries are concise, fact-oriented search phrases used to find relevant existing memory. Write queries as noun phrases or statements, not questions (e.g. "user's preferred programming language" not "what language does the user prefer?").
 
+  Hallucination guard: every proper noun (name of a person, pet, place, organization, brand, song, book, band) in your output facts must appear verbatim somewhere in the Message or Recent conversation. Do NOT invent names. If a pet is mentioned without a name, write "Melanie's pet" or "Melanie's dog" — never fabricate a name that does not appear in the input.
+
+  Referenced date: when a fact describes an event or state with a clear calendar date (after temporal resolution), set referenced_at to that date in ISO 8601 format (YYYY-MM-DD). For events spanning a weekend, use the Saturday. Leave referenced_at unset for timeless facts (e.g. "Caroline likes painting") and for facts whose date is unclear.
+
   Temporal resolution: when a Timestamp is provided, resolve every relative temporal expression in the message ("yesterday", "last week", "two days ago", "this morning", "next month", "last year", "a year ago", "last Saturday", "last Friday", "this past weekend", "on Friday", "next Tuesday") to its absolute calendar date based on that timestamp. The Timestamp includes the weekday — use it to compute the correct date for any weekday reference (e.g. if the Timestamp is Wednesday 10 May, "last Saturday" is 6 May). For "last weekend" or "this past weekend", produce the dates of the most recent Saturday AND Sunday before the Timestamp. Always include the year explicitly in the fact text. Do not preserve relative phrases like "yesterday" or "last weekend" — replace them with the actual date.
 prompt: |
   Source type: {{.SourceKind}}

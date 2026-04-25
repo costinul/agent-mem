@@ -261,16 +261,17 @@ func (r *PostgresRepository) ListConversationSourcesByThreadID(ctx context.Conte
 
 func (r *PostgresRepository) InsertFact(ctx context.Context, fact models.Fact) (*models.Fact, error) {
 	var (
-		stored   models.Fact
-		agentID  sql.NullString
-		threadID sql.NullString
+		stored        models.Fact
+		agentID       sql.NullString
+		threadID      sql.NullString
+		referencedAt  sql.NullTime
 	)
 
 	err := r.db.QueryRowContext(
 		ctx,
-		`INSERT INTO facts (account_id, agent_id, thread_id, source_id, kind, text, embedding)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7::vector)
-		 RETURNING id, account_id, agent_id, thread_id, source_id, kind, text, created_at, updated_at`,
+		`INSERT INTO facts (account_id, agent_id, thread_id, source_id, kind, text, embedding, referenced_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7::vector, $8)
+		 RETURNING id, account_id, agent_id, thread_id, source_id, kind, text, referenced_at, created_at, updated_at`,
 		fact.AccountID,
 		fact.AgentID,
 		fact.ThreadID,
@@ -278,6 +279,7 @@ func (r *PostgresRepository) InsertFact(ctx context.Context, fact models.Fact) (
 		fact.Kind,
 		fact.Text,
 		vectorParam(fact.Embedding),
+		fact.ReferencedAt,
 	).Scan(
 		&stored.ID,
 		&stored.AccountID,
@@ -286,6 +288,7 @@ func (r *PostgresRepository) InsertFact(ctx context.Context, fact models.Fact) (
 		&stored.SourceID,
 		&stored.Kind,
 		&stored.Text,
+		&referencedAt,
 		&stored.CreatedAt,
 		&stored.UpdatedAt,
 	)
@@ -295,6 +298,9 @@ func (r *PostgresRepository) InsertFact(ctx context.Context, fact models.Fact) (
 
 	stored.AgentID = nullStringPtr(agentID)
 	stored.ThreadID = nullStringPtr(threadID)
+	if referencedAt.Valid {
+		stored.ReferencedAt = &referencedAt.Time
+	}
 	return &stored, nil
 }
 
@@ -458,7 +464,7 @@ func (r *PostgresRepository) ListFactsBySourceIDs(ctx context.Context, accountID
 
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT id, account_id, agent_id, thread_id, source_id, kind, text,
-		        superseded_at, superseded_by, created_at, updated_at
+		        referenced_at, superseded_at, superseded_by, created_at, updated_at
 		 FROM facts
 		 WHERE account_id = $1
 		   AND source_id = ANY($2)`,
@@ -475,19 +481,23 @@ func (r *PostgresRepository) ListFactsBySourceIDs(ctx context.Context, accountID
 			fact         models.Fact
 			agent        sql.NullString
 			thread       sql.NullString
+			referencedAt sql.NullTime
 			supersededAt sql.NullTime
 			supersededBy sql.NullString
 		)
 		if err := rows.Scan(
 			&fact.ID, &fact.AccountID, &agent, &thread,
 			&fact.SourceID, &fact.Kind, &fact.Text,
-			&supersededAt, &supersededBy,
+			&referencedAt, &supersededAt, &supersededBy,
 			&fact.CreatedAt, &fact.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
 		fact.AgentID = nullStringPtr(agent)
 		fact.ThreadID = nullStringPtr(thread)
+		if referencedAt.Valid {
+			fact.ReferencedAt = &referencedAt.Time
+		}
 		if supersededAt.Valid {
 			fact.SupersededAt = &supersededAt.Time
 		}
@@ -563,7 +573,7 @@ func (r *PostgresRepository) SearchFactsByEmbedding(ctx context.Context, params 
 
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT id, account_id, agent_id, thread_id, source_id, kind, text, created_at, updated_at
+		`SELECT id, account_id, agent_id, thread_id, source_id, kind, text, referenced_at, created_at, updated_at
 		 FROM facts
 		 WHERE account_id = $1
 		   AND (($2::uuid IS NULL AND agent_id IS NULL) OR agent_id = $2)
@@ -588,9 +598,10 @@ func (r *PostgresRepository) SearchFactsByEmbedding(ctx context.Context, params 
 	facts := make([]models.Fact, 0)
 	for rows.Next() {
 		var (
-			fact   models.Fact
-			agent  sql.NullString
-			thread sql.NullString
+			fact         models.Fact
+			agent        sql.NullString
+			thread       sql.NullString
+			referencedAt sql.NullTime
 		)
 		if err := rows.Scan(
 			&fact.ID,
@@ -600,6 +611,7 @@ func (r *PostgresRepository) SearchFactsByEmbedding(ctx context.Context, params 
 			&fact.SourceID,
 			&fact.Kind,
 			&fact.Text,
+			&referencedAt,
 			&fact.CreatedAt,
 			&fact.UpdatedAt,
 		); err != nil {
@@ -607,6 +619,9 @@ func (r *PostgresRepository) SearchFactsByEmbedding(ctx context.Context, params 
 		}
 		fact.AgentID = nullStringPtr(agent)
 		fact.ThreadID = nullStringPtr(thread)
+		if referencedAt.Valid {
+			fact.ReferencedAt = &referencedAt.Time
+		}
 		facts = append(facts, fact)
 	}
 	return facts, rows.Err()
@@ -622,7 +637,7 @@ func (r *PostgresRepository) SearchFactsByEmbeddingWithScores(ctx context.Contex
 
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT id, account_id, agent_id, thread_id, source_id, kind, text, created_at, updated_at,
+		`SELECT id, account_id, agent_id, thread_id, source_id, kind, text, referenced_at, created_at, updated_at,
 		        1 - (embedding <=> $4::vector) AS score
 		 FROM facts
 		 WHERE account_id = $1
@@ -646,9 +661,10 @@ func (r *PostgresRepository) SearchFactsByEmbeddingWithScores(ctx context.Contex
 	results := make([]FactWithScore, 0)
 	for rows.Next() {
 		var (
-			fs     FactWithScore
-			agent  sql.NullString
-			thread sql.NullString
+			fs           FactWithScore
+			agent        sql.NullString
+			thread       sql.NullString
+			referencedAt sql.NullTime
 		)
 		if err := rows.Scan(
 			&fs.ID,
@@ -658,6 +674,7 @@ func (r *PostgresRepository) SearchFactsByEmbeddingWithScores(ctx context.Contex
 			&fs.SourceID,
 			&fs.Kind,
 			&fs.Text,
+			&referencedAt,
 			&fs.CreatedAt,
 			&fs.UpdatedAt,
 			&fs.Score,
@@ -666,6 +683,9 @@ func (r *PostgresRepository) SearchFactsByEmbeddingWithScores(ctx context.Contex
 		}
 		fs.AgentID = nullStringPtr(agent)
 		fs.ThreadID = nullStringPtr(thread)
+		if referencedAt.Valid {
+			fs.ReferencedAt = &referencedAt.Time
+		}
 		results = append(results, fs)
 	}
 	return results, rows.Err()

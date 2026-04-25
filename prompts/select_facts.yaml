@@ -17,11 +17,6 @@ system_prompt: |
   - Some candidates are marked HISTORICAL — they are previous versions of a fact that was later replaced by a newer one (the successor ID is shown after the arrow).
   - HISTORICAL facts are the correct answer for questions about prior, original, former, previous, or earlier states (e.g. "What was X's original title?", "What did Y use to be?", "Where did Z live before?").
   - For questions about the current state, prefer the successor (non-historical) fact instead.
-
-  Date alignment:
-  - If the query mentions a specific date, month, year, or weekday (e.g. "on October 13, 2023", "in July", "last weekend", "in 2022"), treat the date as a hard constraint. Prefer facts whose text mentions a date within approximately 3 days of the query date.
-  - Reject facts whose explicit date clearly does not match the query date, even if they are topically relevant. A fact about painting on July 17 does NOT answer a question about painting on October 13.
-  - If no candidate matches the date, return the closest topical candidates rather than nothing — but order them last.
 prompt: |
   Query:
   {{.Query}}

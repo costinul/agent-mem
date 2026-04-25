@@ -6,6 +6,7 @@ import (
 	"log"
 	"sort"
 	"strings"
+	"time"
 
 	"agentmem/internal/errs"
 	models "agentmem/internal/models"
@@ -210,16 +211,26 @@ func (e *MemoryEngine) applyEvaluateResult(
 		return nil, fmt.Errorf("embed new facts: expected %d embeddings, got %d", len(newTexts), len(embeddings))
 	}
 
+	// Build a lookup so referenced_at from the original extracted facts can be
+	// carried through to the stored facts (the evaluate LLM doesn't echo dates).
+	referencedAtByText := make(map[string]*time.Time, len(newFacts))
+	for _, f := range newFacts {
+		if f.ReferencedAt != nil {
+			referencedAtByText[f.Text] = f.ReferencedAt
+		}
+	}
+
 	stored := make([]models.Fact, 0, len(result.FactsToStore))
 	for idx, fact := range result.FactsToStore {
 		sourceID := selectSourceIDForExtractedFact(storedSources, idx)
 		newFact := models.Fact{
-			AccountID: input.AccountID,
-			AgentID:   ptrString(input.AgentID),
-			ThreadID:  ptrString(input.ThreadID),
-			SourceID:  sourceID,
-			Kind:      fact.Kind,
-			Text:      fact.Text,
+			AccountID:    input.AccountID,
+			AgentID:      ptrString(input.AgentID),
+			ThreadID:     ptrString(input.ThreadID),
+			SourceID:     sourceID,
+			Kind:         fact.Kind,
+			Text:         fact.Text,
+			ReferencedAt: referencedAtByText[fact.Text],
 		}
 		if len(embeddings[idx]) == 0 {
 			return nil, fmt.Errorf("embed new facts: empty embedding for fact index %d", idx)
@@ -293,7 +304,6 @@ func (e *MemoryEngine) applyEvaluateResult(
 		}
 	}
 
-	_ = newFacts
 	return stored, nil
 }
 

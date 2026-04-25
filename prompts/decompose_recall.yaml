@@ -9,6 +9,8 @@ system_prompt: |
   - Each phrase should target a single concept — do not merge unrelated topics into one phrase.
   - If the query is already a single atomic fact or phrase, return it as the sole query.
   - Return only queries — leave the facts array empty.
+
+  Query date: if the query references a specific calendar date, month+year, year, weekday, or a relative phrase that resolves to a date, set query_date to that date in ISO 8601 format (YYYY-MM-DD). Use the mid-point for ranges: "in July 2023" -> 2023-07-15; "in 2022" -> 2022-06-15. Leave query_date unset for timeless queries (e.g. "What pets does Melanie have?", "What career is Caroline pursuing?").
 prompt: |
   Query to decompose:
   {{.Content}}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"agentmem/internal/errs"
 	models "agentmem/internal/models"
@@ -13,6 +14,7 @@ import (
 const (
 	recallCandidateK    = 40
 	recallSiblingBudget = 25
+	dateWindowDays      = 3
 )
 
 // Recall answers a free-text query by decomposing it into search phrases, retrieving
@@ -55,6 +57,11 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 		return models.RecallOutput{}, err
 	}
 	log.Printf("recall expanded=%d", len(candidates))
+
+	if decomposition.QueryDate != nil {
+		candidates = dateRerank(candidates, *decomposition.QueryDate, dateWindowDays)
+		log.Printf("recall date-reranked query_date=%s", decomposition.QueryDate.Format("2006-01-02"))
+	}
 
 	selected, err := e.ai.SelectFacts(ctx, SelectFactsRequest{
 		Query:      input.Query,
@@ -132,6 +139,32 @@ outer:
 		log.Printf("recall sibling expansion: added=%d sources=%d total=%d", added, len(rankedSourceIDs), len(seeds))
 	}
 	return seeds, nil
+}
+
+// dateRerank partitions candidates into those whose referenced_at is within windowDays
+// of queryDate (or have no referenced_at) and those that are clearly out-of-window.
+// In-window facts are returned first (preserving original order); out-of-window facts follow.
+// No candidates are dropped — a wrong query_date must not nuke recall.
+func dateRerank(candidates []models.Fact, queryDate time.Time, windowDays int) []models.Fact {
+	threshold := float64(windowDays) * 24 * float64(time.Hour)
+	inWindow := make([]models.Fact, 0, len(candidates))
+	outOfWindow := make([]models.Fact, 0)
+	for _, f := range candidates {
+		if f.ReferencedAt == nil {
+			inWindow = append(inWindow, f)
+			continue
+		}
+		diff := f.ReferencedAt.Sub(queryDate)
+		if diff < 0 {
+			diff = -diff
+		}
+		if float64(diff) <= threshold {
+			inWindow = append(inWindow, f)
+		} else {
+			outOfWindow = append(outOfWindow, f)
+		}
+	}
+	return append(inWindow, outOfWindow...)
 }
 
 func recallPreviews(facts []models.Fact, n int) []string {
