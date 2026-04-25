@@ -90,7 +90,7 @@ func (r *PostgresRepository) CreateAPIKey(ctx context.Context, params CreateAPIK
 		ctx,
 		`INSERT INTO api_keys (account_id, prefix, key_hash, label, expires_at, valid)
 		 VALUES ($1, $2, $3, $4, $5, true)
-		 RETURNING id, account_id, prefix, key_hash, label, expires_at, valid, created_at`,
+		 RETURNING id, account_id, prefix, key_hash, label, expires_at, valid, debug, created_at`,
 		params.AccountID,
 		params.Prefix,
 		params.KeyHash,
@@ -104,6 +104,7 @@ func (r *PostgresRepository) CreateAPIKey(ctx context.Context, params CreateAPIK
 		&dbLabel,
 		&dbExpiresAt,
 		&stored.Valid,
+		&stored.Debug,
 		&stored.CreatedAt,
 	)
 	if err != nil {
@@ -144,7 +145,7 @@ func (r *PostgresRepository) InvalidateAPIKeyByPrefix(ctx context.Context, prefi
 func (r *PostgresRepository) ListAPIKeysByPrefix(ctx context.Context, prefix string) ([]models.APIKey, error) {
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT id, account_id, prefix, key_hash, label, expires_at, valid, created_at
+		`SELECT id, account_id, prefix, key_hash, label, expires_at, valid, debug, created_at
 		 FROM api_keys
 		 WHERE prefix = $1`,
 		prefix,
@@ -186,6 +187,7 @@ func scanAPIKey(scanner interface {
 		&label,
 		&expiresAt,
 		&key.Valid,
+		&key.Debug,
 		&key.CreatedAt,
 	)
 	if err != nil {

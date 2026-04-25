@@ -37,6 +37,32 @@ type WriteOutput struct{}
 // RecallOutput is the response from the recall (read-only retrieval) endpoint.
 type RecallOutput struct {
 	Facts []ReturnedFact `json:"facts"`
+	Debug *RecallDebug   `json:"debug,omitempty"`
+}
+
+// RecallDebug holds verbose diagnostic information emitted only when the API key has debug=true.
+type RecallDebug struct {
+	Query            string           `json:"query"`
+	Phrases          []string         `json:"phrases"`
+	QueryDate        *time.Time       `json:"query_date,omitempty"`
+	RetrievedCount   int              `json:"retrieved_count"`
+	ExpandedCount    int              `json:"expanded_count"`
+	InWindowCount    int              `json:"in_window_count"`
+	OutOfWindowCount int              `json:"out_of_window_count"`
+	DateWindowDays   int              `json:"date_window_days"`
+	Candidates       []DebugCandidate `json:"candidates"`
+	SelectedIDs      []string         `json:"selected_ids"`
+}
+
+// DebugCandidate is a single candidate fact entry in RecallDebug.
+type DebugCandidate struct {
+	ID           string     `json:"id"`
+	Text         string     `json:"text"`
+	SourceID     string     `json:"source_id"`
+	Kind         FactKind   `json:"kind"`
+	ReferencedAt *time.Time `json:"referenced_at,omitempty"`
+	InWindow     bool       `json:"in_window"`
+	Selected     bool       `json:"selected"`
 }
 
 // ThreadMessagesOutput is the response from the thread messages endpoint.
@@ -108,6 +134,7 @@ type RecallInput struct {
 	Query          string `json:"query"`
 	Limit          int    `json:"limit"`
 	IncludeSources bool   `json:"include_sources"`
+	Debug          bool   `json:"-" swaggerignore:"true"`
 }
 
 type ThreadCreateBody struct {

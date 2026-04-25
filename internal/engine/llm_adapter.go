@@ -92,8 +92,12 @@ func (a *LLMAdapter) Decompose(ctx context.Context, req DecomposeRequest) (model
 		return models.Decomposition{}, fmt.Errorf("decompose %s source: %w", req.SourceKind, err)
 	}
 
+	facts := make([]models.ExtractedFact, len(out.Facts))
+	for i, f := range out.Facts {
+		facts[i] = f.toModel()
+	}
 	return models.Decomposition{
-		Facts:   out.Facts,
+		Facts:   facts,
 		Queries: out.Queries,
 	}, nil
 }
@@ -109,12 +113,16 @@ func (a *LLMAdapter) DecomposeRecall(ctx context.Context, query string) (models.
 		return models.Decomposition{}, fmt.Errorf("decompose recall query: %w", err)
 	}
 
+	facts := make([]models.ExtractedFact, len(out.Facts))
+	for i, f := range out.Facts {
+		facts[i] = f.toModel()
+	}
 	d := models.Decomposition{
-		Facts:   out.Facts,
+		Facts:   facts,
 		Queries: out.Queries,
 	}
-	if out.QueryDate != nil && *out.QueryDate != "" {
-		if t, err := time.Parse("2006-01-02", *out.QueryDate); err == nil {
+	if out.QueryDate != "" {
+		if t, err := time.Parse("2006-01-02", out.QueryDate); err == nil {
 			d.QueryDate = &t
 		}
 	}
@@ -206,10 +214,37 @@ func (a *LLMAdapter) SelectFacts(ctx context.Context, req SelectFactsRequest) ([
 // Structured output types
 // ──────────────────────────────────────────────
 
+// extractedFactLLM is the LLM wire shape for a single extracted fact.
+// referenced_at is a plain string (ISO 8601 "YYYY-MM-DD" or "") rather than a
+// pointer so that Azure's strict schema requirement (all properties must be in
+// required) is satisfied.
+type extractedFactLLM struct {
+	Text         string          `json:"text"`
+	Kind         models.FactKind `json:"kind"`
+	ReferencedAt string          `json:"referenced_at"`
+}
+
+func (f extractedFactLLM) toModel() models.ExtractedFact {
+	ef := models.ExtractedFact{Text: f.Text, Kind: f.Kind}
+	if f.ReferencedAt != "" {
+		if t, err := time.Parse("2006-01-02", f.ReferencedAt); err == nil {
+			ef.ReferencedAt = &t
+		}
+	}
+	return ef
+}
+
+// extractedFactStoreLLM is the evaluate step's wire shape: no referenced_at since
+// the evaluate prompt doesn't generate dates.
+type extractedFactStoreLLM struct {
+	Text string          `json:"text"`
+	Kind models.FactKind `json:"kind"`
+}
+
 type decompositionOutput struct {
-	Facts     []models.ExtractedFact  `json:"facts"`
+	Facts     []extractedFactLLM      `json:"facts"`
 	Queries   []models.ExtractedQuery `json:"queries"`
-	QueryDate *string                 `json:"query_date,omitempty"` // ISO 8601 date string, set by decompose_recall.
+	QueryDate string                  `json:"query_date"` // ISO 8601 "YYYY-MM-DD" or ""; plain string for Azure schema compliance.
 }
 
 func (o *decompositionOutput) SchemaDescription() string {
@@ -240,10 +275,10 @@ type factUpdate struct {
 }
 
 type evaluateOutput struct {
-	FactsToReturn []string               `json:"facts_to_return"`
-	FactsToStore  []models.ExtractedFact `json:"facts_to_store"`
-	FactsToUpdate []factUpdate           `json:"facts_to_update"`
-	FactsToEvolve []models.FactEvolution `json:"facts_to_evolve"`
+	FactsToReturn []string                `json:"facts_to_return"`
+	FactsToStore  []extractedFactStoreLLM `json:"facts_to_store"`
+	FactsToUpdate []factUpdate            `json:"facts_to_update"`
+	FactsToEvolve []models.FactEvolution  `json:"facts_to_evolve"`
 }
 
 func (o *evaluateOutput) SchemaDescription() string {

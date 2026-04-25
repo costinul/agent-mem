@@ -24,6 +24,22 @@ Options:
     --out FILE          Output file path            (default: results.json)
     --data FILE         Path to locomo10.json       (default: ./data/locomo10.json,
                                                      auto-downloaded if missing)
+
+Debug workflow (fast iteration without re-ingesting):
+    1. Flag your dev API key in Postgres:
+           UPDATE api_keys SET debug=true WHERE prefix='<prefix>';
+       This makes every /memory/recall response include a "debug" block with
+       candidate lists, counts, query_date, and per-fact window flags.
+
+    2. Ingest once and note the thread_id printed at the start:
+           python run.py --limit 1 --out baseline.json
+
+    3. Iterate quickly (seconds instead of 45 min) using --reuse-thread:
+           python run.py --limit 1 --reuse-thread <thread_id> --out v3f.json
+       The ingest step is skipped entirely; only recall + judge runs.
+
+    The "recall_debug" key is captured per QA entry in the output JSON
+    whenever the API key has debug=true.
 """
 from __future__ import annotations
 
@@ -201,9 +217,11 @@ async def evaluate_sample(
             try:
                 memory_output = await client.recall(thread_id, question)
                 facts = [f["text"] for f in memory_output.get("facts", [])]
+                recall_debug = memory_output.get("debug")
             except Exception as exc:
                 print(f"  [WARN] query error in sample {sample_id}: {exc}", flush=True)
                 facts = []
+                recall_debug = None
 
             if evaluator is None:
                 score = "skipped"
@@ -231,6 +249,7 @@ async def evaluate_sample(
                 "facts_returned": facts,
                 "score": score,
                 "reason": reason,
+                "recall_debug": recall_debug,
             })
 
         judge_elapsed = time.time() - judge_start

@@ -12,6 +12,7 @@ import (
 type contextKey string
 
 const accountIDContextKey contextKey = "account_id"
+const debugContextKey contextKey = "debug_enabled"
 
 func requireAPIKey(accountSvc *account.Service, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -26,6 +27,7 @@ func requireAPIKey(accountSvc *account.Service, next http.HandlerFunc) http.Hand
 			return
 		}
 		ctx := context.WithValue(r.Context(), accountIDContextKey, key.AccountID)
+		ctx = context.WithValue(ctx, debugContextKey, key.Debug)
 		next(w, r.WithContext(ctx))
 	}
 }
@@ -38,6 +40,11 @@ func validateAgentOwnership(ctx context.Context, agentSvc *agent.Service, accoun
 func accountIDFromContext(ctx context.Context) string {
 	value, _ := ctx.Value(accountIDContextKey).(string)
 	return strings.TrimSpace(value)
+}
+
+func debugFromContext(ctx context.Context) bool {
+	v, _ := ctx.Value(debugContextKey).(bool)
+	return v
 }
 
 func extractAPIKey(r *http.Request) string {

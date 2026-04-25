@@ -101,9 +101,11 @@ func (e *MemoryEngine) DeleteFactForAccount(ctx context.Context, accountID, fact
 }
 
 // buildRecallOutput maps a list of selected facts to ReturnedFact, deduplicating by ID (or text when ID is absent).
-func (e *MemoryEngine) buildRecallOutput(ctx context.Context, input models.RecallInput, facts []models.Fact) (models.RecallOutput, error) {
+// Pass a non-nil dbg to attach debug information to the response (only when the API key has debug=true).
+func (e *MemoryEngine) buildRecallOutput(ctx context.Context, input models.RecallInput, facts []models.Fact, dbg *models.RecallDebug) (models.RecallOutput, error) {
 	output := models.RecallOutput{
 		Facts: make([]models.ReturnedFact, 0, len(facts)),
+		Debug: dbg,
 	}
 	seen := map[string]struct{}{}
 	for _, fact := range facts {

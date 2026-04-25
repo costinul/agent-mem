@@ -32,5 +32,6 @@ type APIKey struct {
 	Label     *string    `json:"label"`
 	ExpiresAt *time.Time `json:"expires_at"`
 	Valid     bool       `json:"valid"`
+	Debug     bool       `json:"debug"`
 	CreatedAt time.Time  `json:"created_at"`
 }

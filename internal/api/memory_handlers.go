@@ -125,6 +125,7 @@ func recallHandler(memEngine *engine.MemoryEngine, agentSvc *agent.Service) http
 			return
 		}
 		input.AccountID = accountID
+		input.Debug = debugFromContext(r.Context())
 		if input.AgentID != "" {
 			if err := validateAgentOwnership(r.Context(), agentSvc, accountID, input.AgentID); err != nil {
 				writeEngineError(w, r, err)

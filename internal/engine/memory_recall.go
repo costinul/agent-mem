@@ -51,16 +51,19 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 		return models.RecallOutput{}, err
 	}
 	log.Printf("recall retrieved=%d top_texts=%v", len(candidates), recallPreviews(candidates, 5))
+	retrievedCount := len(candidates)
 
 	candidates, err = e.expandBySource(ctx, input.AccountID, candidates, recallSiblingBudget)
 	if err != nil {
 		return models.RecallOutput{}, err
 	}
 	log.Printf("recall expanded=%d", len(candidates))
+	expandedCount := len(candidates)
 
+	var inWindowCount, outOfWindowCount int
 	if decomposition.QueryDate != nil {
-		candidates = dateRerank(candidates, *decomposition.QueryDate, dateWindowDays)
-		log.Printf("recall date-reranked query_date=%s", decomposition.QueryDate.Format("2006-01-02"))
+		candidates, inWindowCount, outOfWindowCount = dateRerank(candidates, *decomposition.QueryDate, dateWindowDays)
+		log.Printf("recall date-reranked query_date=%s in_window=%d out_of_window=%d", decomposition.QueryDate.Format("2006-01-02"), inWindowCount, outOfWindowCount)
 	}
 
 	selected, err := e.ai.SelectFacts(ctx, SelectFactsRequest{
@@ -76,7 +79,58 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 		selected = selected[:input.Limit]
 	}
 
-	return e.buildRecallOutput(ctx, input, selected)
+	var dbg *models.RecallDebug
+	if input.Debug {
+		selectedSet := make(map[string]bool, len(selected))
+		for _, f := range selected {
+			selectedSet[f.ID] = true
+		}
+
+		selectedIDs := make([]string, 0, len(selected))
+		for _, f := range selected {
+			selectedIDs = append(selectedIDs, f.ID)
+		}
+
+		debugCandidates := make([]models.DebugCandidate, 0, len(candidates))
+		for _, f := range candidates {
+			inWindow := true
+			if decomposition.QueryDate != nil && f.ReferencedAt != nil {
+				diff := f.ReferencedAt.Sub(*decomposition.QueryDate)
+				if diff < 0 {
+					diff = -diff
+				}
+				inWindow = float64(diff) <= float64(dateWindowDays)*24*float64(time.Hour)
+			}
+			text := f.Text
+			if len(text) > 120 {
+				text = text[:120] + "…"
+			}
+			debugCandidates = append(debugCandidates, models.DebugCandidate{
+				ID:           f.ID,
+				Text:         text,
+				SourceID:     f.SourceID,
+				Kind:         f.Kind,
+				ReferencedAt: f.ReferencedAt,
+				InWindow:     inWindow,
+				Selected:     selectedSet[f.ID],
+			})
+		}
+
+		dbg = &models.RecallDebug{
+			Query:            input.Query,
+			Phrases:          phrases,
+			QueryDate:        decomposition.QueryDate,
+			RetrievedCount:   retrievedCount,
+			ExpandedCount:    expandedCount,
+			InWindowCount:    inWindowCount,
+			OutOfWindowCount: outOfWindowCount,
+			DateWindowDays:   dateWindowDays,
+			Candidates:       debugCandidates,
+			SelectedIDs:      selectedIDs,
+		}
+	}
+
+	return e.buildRecallOutput(ctx, input, selected, dbg)
 }
 
 // expandBySource augments the candidate set with facts that share a source_id with any
@@ -145,7 +199,8 @@ outer:
 // of queryDate (or have no referenced_at) and those that are clearly out-of-window.
 // In-window facts are returned first (preserving original order); out-of-window facts follow.
 // No candidates are dropped — a wrong query_date must not nuke recall.
-func dateRerank(candidates []models.Fact, queryDate time.Time, windowDays int) []models.Fact {
+// Returns the reordered slice plus in-window and out-of-window counts.
+func dateRerank(candidates []models.Fact, queryDate time.Time, windowDays int) ([]models.Fact, int, int) {
 	threshold := float64(windowDays) * 24 * float64(time.Hour)
 	inWindow := make([]models.Fact, 0, len(candidates))
 	outOfWindow := make([]models.Fact, 0)
@@ -164,7 +219,7 @@ func dateRerank(candidates []models.Fact, queryDate time.Time, windowDays int) [
 			outOfWindow = append(outOfWindow, f)
 		}
 	}
-	return append(inWindow, outOfWindow...)
+	return append(inWindow, outOfWindow...), len(inWindow), len(outOfWindow)
 }
 
 func recallPreviews(facts []models.Fact, n int) []string {
