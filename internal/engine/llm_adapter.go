@@ -39,6 +39,7 @@ type EvaluateRequest struct {
 // SelectFactsRequest is the input for the fact selection step.
 type SelectFactsRequest struct {
 	Query      string
+	QueryDate  *time.Time
 	Candidates []models.Fact
 }
 
@@ -183,9 +184,37 @@ func (a *LLMAdapter) SelectFacts(ctx context.Context, req SelectFactsRequest) ([
 		return nil, nil
 	}
 
+	// Build a template-friendly representation so the prompt can access pre-formatted dates.
+	type candidateView struct {
+		ID           string
+		Kind         models.FactKind
+		Text         string
+		ReferencedAt string // ISO "YYYY-MM-DD" or "" when unset
+		SupersededBy string
+	}
+	type templateData struct {
+		Query      string
+		QueryDate  string // ISO "YYYY-MM-DD" or "" when unset
+		Candidates []candidateView
+	}
+	td := templateData{Query: req.Query}
+	if req.QueryDate != nil {
+		td.QueryDate = req.QueryDate.Format("2006-01-02")
+	}
+	for _, f := range req.Candidates {
+		cv := candidateView{ID: f.ID, Kind: f.Kind, Text: f.Text}
+		if f.ReferencedAt != nil {
+			cv.ReferencedAt = f.ReferencedAt.Format("2006-01-02")
+		}
+		if f.SupersededBy != nil {
+			cv.SupersededBy = *f.SupersededBy
+		}
+		td.Candidates = append(td.Candidates, cv)
+	}
+
 	out := &selectFactsOutput{}
 	err := a.client.ExecuteAs(ctx, uuid.New(), "select_facts", a.schemaModel, &bwai.PromptData{
-		Data: req,
+		Data: td,
 	}, out)
 	if err != nil {
 		return nil, fmt.Errorf("select facts: %w", err)
@@ -208,6 +237,58 @@ func (a *LLMAdapter) SelectFacts(ctx context.Context, req SelectFactsRequest) ([
 		}
 	}
 	return selected, nil
+}
+
+// VerifyExtraction checks extracted facts against the original source content and
+// restores any proper nouns, titles, or descriptive attributes that were lost during
+// extraction. Returns the same number of facts in the same order; if the LLM output
+// is malformed the original facts are returned unchanged.
+func (a *LLMAdapter) VerifyExtraction(ctx context.Context, source string, facts []models.ExtractedFact) ([]models.ExtractedFact, error) {
+	if len(facts) == 0 {
+		return facts, nil
+	}
+
+	type factView struct {
+		Text string `json:"text"`
+		Kind string `json:"kind"`
+	}
+	type templateData struct {
+		Source string
+		Facts  []factView
+	}
+	td := templateData{Source: source}
+	for _, f := range facts {
+		td.Facts = append(td.Facts, factView{Text: f.Text, Kind: string(f.Kind)})
+	}
+
+	out := &decompositionOutput{}
+	err := a.client.ExecuteAs(ctx, uuid.New(), "verify_extraction", a.schemaModel, &bwai.PromptData{
+		Data: td,
+	}, out)
+	if err != nil {
+		return facts, fmt.Errorf("verify extraction: %w", err)
+	}
+
+	if len(out.Facts) != len(facts) {
+		// Wrong count — fall back to originals rather than misaligning.
+		return facts, nil
+	}
+
+	result := make([]models.ExtractedFact, len(facts))
+	for i, llmFact := range out.Facts {
+		orig := facts[i]
+		verified := llmFact.toModel()
+		// Keep the original referenced_at when the LLM didn't echo one.
+		if verified.ReferencedAt == nil && orig.ReferencedAt != nil {
+			verified.ReferencedAt = orig.ReferencedAt
+		}
+		// Keep original kind if LLM produced an empty one.
+		if verified.Kind == "" {
+			verified.Kind = orig.Kind
+		}
+		result[i] = verified
+	}
+	return result, nil
 }
 
 // ──────────────────────────────────────────────

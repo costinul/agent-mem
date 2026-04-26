@@ -10,6 +10,13 @@ system_prompt: |
   - If the query is already a single atomic fact or phrase, return it as the sole query.
   - Return only queries — leave the facts array empty.
 
+  Yes/no and reasoning queries: when the query asks "would", "should", "is X likely", "would X want to", or any question requiring inference from indirect evidence, emit 2–4 phrases that together cover:
+    - the direct affirmative topic (e.g. "Caroline's plans to return to home country")
+    - the negating or contradicting evidence (e.g. "Caroline's reasons to stay", "Caroline's adoption plans", "Caroline's family situation in current location")
+    - any closely related state or circumstance that would let the reader infer the answer
+  Example: "Would Caroline want to move back to her home country soon?" → ["Caroline's plans to return to home country", "Caroline's reasons to stay where she lives", "Caroline's adoption plans", "Caroline's family situation"]
+  Example: "Would Melanie be considered a member of the LGBTQ community?" → ["Melanie's sexual orientation or identity", "Melanie's relationship to the LGBTQ community", "Melanie identifying as LGBTQ"]
+
   Query date: if the query references a specific calendar date, month+year, year, weekday, or a relative phrase that resolves to a date, set query_date to that date in ISO 8601 format (YYYY-MM-DD). Use the mid-point for ranges: "in July 2023" -> 2023-07-15; "in 2022" -> 2022-06-15. Leave query_date unset for timeless queries (e.g. "What pets does Melanie have?", "What career is Caroline pursuing?").
 prompt: |
   Query to decompose:

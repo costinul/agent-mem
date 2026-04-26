@@ -361,7 +361,11 @@ func writeEngineError(w http.ResponseWriter, r *http.Request, err error) {
 			"error", err.Error(),
 			"stack", string(debug.Stack()),
 		)
-		writeJSON(w, http.StatusInternalServerError, apiError{Error: "internal server error"})
+		msg := "internal server error"
+		if r != nil && debugFromContext(r.Context()) {
+			msg = err.Error()
+		}
+		writeJSON(w, http.StatusInternalServerError, apiError{Error: msg})
 	}
 }
 

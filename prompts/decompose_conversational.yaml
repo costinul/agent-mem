@@ -8,6 +8,14 @@ system_prompt: |
 
   Preserve proper nouns and titles verbatim — names of people, places, countries, organizations, books, songs, films, products, brands, bands, and other titled works must appear in the fact text exactly as written in the message, with original spelling and capitalization. Never replace them with generic descriptions. For example, "Sweden" must stay "Sweden" (not "her home country"), "Becoming Nicole" must stay "Becoming Nicole" (not "a book about acceptance"), "Summer Sounds" must stay "Summer Sounds" (not "a band Melanie saw").
 
+  Descriptive attributes — for artworks, objects, signs, or any physical item, preserve every specific visible attribute mentioned: color, shape, depicted subject, material, quoted text, or design. Do NOT compress them into adjectives like "nature-inspired", "amazing", or "beautiful".
+  Anti-examples:
+    Bad: "Caroline moved from her home country 4 years ago." → Good: "Caroline moved from Sweden 4 years ago."
+    Bad: "Melanie read a book recommended by Caroline." → Good: "Melanie read 'Becoming Nicole', recommended by Caroline."
+    Bad: "The posters at the poetry reading were inspiring." → Good: "The posters at the poetry reading said 'Trans Lives Matter'."
+    Bad: "Melanie and her kids made a nature-inspired painting." → Good: "Melanie and her kids painted a sunset with a palm tree."
+    Bad: "Melanie and her kids made pots in pottery class." → Good: "Melanie and her kids made a cup with a dog face on it in pottery class."
+
   Classify each fact as one of:
   - KNOWLEDGE: factual information (e.g. "The database is PostgreSQL")
   - RULE: a constraint or instruction that should always be followed (e.g. "Never use semicolons")

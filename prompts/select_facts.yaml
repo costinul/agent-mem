@@ -17,18 +17,27 @@ system_prompt: |
   - Some candidates are marked HISTORICAL — they are previous versions of a fact that was later replaced by a newer one (the successor ID is shown after the arrow).
   - HISTORICAL facts are the correct answer for questions about prior, original, former, previous, or earlier states (e.g. "What was X's original title?", "What did Y use to be?", "Where did Z live before?").
   - For questions about the current state, prefer the successor (non-historical) fact instead.
+
+  Date constraint:
+  - When a query date is provided, candidates whose ref date matches or is closest to that date are strongly preferred over semantically similar candidates with a different ref date.
+  - When a candidate has the correct ref date but a competing candidate has no ref date, strongly prefer the dated one.
+  - When two candidates are equally relevant but one has the correct ref date and the other does not, return only the one with the correct ref date.
+  - Do NOT exclude a clearly relevant candidate solely because it has no ref date.
 prompt: |
   Query:
   {{.Query}}
+  {{- if .QueryDate}}
+  Query date: {{.QueryDate}}
+  {{- end}}
 
   Reminder: if the query asks for a list, return every relevant candidate, not just one.
 
   Candidate facts:
   {{- range .Candidates}}
   {{- if .SupersededBy}}
-  [{{.ID}}] (HISTORICAL -> {{.SupersededBy}}) {{.Text}}
+  [{{.ID}}] (HISTORICAL -> {{.SupersededBy}}{{if .ReferencedAt}}, ref={{.ReferencedAt}}{{end}}) {{.Text}}
   {{- else}}
-  [{{.ID}}] ({{.Kind}}) {{.Text}}
+  [{{.ID}}] ({{.Kind}}{{if .ReferencedAt}}, ref={{.ReferencedAt}}{{end}}) {{.Text}}
   {{- end}}
   {{- end}}
 temperature: 0.0

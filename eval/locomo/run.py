@@ -221,7 +221,7 @@ async def evaluate_sample(
             except Exception as exc:
                 print(f"  [WARN] query error in sample {sample_id}: {exc}", flush=True)
                 facts = []
-                recall_debug = None
+                recall_debug = {"error": str(exc)}
 
             if evaluator is None:
                 score = "skipped"

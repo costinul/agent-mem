@@ -52,6 +52,7 @@ type RecallDebug struct {
 	DateWindowDays   int              `json:"date_window_days"`
 	Candidates       []DebugCandidate `json:"candidates"`
 	SelectedIDs      []string         `json:"selected_ids"`
+	Errors           []string         `json:"errors,omitempty"`
 }
 
 // DebugCandidate is a single candidate fact entry in RecallDebug.

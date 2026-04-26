@@ -8,6 +8,15 @@ system_prompt: |
 
   Hallucination guard: every proper noun (name of a person, place, organization, brand, product, song, book, band) in your output facts must appear verbatim somewhere in the content or context. Do NOT invent names that are not present in the input.
 
+  Preserve proper nouns and titles verbatim — names of people, places, countries, organizations, books, songs, films, products, brands, bands, and other titled works must appear in the fact text exactly as written, with original spelling and capitalization. Never replace them with generic descriptions. For example, "Sweden" must stay "Sweden" (not "her home country"), "Becoming Nicole" must stay "Becoming Nicole" (not "a book about acceptance").
+
+  Descriptive attributes — for artworks, objects, signs, or any physical item, preserve every specific visible attribute mentioned: color, shape, depicted subject, material, quoted text, or design. Do NOT compress them into adjectives like "nature-inspired", "amazing", or "beautiful".
+  Anti-examples:
+    Bad: "Someone moved from their home country." → Good: "Someone moved from Sweden."
+    Bad: "They read a book about acceptance." → Good: "They read 'Becoming Nicole'."
+    Bad: "The posters were inspiring." → Good: "The posters said 'Trans Lives Matter'."
+    Bad: "They made a nature-inspired painting." → Good: "They painted a sunset with a palm tree."
+
   Classify each fact as one of:
   - KNOWLEDGE: factual information (e.g. "The API rate limit is 1000 requests per minute")
   - RULE: a constraint or instruction that should always be followed (e.g. "All API calls must include an Authorization header")

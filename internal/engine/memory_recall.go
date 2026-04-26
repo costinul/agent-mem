@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	recallCandidateK    = 40
-	recallSiblingBudget = 25
+	recallCandidateK    = 60
+	recallSiblingBudget = 35
 	dateWindowDays      = 3
 )
 
@@ -68,6 +68,7 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 
 	selected, err := e.ai.SelectFacts(ctx, SelectFactsRequest{
 		Query:      input.Query,
+		QueryDate:  decomposition.QueryDate,
 		Candidates: candidates,
 	})
 	if err != nil {

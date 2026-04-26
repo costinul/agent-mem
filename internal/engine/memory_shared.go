@@ -3,10 +3,14 @@ package engine
 import (
 	"context"
 	"fmt"
+	"log"
+	"regexp"
 	"strings"
 
 	models "agentmem/internal/models"
 )
+
+var properNounRe = regexp.MustCompile(`\b[A-Z][a-z]+\b`)
 
 // persistAndDecomposeSources saves each input as a Source record, then calls the LLM
 // to decompose it into extracted facts and search queries. Optionally loads recent
@@ -69,6 +73,16 @@ func (e *MemoryEngine) persistAndDecomposeSources(ctx context.Context, eventID, 
 		if err != nil {
 			return nil, nil, fmt.Errorf("decompose source %s: %w", inserted.ID, err)
 		}
+
+		if len(decomposition.Facts) > 0 && containsProperNoun(item.Content) {
+			verified, verErr := e.ai.VerifyExtraction(ctx, item.Content, decomposition.Facts)
+			if verErr != nil {
+				log.Printf("verify_extraction skipped for source %s: %v", inserted.ID, verErr)
+			} else {
+				decomposition.Facts = verified
+			}
+		}
+
 		decompositions = append(decompositions, decomposition)
 	}
 
@@ -130,4 +144,10 @@ func ptrString(value string) *string {
 		return nil
 	}
 	return &trimmed
+}
+
+// containsProperNoun returns true when the text contains at least one capitalised word
+// that could be a proper noun. Used as a cheap pre-filter before the verify pass.
+func containsProperNoun(text string) bool {
+	return properNounRe.MatchString(text)
 }
