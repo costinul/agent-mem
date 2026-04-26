@@ -8,6 +8,12 @@ system_prompt: |
 
   Preserve proper nouns and titles verbatim — names of people, places, countries, organizations, books, songs, films, products, brands, bands, and other titled works must appear in the fact text exactly as written in the message, with original spelling and capitalization. Never replace them with generic descriptions. For example, "Sweden" must stay "Sweden" (not "her home country"), "Becoming Nicole" must stay "Becoming Nicole" (not "a book about acceptance"), "Summer Sounds" must stay "Summer Sounds" (not "a band Melanie saw").
 
+  IMPORTANT — generic replacements are ALWAYS wrong:
+    Bad: "Caroline moved from her home country 4 years ago." → Good: "Caroline moved from Sweden 4 years ago."
+    Bad: "Melanie read a book recommended by Caroline." → Good: "Melanie read 'Nothing is Impossible', recommended by Caroline."
+    Bad: "Melanie has been reading a book to keep busy." → Good: "Melanie has been reading 'Nothing is Impossible' to keep busy."
+  Check every proper noun in the source — if the source names a country, book title, or organization, that name MUST appear in the fact text.
+
   Descriptive attributes — for artworks, objects, signs, or any physical item, preserve every specific visible attribute mentioned: color, shape, depicted subject, material, quoted text, or design. Do NOT compress them into adjectives like "nature-inspired", "amazing", or "beautiful".
   Anti-examples:
     Bad: "Caroline moved from her home country 4 years ago." → Good: "Caroline moved from Sweden 4 years ago."
@@ -29,7 +35,13 @@ system_prompt: |
 
   Temporal resolution: when an EventDate is provided, resolve every relative temporal expression in the message ("yesterday", "last week", "two days ago", "this morning", "next month", "last year", "a year ago", "last Saturday", "last Friday", "this past weekend", "on Friday", "next Tuesday") to its absolute calendar date based on that EventDate. The EventDate includes the weekday — use it to compute the correct date for any weekday reference (e.g. if the EventDate is Wednesday 10 May, "last Saturday" is 6 May). For "last weekend" or "this past weekend", produce the dates of the most recent Saturday AND Sunday before the EventDate. Always include the year explicitly in the fact text. Do not preserve relative phrases like "yesterday" or "last weekend" — replace them with the actual date.
 
-  Do not store relative-time words ("yesterday", "last week", "last year", "a few months ago", "recently", "soon") in fact text. Always rewrite them to the absolute calendar date or year using the EventDate.
+  IMPORTANT — unresolved relative time in a stored fact is ALWAYS wrong when EventDate is provided:
+    Bad: "Melanie painted a sunrise last year." → Good: "Melanie painted a sunrise in 2022." (EventDate = Monday, 8 May 2023)
+    Bad: "Melanie has been reading a book recently." → Good: "Melanie has been reading 'Nothing is Impossible' as of October 2023."
+    Bad: "Caroline started transitioning a few years ago." → Good: "Caroline started transitioning in 2020." (EventDate = Friday, 9 June 2023, three years before)
+  If you find yourself writing "last year", "recently", "a while ago", "a few months ago", "soon", or any other relative-time phrase in a fact text, STOP and compute the absolute date or year from EventDate instead.
+
+  Do not store relative-time words ("yesterday", "last week", "last year", "a few months ago", "recently", "soon") in fact text. Always rewrite them to the absolute calendar date or year using the EventDate. Similarly, do not store generic descriptions ("home country", "a book", "a band") when the source names a specific proper noun — always use the actual name.
 prompt: |
   Source type: {{.SourceKind}}
   {{- if .EventDate}}
@@ -58,7 +70,7 @@ prompt: |
   When writing facts, refer to the author by name ("{{.Author}}") rather than "the user" or "the agent" (e.g. "{{.Author}} works at TechCorp" not "The user works at TechCorp").
   {{- end}}
 temperature: 0.0
-max_tokens: 4096
+max_tokens: 8192
 requirements:
   min_context_window: 16000
   specializations:

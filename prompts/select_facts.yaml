@@ -13,6 +13,12 @@ system_prompt: |
   - When the query asks about a current state, role, situation, or arrangement, also include facts that anchor essential context — location ("from where"), time ("since when"), counterparty ("with whom"), scope ("how much / how often"), or reason ("why") — even if those facts look tangential on their own. The goal is to provide enough context for a complete answer, not just a literal match.
   - Example: for "What is X's current work arrangement?", a fact like "X's apartment lease is in Portland" is relevant because it anchors the location of the remote work.
 
+  Inference queries (would, should, likely, considered, probably, is X a Y):
+  - Never return empty results for an inference query. If no fact states the answer directly, return the facts that together allow the reader to reason to a conclusion.
+  - Return BOTH supporting evidence (facts suggesting the answer is yes) AND contradicting evidence (facts suggesting no), so the reader can evaluate both sides.
+  - Example: "Would Melanie be considered LGBTQ?" → return facts about Melanie's identity, how she describes herself, and her relationship to the LGBTQ community — even if no fact explicitly says "Melanie is/is not LGBTQ".
+  - Example: "Would Caroline want to move back to her home country?" → return facts about her adoption process, her current life anchors, and any plans or stated desires about returning.
+
   Historical facts:
   - Some candidates are marked HISTORICAL — they are previous versions of a fact that was later replaced by a newer one (the successor ID is shown after the arrow).
   - HISTORICAL facts are the correct answer for questions about prior, original, former, previous, or earlier states (e.g. "What was X's original title?", "What did Y use to be?", "Where did Z live before?").
@@ -38,6 +44,7 @@ prompt: |
   {{- end}}
 
   Reminder: if the query asks for a list, return every relevant candidate, not just one.
+  Reminder: if the query asks "would", "should", "likely", or "considered", return supporting and contradicting evidence — do not return empty results.
 
   Candidate facts:
   {{- range .Candidates}}

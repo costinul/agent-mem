@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -14,7 +16,6 @@ import (
 const (
 	recallCandidateK    = 60
 	recallSiblingBudget = 35
-	dateWindowDays      = 3
 )
 
 // Recall answers a free-text query by decomposing it into search phrases, retrieving
@@ -69,9 +70,14 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 	log.Printf("recall expanded=%d", len(candidates))
 	expandedCount := len(candidates)
 
-	// Date-rerank using referenced_at proximity to the query event_date.
-	candidates, inWindowCount, outOfWindowCount := dateRerank(candidates, eventDate, dateWindowDays)
-	log.Printf("recall date-reranked event_date=%s in_window=%d out_of_window=%d", eventDateStr, inWindowCount, outOfWindowCount)
+	// Cosine rerank restores semantic ordering after sibling expansion mixes in
+	// source-grouped facts that may not be in similarity order.
+	candidates = cosineRerank(candidates, embeddings)
+
+	// Temporal rerank: demote facts whose referenced_at is after the query event_date
+	// (future facts). Timeless facts and past/present facts retain embedding order.
+	candidates, eligibleCount, futureCount := dateRerank(candidates, eventDate)
+	log.Printf("recall date-reranked event_date=%s eligible=%d future=%d", eventDateStr, eligibleCount, futureCount)
 
 	selected, err := e.ai.SelectFacts(ctx, SelectFactsRequest{
 		Query:      input.Query,
@@ -101,14 +107,8 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 
 		debugCandidates := make([]models.DebugCandidate, 0, len(candidates))
 		for _, f := range candidates {
-			inWindow := true
-			if f.ReferencedAt != nil {
-				diff := f.ReferencedAt.Sub(eventDate)
-				if diff < 0 {
-					diff = -diff
-				}
-				inWindow = float64(diff) <= float64(dateWindowDays)*24*float64(time.Hour)
-			}
+			// Eligible = no referenced_at (timeless) or referenced_at not in the future.
+			eligible := f.ReferencedAt == nil || !f.ReferencedAt.After(eventDate)
 			text := f.Text
 			if len(text) > 120 {
 				text = text[:120] + "…"
@@ -124,7 +124,7 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 				Kind:         f.Kind,
 				EventDate:    factEventDate,
 				ReferencedAt: f.ReferencedAt,
-				InWindow:     inWindow,
+				InWindow:     eligible,
 				Selected:     selectedSet[f.ID],
 			})
 		}
@@ -135,9 +135,9 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 			EventDate:        eventDateStr,
 			RetrievedCount:   retrievedCount,
 			ExpandedCount:    expandedCount,
-			InWindowCount:    inWindowCount,
-			OutOfWindowCount: outOfWindowCount,
-			DateWindowDays:   dateWindowDays,
+			InWindowCount:    eligibleCount,
+			OutOfWindowCount: futureCount,
+			DateWindowDays:   0,
 			Candidates:       debugCandidates,
 			SelectedIDs:      selectedIDs,
 		}
@@ -208,31 +208,97 @@ outer:
 	return seeds, nil
 }
 
-// dateRerank partitions candidates into those whose referenced_at is within windowDays
-// of queryDate (or have no referenced_at) and those that are clearly out-of-window.
-// In-window facts are returned first (preserving original order); out-of-window facts follow.
-// No candidates are dropped — a wrong event_date must not nuke recall.
-// Returns the reordered slice plus in-window and out-of-window counts.
-func dateRerank(candidates []models.Fact, eventDate time.Time, windowDays int) ([]models.Fact, int, int) {
-	threshold := float64(windowDays) * 24 * float64(time.Hour)
-	inWindow := make([]models.Fact, 0, len(candidates))
-	outOfWindow := make([]models.Fact, 0)
+// dateRerank partitions candidates using the recall event_date as an as-of boundary.
+// No candidates are dropped. Three groups (relative order preserved within each):
+//
+//   - No referenced_at: timeless facts — eligible, position preserved.
+//   - referenced_at <= eventDate: past/present facts — eligible, position preserved.
+//   - referenced_at > eventDate: facts about future events — demoted to end.
+//
+// This replaces the old ±windowDays proximity boost, which incorrectly promoted
+// recently-dated facts over historically-dated ones for past-event queries.
+func dateRerank(candidates []models.Fact, eventDate time.Time) ([]models.Fact, int, int) {
+	eligible := make([]models.Fact, 0, len(candidates))
+	future := make([]models.Fact, 0)
 	for _, f := range candidates {
-		if f.ReferencedAt == nil {
-			inWindow = append(inWindow, f)
-			continue
-		}
-		diff := f.ReferencedAt.Sub(eventDate)
-		if diff < 0 {
-			diff = -diff
-		}
-		if float64(diff) <= threshold {
-			inWindow = append(inWindow, f)
+		if f.ReferencedAt == nil || !f.ReferencedAt.After(eventDate) {
+			eligible = append(eligible, f)
 		} else {
-			outOfWindow = append(outOfWindow, f)
+			future = append(future, f)
 		}
 	}
-	return append(inWindow, outOfWindow...), len(inWindow), len(outOfWindow)
+	return append(eligible, future...), len(eligible), len(future)
+}
+
+// cosineRerank sorts candidates by their maximum cosine similarity against any of the
+// query phrase embeddings, using the stored fact embeddings. Facts with no embedding
+// score 0 and fall to the end. Relative order among equal-scoring facts is preserved
+// (stable sort).
+//
+// Applied after sibling expansion so that siblings injected in source order are
+// correctly interleaved with semantically-retrieved facts before SelectFacts sees them.
+func cosineRerank(candidates []models.Fact, queryEmbeddings [][]float64) []models.Fact {
+	if len(candidates) == 0 || len(queryEmbeddings) == 0 {
+		return candidates
+	}
+	type scored struct {
+		fact  models.Fact
+		score float64
+	}
+	ss := make([]scored, len(candidates))
+	for i, f := range candidates {
+		ss[i] = scored{fact: f, score: maxCosine(f.Embedding, queryEmbeddings)}
+	}
+	sort.SliceStable(ss, func(i, j int) bool {
+		return ss[i].score > ss[j].score
+	})
+	out := make([]models.Fact, len(ss))
+	for i, s := range ss {
+		out[i] = s.fact
+	}
+	return out
+}
+
+// maxCosine returns the maximum cosine similarity between vec and any of the query vectors.
+func maxCosine(vec []float64, queries [][]float64) float64 {
+	if len(vec) == 0 {
+		return 0
+	}
+	normVec := l2Norm(vec)
+	if normVec == 0 {
+		return 0
+	}
+	best := 0.0
+	for _, q := range queries {
+		if len(q) == 0 {
+			continue
+		}
+		normQ := l2Norm(q)
+		if normQ == 0 {
+			continue
+		}
+		n := len(vec)
+		if len(q) < n {
+			n = len(q)
+		}
+		dot := 0.0
+		for k := 0; k < n; k++ {
+			dot += vec[k] * q[k]
+		}
+		if sim := dot / (normVec * normQ); sim > best {
+			best = sim
+		}
+	}
+	return best
+}
+
+// l2Norm returns the Euclidean (L2) norm of v.
+func l2Norm(v []float64) float64 {
+	sum := 0.0
+	for _, x := range v {
+		sum += x * x
+	}
+	return math.Sqrt(sum)
 }
 
 func recallPreviews(facts []models.Fact, n int) []string {
