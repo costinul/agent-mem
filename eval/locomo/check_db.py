@@ -1,14 +1,11 @@
 """Check DB for null embeddings and probe specific MISS_C facts."""
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 import psycopg2
 
-conn = psycopg2.connect(
-    host='agent-mem.postgres.database.azure.com',
-    port=5432,
-    dbname='agent-mem',
-    user='agentmemadm',
-    password='6dFAW49oXbNLNU8S3gqGLJKp8FTAAB2w',
-    sslmode='require',
-)
+conn = psycopg2.connect(os.environ["POSTGRES_DSN"])
 cur = conn.cursor()
 THREAD = '8fa46be9-eb4f-475d-b088-ea3d68c746da'
 

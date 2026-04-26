@@ -99,7 +99,7 @@ func main() {
 			sessionStore,
 			cfg.Admin.SessionTTL,
 		)
-		adminHandler := admin.NewHandler(accountRepo, agentRepo, memoryRepo, userRepo, engine)
+		adminHandler := admin.NewHandler(accountRepo, accountSvc, agentRepo, memoryRepo, userRepo, engine)
 		adminDeps = &api.AdminDeps{
 			GoogleAuth:   googleAuth,
 			SessionStore: sessionStore,

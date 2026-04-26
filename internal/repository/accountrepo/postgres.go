@@ -170,6 +170,35 @@ func (r *PostgresRepository) ListAPIKeysByPrefix(ctx context.Context, prefix str
 	return keys, nil
 }
 
+func (r *PostgresRepository) ListAPIKeysByAccountID(ctx context.Context, accountID string) ([]models.APIKey, error) {
+	rows, err := r.db.QueryContext(
+		ctx,
+		`SELECT id, account_id, prefix, key_hash, label, expires_at, valid, debug, created_at
+		 FROM api_keys
+		 WHERE account_id = $1
+		 ORDER BY created_at DESC`,
+		accountID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	keys := make([]models.APIKey, 0)
+	for rows.Next() {
+		key, scanErr := scanAPIKey(rows)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		keys = append(keys, *key)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return keys, nil
+}
+
 func scanAPIKey(scanner interface {
 	Scan(dest ...any) error
 }) (*models.APIKey, error) {

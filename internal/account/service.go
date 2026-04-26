@@ -47,6 +47,14 @@ func (s *Service) CreateAccount(ctx context.Context, name string) (*models.Accou
 	return account, nil
 }
 
+func (s *Service) ListAPIKeysByAccountID(ctx context.Context, accountID string) ([]models.APIKey, error) {
+	accountID = strings.TrimSpace(accountID)
+	if accountID == "" {
+		return nil, fmt.Errorf("account id is required")
+	}
+	return s.repo.ListAPIKeysByAccountID(ctx, accountID)
+}
+
 func (s *Service) CreateAPIKey(ctx context.Context, accountID string, label *string, expiresAt *time.Time) (*models.APIKey, string, error) {
 	accountID = strings.TrimSpace(accountID)
 	if accountID == "" {

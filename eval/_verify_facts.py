@@ -15,10 +15,7 @@ client = AzureOpenAI(
 def get_embedding(text):
     return client.embeddings.create(model="text-embedding-3-small", input=[text]).data[0].embedding
 
-conn = psycopg2.connect(
-    host='agent-mem.postgres.database.azure.com', port=5432, dbname='agent-mem',
-    user='agentmemadm', password='6dFAW49oXbNLNU8S3gqGLJKp8FTAAB2w', sslmode='require',
-)
+conn = psycopg2.connect(os.environ["POSTGRES_DSN"])
 cur = conn.cursor()
 
 # 1. Verify the necklace fact exists

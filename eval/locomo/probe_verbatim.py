@@ -1,12 +1,16 @@
 """Quick script to test verbatim vs natural queries for MISS_C vs MISS_E distinction."""
+import os
 import urllib.request
 import json
 import time
+from pathlib import Path
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
-API = 'http://localhost:8080/memory/recall'
+API = os.environ.get("MEMORY_API_URL", "http://localhost:8080") + "/memory/recall"
 THREAD = '8fa46be9-eb4f-475d-b088-ea3d68c746da'
 AGENT = '640fef54-85e8-4174-a2bb-8822c84b606a'
-KEY = 'amk_f923aad4b84a_c8437dd9a034186030b136d1eb65d4ed8953dcd78f99de45'
+KEY = os.environ["MEMORY_API_KEY"]
 
 
 def recall(q):

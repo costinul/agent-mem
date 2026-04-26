@@ -9,7 +9,9 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
+	"agentmem/internal/account"
 	"agentmem/internal/auth"
 	"agentmem/internal/engine"
 	models "agentmem/internal/models"
@@ -24,6 +26,7 @@ var templateFS embed.FS
 
 type Handler struct {
 	accountRepo accountrepo.Repository
+	accountSvc  *account.Service
 	agentRepo   agentrepo.Repository
 	memoryRepo  memoryrepo.Repository
 	userRepo    userrepo.Repository
@@ -32,6 +35,7 @@ type Handler struct {
 
 func NewHandler(
 	accountRepo accountrepo.Repository,
+	accountSvc *account.Service,
 	agentRepo agentrepo.Repository,
 	memoryRepo memoryrepo.Repository,
 	userRepo userrepo.Repository,
@@ -39,6 +43,7 @@ func NewHandler(
 ) *Handler {
 	return &Handler{
 		accountRepo: accountRepo,
+		accountSvc:  accountSvc,
 		agentRepo:   agentRepo,
 		memoryRepo:  memoryRepo,
 		userRepo:    userRepo,
@@ -49,7 +54,11 @@ func NewHandler(
 // tmpl builds a fresh template set for each render to avoid block name conflicts
 // when multiple page templates define the same "content" block.
 func tmpl(page string) *template.Template {
-	return template.Must(template.ParseFS(templateFS, "templates/layout.html", "templates/"+page))
+	return template.Must(template.New("").Funcs(template.FuncMap{
+		"not":         func(b bool) bool { return !b },
+		"derefString": func(s *string) string { return *s },
+		"derefTimeStr": func(t *time.Time) string { return t.Format("2006-01-02") },
+	}).ParseFS(templateFS, "templates/layout.html", "templates/"+page))
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux, adminMw func(http.Handler) http.Handler) {
@@ -60,6 +69,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, adminMw func(http.Handler) 
 	protected.HandleFunc("GET /admin/accounts", h.listAccounts)
 	protected.HandleFunc("POST /admin/accounts", h.createAccount)
 	protected.HandleFunc("DELETE /admin/accounts/{id}", h.deleteAccount)
+	protected.HandleFunc("GET /admin/accounts/{id}", h.accountDetail)
+	protected.HandleFunc("POST /admin/accounts/{id}/api-keys", h.createAPIKey)
+	protected.HandleFunc("DELETE /admin/accounts/{id}/api-keys/{key_id}", h.revokeAPIKey)
 	protected.HandleFunc("GET /admin/agents", h.listAgents)
 	protected.HandleFunc("POST /admin/agents", h.createAgent)
 	protected.HandleFunc("PUT /admin/agents/{id}", h.updateAgent)
@@ -90,6 +102,9 @@ type pageData struct {
 
 	// page-specific
 	Accounts      []models.Account
+	Account       *models.Account
+	APIKeys       []models.APIKey
+	NewAPIKey     *newAPIKeyResult
 	Agents        []models.Agent
 	Threads       []models.Thread
 	Thread        *models.Thread
@@ -101,6 +116,11 @@ type pageData struct {
 
 	// playground
 	PlaygroundResult *PlaygroundResult
+}
+
+type newAPIKeyResult struct {
+	Key      *models.APIKey
+	Plaintext string
 }
 
 func (h *Handler) page(r *http.Request, title, nav string) pageData {
@@ -181,6 +201,196 @@ func (h *Handler) deleteAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/admin/accounts", http.StatusSeeOther)
+}
+
+func (h *Handler) accountDetail(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	acct, err := h.accountRepo.GetAccountByID(r.Context(), id)
+	if err != nil {
+		slog.Error("get account", "error", err)
+		http.NotFound(w, r)
+		return
+	}
+	keys, err := h.accountSvc.ListAPIKeysByAccountID(r.Context(), id)
+	if err != nil {
+		slog.Error("list api keys", "error", err)
+		http.Error(w, "failed to list api keys", http.StatusInternalServerError)
+		return
+	}
+	data := h.page(r, "Account: "+acct.Name, "accounts")
+	data.Account = acct
+	data.APIKeys = keys
+	h.render(w, "account_detail.html", data)
+}
+
+func (h *Handler) createAPIKey(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	label := strings.TrimSpace(r.FormValue("label"))
+	expiresAtRaw := strings.TrimSpace(r.FormValue("expires_at"))
+
+	var labelPtr *string
+	if label != "" {
+		labelPtr = &label
+	}
+
+	var expiresAt *time.Time
+	if expiresAtRaw != "" {
+		parsed, err := time.Parse("2006-01-02", expiresAtRaw)
+		if err == nil {
+			utc := parsed.UTC()
+			expiresAt = &utc
+		}
+	}
+
+	key, plaintext, err := h.accountSvc.CreateAPIKey(r.Context(), id, labelPtr, expiresAt)
+	if err != nil {
+		slog.Error("create api key", "error", err)
+		http.Error(w, "failed to create api key", http.StatusInternalServerError)
+		return
+	}
+
+	keys, err := h.accountSvc.ListAPIKeysByAccountID(r.Context(), id)
+	if err != nil {
+		slog.Error("list api keys after create", "error", err)
+		http.Error(w, "failed to list api keys", http.StatusInternalServerError)
+		return
+	}
+
+	if isHTMX(r) {
+		data := apiKeysSectionData{
+			AccountID: id,
+			Keys:      keys,
+			NewAPIKey: &newAPIKeyResult{Key: key, Plaintext: plaintext},
+		}
+		h.renderAPIKeysSection(w, data)
+		return
+	}
+	http.Redirect(w, r, "/admin/accounts/"+id, http.StatusSeeOther)
+}
+
+func (h *Handler) revokeAPIKey(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	keyID := r.PathValue("key_id")
+
+	if err := h.accountSvc.InvalidateAPIKeyByID(r.Context(), keyID); err != nil {
+		slog.Error("revoke api key", "error", err)
+		http.Error(w, "failed to revoke api key", http.StatusInternalServerError)
+		return
+	}
+
+	keys, err := h.accountSvc.ListAPIKeysByAccountID(r.Context(), id)
+	if err != nil {
+		slog.Error("list api keys after revoke", "error", err)
+		http.Error(w, "failed to list api keys", http.StatusInternalServerError)
+		return
+	}
+
+	if isHTMX(r) {
+		data := apiKeysSectionData{
+			AccountID: id,
+			Keys:      keys,
+		}
+		h.renderAPIKeysSection(w, data)
+		return
+	}
+	http.Redirect(w, r, "/admin/accounts/"+id, http.StatusSeeOther)
+}
+
+type apiKeysSectionData struct {
+	AccountID string
+	Keys      []models.APIKey
+	NewAPIKey *newAPIKeyResult
+}
+
+func (h *Handler) renderAPIKeysSection(w http.ResponseWriter, data apiKeysSectionData) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	tmplStr := `{{define "api-keys-section"}}
+<div id="api-keys-section">
+  {{if .NewAPIKey}}
+  <div class="mb-4 rounded-lg border border-green-200 bg-green-50 p-4">
+    <p class="text-sm font-medium text-green-800 mb-2">API key created. Copy it now — it will not be shown again.</p>
+    <div class="flex items-center gap-2">
+      <code id="new-key-value" class="flex-1 font-mono text-sm bg-white border border-green-300 rounded px-3 py-2 text-green-900 break-all">{{.NewAPIKey.Plaintext}}</code>
+      <button type="button" onclick="copyNewKey()"
+              class="shrink-0 px-3 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors">
+        Copy
+      </button>
+    </div>
+    <script>
+    function copyNewKey() {
+      const val = document.getElementById('new-key-value').textContent;
+      navigator.clipboard.writeText(val).then(() => {
+        const btn = event.target;
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 2000);
+      });
+    }
+    </script>
+  </div>
+  {{end}}
+  <form hx-post="/admin/accounts/{{.AccountID}}/api-keys"
+        hx-target="#api-keys-section"
+        hx-swap="outerHTML"
+        class="flex gap-2 mb-4">
+    <input type="text" name="label" placeholder="Label (optional)"
+           class="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+    <input type="date" name="expires_at" title="Expiry date (optional)"
+           class="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+    <button type="submit"
+            class="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors whitespace-nowrap">
+      Create Key
+    </button>
+  </form>
+  {{if .Keys}}
+  <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b border-gray-200">
+        <tr>
+          <th class="text-left px-4 py-3 font-medium text-gray-500">Prefix</th>
+          <th class="text-left px-4 py-3 font-medium text-gray-500">Label</th>
+          <th class="text-left px-4 py-3 font-medium text-gray-500">Status</th>
+          <th class="text-left px-4 py-3 font-medium text-gray-500">Expires</th>
+          <th class="text-left px-4 py-3 font-medium text-gray-500">Created</th>
+          <th class="text-right px-4 py-3 font-medium text-gray-500">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {{range .Keys}}
+        <tr class="{{if not .Valid}}opacity-50{{end}}">
+          <td class="px-4 py-3 font-mono text-xs text-gray-600">{{.Prefix}}</td>
+          <td class="px-4 py-3 text-gray-700">{{if .Label}}{{deref .Label}}{{else}}<span class="text-gray-300">—</span>{{end}}</td>
+          <td class="px-4 py-3 text-xs">
+            {{if .Valid}}<span class="text-green-600 font-medium">Active</span>{{else}}<span class="text-gray-400">Revoked</span>{{end}}
+          </td>
+          <td class="px-4 py-3 text-xs text-gray-500">
+            {{if .ExpiresAt}}{{derefTime .ExpiresAt}}{{else}}<span class="text-gray-300">Never</span>{{end}}
+          </td>
+          <td class="px-4 py-3 text-xs text-gray-500">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
+          <td class="px-4 py-3 text-right">
+            {{if .Valid}}
+            <button hx-delete="/admin/accounts/{{$.AccountID}}/api-keys/{{.ID}}"
+                    hx-target="#api-keys-section"
+                    hx-swap="outerHTML"
+                    hx-confirm="Revoke this API key? It will stop working immediately."
+                    class="text-xs text-red-600 hover:text-red-800 font-medium">Revoke</button>
+            {{end}}
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <p class="text-sm text-gray-400">No API keys yet.</p>
+  {{end}}
+</div>
+{{end}}`
+	t := template.Must(template.New("api-keys-section").Funcs(template.FuncMap{
+		"not":      func(b bool) bool { return !b },
+		"deref":    func(s *string) string { return *s },
+		"derefTime": func(t *time.Time) string { return t.Format("2006-01-02") },
+	}).Parse(tmplStr))
+	_ = t.ExecuteTemplate(w, "api-keys-section", data)
 }
 
 func (h *Handler) listAgents(w http.ResponseWriter, r *http.Request) {
@@ -547,8 +757,8 @@ func (h *Handler) deleteUser(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) renderAccountRow(w http.ResponseWriter, acct *models.Account) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	tmpl := `<tr id="account-{{.ID}}">
-	<td class="px-4 py-3 font-mono text-xs text-gray-600">{{.ID}}</td>
-	<td class="px-4 py-3 text-gray-900">{{.Name}}</td>
+	<td class="px-4 py-3 font-mono text-xs text-gray-600"><a href="/admin/accounts/{{.ID}}" class="hover:underline text-blue-600">{{.ID}}</a></td>
+	<td class="px-4 py-3 text-gray-900"><a href="/admin/accounts/{{.ID}}" class="hover:underline">{{.Name}}</a></td>
 	<td class="px-4 py-3 text-gray-500">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
 	<td class="px-4 py-3 text-right">
 		<button hx-delete="/admin/accounts/{{.ID}}" hx-target="#account-{{.ID}}" hx-swap="outerHTML swap:0.3s"

@@ -24,4 +24,5 @@ type Repository interface {
 	InvalidateAPIKeyByID(ctx context.Context, apiKeyID string) (bool, error)
 	InvalidateAPIKeyByPrefix(ctx context.Context, prefix string) (bool, error)
 	ListAPIKeysByPrefix(ctx context.Context, prefix string) ([]models.APIKey, error)
+	ListAPIKeysByAccountID(ctx context.Context, accountID string) ([]models.APIKey, error)
 }

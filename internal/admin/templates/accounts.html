@@ -24,8 +24,12 @@
         <tbody id="account-list" class="divide-y divide-gray-100">
             {{range .Accounts}}
             <tr id="account-{{.ID}}">
-                <td class="px-4 py-3 font-mono text-xs text-gray-600">{{.ID}}</td>
-                <td class="px-4 py-3 text-gray-900">{{.Name}}</td>
+                <td class="px-4 py-3 font-mono text-xs text-gray-600">
+                    <a href="/admin/accounts/{{.ID}}" class="hover:underline text-blue-600">{{.ID}}</a>
+                </td>
+                <td class="px-4 py-3 text-gray-900">
+                    <a href="/admin/accounts/{{.ID}}" class="hover:underline">{{.Name}}</a>
+                </td>
                 <td class="px-4 py-3 text-gray-500">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
                 <td class="px-4 py-3 text-right">
                     <button hx-delete="/admin/accounts/{{.ID}}"

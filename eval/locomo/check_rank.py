@@ -51,14 +51,7 @@ def rank_fact_for_query(conn, query_embedding: list[float], target_text_snippet:
 
 
 def main():
-    conn = psycopg2.connect(
-        host='agent-mem.postgres.database.azure.com',
-        port=5432,
-        dbname='agent-mem',
-        user='agentmemadm',
-        password='6dFAW49oXbNLNU8S3gqGLJKp8FTAAB2w',
-        sslmode='require',
-    )
+    conn = psycopg2.connect(os.environ["POSTGRES_DSN"])
 
     probes = [
         # (query, target_text_snippet)
