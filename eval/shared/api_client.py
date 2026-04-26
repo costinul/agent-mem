@@ -61,14 +61,14 @@ class MemoryAPIClient:
 
         Args:
             when: ISO 8601 timestamp string for when the message was produced.
-                  Used to resolve relative dates in fact extraction.
+                  Sent as event_date; used to resolve relative dates in fact extraction.
         """
         kind = _ROLE_TO_KIND.get(role.lower(), role.upper())
         item: dict = {"kind": kind, "content": content, "content_type": "text/plain"}
         if author:
             item["author"] = author
         if when:
-            item["timestamp"] = when
+            item["event_date"] = when
         payload = {
             "thread_id": thread_id,
             "inputs": [item],
@@ -77,13 +77,20 @@ class MemoryAPIClient:
         self._raise_with_body(resp)
         return resp.json()
 
-    async def recall(self, thread_id: str, question: str) -> dict:
-        """Read-only retrieval of facts relevant to the question."""
+    async def recall(self, thread_id: str, question: str, when: str | None = None) -> dict:
+        """Read-only retrieval of facts relevant to the question.
+
+        Args:
+            when: ISO 8601 timestamp string for when the question is being asked.
+                  Sent as event_date; used to resolve relative-time phrases in the query.
+        """
         payload = {
             "thread_id": thread_id,
             "agent_id": self.agent_id,
             "query": question,
         }
+        if when:
+            payload["event_date"] = when
         resp = await self._client_or_raise().post(f"{self.base_url}/memory/recall", json=payload)
         self._raise_with_body(resp)
         return resp.json()

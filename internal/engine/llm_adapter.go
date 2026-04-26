@@ -20,14 +20,15 @@ type DecomposeRequest struct {
 	Content        string
 	ContextHeader  string
 	MessageHistory []string
-	// Timestamp is a human-readable date/time string (e.g. "8 May 2023") derived from
-	// the session wall-clock time, used to resolve relative temporal expressions in facts.
-	Timestamp string
+	// EventDate is a human-readable date/time string (e.g. "Monday, 8 May 2023, 10:30 UTC") derived from
+	// the caller-supplied event_date. Used to resolve relative temporal expressions in facts.
+	EventDate string
 }
 
 // DecomposeRecallRequest is the input for decomposing a recall query into search phrases.
 type DecomposeRecallRequest struct {
-	Content string
+	Content   string
+	EventDate string // ISO "YYYY-MM-DD" used to resolve relative-time phrases in the query.
 }
 
 // EvaluateRequest is the input for the evaluate step.
@@ -39,7 +40,7 @@ type EvaluateRequest struct {
 // SelectFactsRequest is the input for the fact selection step.
 type SelectFactsRequest struct {
 	Query      string
-	QueryDate  *time.Time
+	EventDate  string // ISO "YYYY-MM-DD" when the question is asked; used by the LLM to resolve relative-time phrases.
 	Candidates []models.Fact
 }
 
@@ -104,11 +105,10 @@ func (a *LLMAdapter) Decompose(ctx context.Context, req DecomposeRequest) (model
 }
 
 // DecomposeRecall breaks a recall query into atomic search phrases via the LLM.
-// It also parses query_date when the LLM extracts a temporal anchor from the query.
-func (a *LLMAdapter) DecomposeRecall(ctx context.Context, query string) (models.Decomposition, error) {
+func (a *LLMAdapter) DecomposeRecall(ctx context.Context, req DecomposeRecallRequest) (models.Decomposition, error) {
 	out := &decompositionOutput{}
 	err := a.client.ExecuteAs(ctx, uuid.New(), "decompose_recall", a.schemaModel, &bwai.PromptData{
-		Data: DecomposeRecallRequest{Content: query},
+		Data: req,
 	}, out)
 	if err != nil {
 		return models.Decomposition{}, fmt.Errorf("decompose recall query: %w", err)
@@ -118,16 +118,10 @@ func (a *LLMAdapter) DecomposeRecall(ctx context.Context, query string) (models.
 	for i, f := range out.Facts {
 		facts[i] = f.toModel()
 	}
-	d := models.Decomposition{
+	return models.Decomposition{
 		Facts:   facts,
 		Queries: out.Queries,
-	}
-	if out.QueryDate != "" {
-		if t, err := time.Parse("2006-01-02", out.QueryDate); err == nil {
-			d.QueryDate = &t
-		}
-	}
-	return d, nil
+	}, nil
 }
 
 // Evaluate determines what to do with new and retrieved facts using the LLM.
@@ -156,15 +150,27 @@ func (a *LLMAdapter) Evaluate(ctx context.Context, req EvaluateRequest) (models.
 		}
 	}
 
+	// LLM echoes referenced_at on each new fact — map it directly, no text-key lookup needed.
 	factsToStore := make([]models.Fact, 0, len(out.FactsToStore))
 	for _, ef := range out.FactsToStore {
-		factsToStore = append(factsToStore, models.Fact{Text: ef.Text, Kind: ef.Kind})
+		f := models.Fact{Text: ef.Text, Kind: ef.Kind}
+		if ef.ReferencedAt != "" {
+			if t, err := time.Parse("2006-01-02", ef.ReferencedAt); err == nil {
+				f.ReferencedAt = &t
+			}
+		}
+		factsToStore = append(factsToStore, f)
 	}
 
 	factsToUpdate := make([]models.Fact, 0, len(out.FactsToUpdate))
 	for _, u := range out.FactsToUpdate {
 		if f, ok := retrievedByID[u.ID]; ok {
 			f.Text = u.Text
+			if u.ReferencedAt != "" {
+				if t, err := time.Parse("2006-01-02", u.ReferencedAt); err == nil {
+					f.ReferencedAt = &t
+				}
+			}
 			factsToUpdate = append(factsToUpdate, f)
 		}
 	}
@@ -189,20 +195,21 @@ func (a *LLMAdapter) SelectFacts(ctx context.Context, req SelectFactsRequest) ([
 		ID           string
 		Kind         models.FactKind
 		Text         string
-		ReferencedAt string // ISO "YYYY-MM-DD" or "" when unset
+		EventDate    string // ISO "YYYY-MM-DD" of the source message; "" when unset
+		ReferencedAt string // ISO "YYYY-MM-DD" of the described event; "" when unset
 		SupersededBy string
 	}
 	type templateData struct {
-		Query      string
-		QueryDate  string // ISO "YYYY-MM-DD" or "" when unset
+		Query     string
+		EventDate string // ISO "YYYY-MM-DD" when the question is asked; "" when unset
 		Candidates []candidateView
 	}
-	td := templateData{Query: req.Query}
-	if req.QueryDate != nil {
-		td.QueryDate = req.QueryDate.Format("2006-01-02")
-	}
+	td := templateData{Query: req.Query, EventDate: req.EventDate}
 	for _, f := range req.Candidates {
 		cv := candidateView{ID: f.ID, Kind: f.Kind, Text: f.Text}
+		if f.EventDate != nil {
+			cv.EventDate = f.EventDate.Format("2006-01-02")
+		}
 		if f.ReferencedAt != nil {
 			cv.ReferencedAt = f.ReferencedAt.Format("2006-01-02")
 		}
@@ -239,58 +246,6 @@ func (a *LLMAdapter) SelectFacts(ctx context.Context, req SelectFactsRequest) ([
 	return selected, nil
 }
 
-// VerifyExtraction checks extracted facts against the original source content and
-// restores any proper nouns, titles, or descriptive attributes that were lost during
-// extraction. Returns the same number of facts in the same order; if the LLM output
-// is malformed the original facts are returned unchanged.
-func (a *LLMAdapter) VerifyExtraction(ctx context.Context, source string, facts []models.ExtractedFact) ([]models.ExtractedFact, error) {
-	if len(facts) == 0 {
-		return facts, nil
-	}
-
-	type factView struct {
-		Text string `json:"text"`
-		Kind string `json:"kind"`
-	}
-	type templateData struct {
-		Source string
-		Facts  []factView
-	}
-	td := templateData{Source: source}
-	for _, f := range facts {
-		td.Facts = append(td.Facts, factView{Text: f.Text, Kind: string(f.Kind)})
-	}
-
-	out := &decompositionOutput{}
-	err := a.client.ExecuteAs(ctx, uuid.New(), "verify_extraction", a.schemaModel, &bwai.PromptData{
-		Data: td,
-	}, out)
-	if err != nil {
-		return facts, fmt.Errorf("verify extraction: %w", err)
-	}
-
-	if len(out.Facts) != len(facts) {
-		// Wrong count — fall back to originals rather than misaligning.
-		return facts, nil
-	}
-
-	result := make([]models.ExtractedFact, len(facts))
-	for i, llmFact := range out.Facts {
-		orig := facts[i]
-		verified := llmFact.toModel()
-		// Keep the original referenced_at when the LLM didn't echo one.
-		if verified.ReferencedAt == nil && orig.ReferencedAt != nil {
-			verified.ReferencedAt = orig.ReferencedAt
-		}
-		// Keep original kind if LLM produced an empty one.
-		if verified.Kind == "" {
-			verified.Kind = orig.Kind
-		}
-		result[i] = verified
-	}
-	return result, nil
-}
-
 // ──────────────────────────────────────────────
 // Structured output types
 // ──────────────────────────────────────────────
@@ -315,17 +270,16 @@ func (f extractedFactLLM) toModel() models.ExtractedFact {
 	return ef
 }
 
-// extractedFactStoreLLM is the evaluate step's wire shape: no referenced_at since
-// the evaluate prompt doesn't generate dates.
-type extractedFactStoreLLM struct {
-	Text string          `json:"text"`
-	Kind models.FactKind `json:"kind"`
+// factUpdateLLM is the evaluate step's wire shape for an existing fact update.
+type factUpdateLLM struct {
+	ID           string `json:"id"`
+	Text         string `json:"text"`
+	ReferencedAt string `json:"referenced_at"` // ISO 8601 "YYYY-MM-DD" or ""; plain string for schema compliance.
 }
 
 type decompositionOutput struct {
-	Facts     []extractedFactLLM      `json:"facts"`
-	Queries   []models.ExtractedQuery `json:"queries"`
-	QueryDate string                  `json:"query_date"` // ISO 8601 "YYYY-MM-DD" or ""; plain string for Azure schema compliance.
+	Facts   []extractedFactLLM      `json:"facts"`
+	Queries []models.ExtractedQuery `json:"queries"`
 }
 
 func (o *decompositionOutput) SchemaDescription() string {
@@ -350,16 +304,11 @@ func (o *decompositionOutput) Unmarshal(data []byte) error {
 
 // ──────────────────────────────────────────────
 
-type factUpdate struct {
-	ID   string `json:"id"`
-	Text string `json:"text"`
-}
-
 type evaluateOutput struct {
-	FactsToReturn []string                `json:"facts_to_return"`
-	FactsToStore  []extractedFactStoreLLM `json:"facts_to_store"`
-	FactsToUpdate []factUpdate            `json:"facts_to_update"`
-	FactsToEvolve []models.FactEvolution  `json:"facts_to_evolve"`
+	FactsToReturn []string               `json:"facts_to_return"`
+	FactsToStore  []extractedFactLLM     `json:"facts_to_store"`
+	FactsToUpdate []factUpdateLLM        `json:"facts_to_update"`
+	FactsToEvolve []models.FactEvolution `json:"facts_to_evolve"`
 }
 
 func (o *evaluateOutput) SchemaDescription() string {

@@ -957,6 +957,35 @@ const docTemplate = `{
                 }
             }
         },
+        "memory.DebugCandidate": {
+            "type": "object",
+            "properties": {
+                "event_date": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "in_window": {
+                    "type": "boolean"
+                },
+                "kind": {
+                    "$ref": "#/definitions/memory.FactKind"
+                },
+                "referenced_at": {
+                    "type": "string"
+                },
+                "selected": {
+                    "type": "boolean"
+                },
+                "source_id": {
+                    "type": "string"
+                },
+                "text": {
+                    "type": "string"
+                }
+            }
+        },
         "memory.Fact": {
             "type": "object",
             "properties": {
@@ -975,11 +1004,19 @@ const docTemplate = `{
                         "type": "number"
                     }
                 },
+                "event_date": {
+                    "description": "When the source message was authored. Populated from sources.event_date via JOIN at read time; not a column on facts.",
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },
                 "kind": {
                     "$ref": "#/definitions/memory.FactKind"
+                },
+                "referenced_at": {
+                    "description": "Calendar date the fact's content refers to, LLM-extracted at decompose time.",
+                    "type": "string"
                 },
                 "source_id": {
                     "description": "The source that produced this fact.",
@@ -1077,7 +1114,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "author": {
-                    "description": "Optional name of the person or entity that produced this turn (e.g. \"Alex\").",
+                    "description": "Optional: name of the person or entity that produced this turn (e.g. \"Alex\").",
                     "type": "string"
                 },
                 "content": {
@@ -1086,6 +1123,10 @@ const docTemplate = `{
                 },
                 "content_type": {
                     "description": "MIME type: text/plain, application/pdf, image/png, etc.",
+                    "type": "string"
+                },
+                "event_date": {
+                    "description": "When the message was authored. Used to anchor relative dates during fact extraction. Defaults to now().",
                     "type": "string"
                 },
                 "kind": {
@@ -1107,10 +1148,64 @@ const docTemplate = `{
                 }
             }
         },
+        "memory.RecallDebug": {
+            "type": "object",
+            "properties": {
+                "candidates": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/memory.DebugCandidate"
+                    }
+                },
+                "date_window_days": {
+                    "type": "integer"
+                },
+                "errors": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "event_date": {
+                    "type": "string"
+                },
+                "expanded_count": {
+                    "type": "integer"
+                },
+                "in_window_count": {
+                    "type": "integer"
+                },
+                "out_of_window_count": {
+                    "type": "integer"
+                },
+                "phrases": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "query": {
+                    "type": "string"
+                },
+                "retrieved_count": {
+                    "type": "integer"
+                },
+                "selected_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "memory.RecallInput": {
             "type": "object",
             "properties": {
                 "agent_id": {
+                    "type": "string"
+                },
+                "event_date": {
+                    "description": "When the question is being asked. Used to resolve relative-time phrases in the query. Defaults to now().",
                     "type": "string"
                 },
                 "include_sources": {
@@ -1130,6 +1225,9 @@ const docTemplate = `{
         "memory.RecallOutput": {
             "type": "object",
             "properties": {
+                "debug": {
+                    "$ref": "#/definitions/memory.RecallDebug"
+                },
                 "facts": {
                     "type": "array",
                     "items": {

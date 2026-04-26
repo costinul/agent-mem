@@ -21,13 +21,17 @@ system_prompt: |
 prompt: |
   New facts extracted from current input:
   {{- range $i, $f := .NewFacts}}
-  [NEW-{{$i}}] ({{$f.Kind}}) {{$f.Text}}
+  [NEW-{{$i}}] ({{$f.Kind}}{{if $f.ReferencedAt}}, ref={{$f.ReferencedAt.Format "2006-01-02"}}{{end}}) {{$f.Text}}
   {{- end}}
 
   Existing facts retrieved from memory:
   {{- range .RetrievedFacts}}
-  [{{.ID}}] ({{.Kind}}) {{.Text}}
+  [{{.ID}}] ({{.Kind}}{{if .ReferencedAt}}, ref={{.ReferencedAt.Format "2006-01-02"}}{{end}}) {{.Text}}
   {{- end}}
+
+  For facts_to_store: echo each new fact with its kind and referenced_at (ISO "YYYY-MM-DD" or "" if not set).
+  For facts_to_update: echo each existing fact's id and new text; set referenced_at to the updated event date if the date changed, otherwise echo the original.
+  For facts_to_evolve: provide old_fact_id, new_text, new_kind, and new_referenced_at (ISO "YYYY-MM-DD" or "").
 temperature: 0.0
 max_tokens: 8192
 requirements:

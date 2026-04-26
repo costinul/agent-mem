@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"agentmem/internal/errs"
 	models "agentmem/internal/models"
@@ -135,13 +134,9 @@ func (e *MemoryEngine) mapFactForOutput(ctx context.Context, fact models.Fact, i
 	if err != nil {
 		return models.ReturnedFact{}, fmt.Errorf("load source for fact %s: %w", fact.ID, err)
 	}
-	text := fact.Text
-	if fact.ReferencedAt != nil && !factTextContainsDate(text, *fact.ReferencedAt) {
-		text = text + " (on " + fact.ReferencedAt.Format("2006-01-02") + ")"
-	}
 	returned := models.ReturnedFact{
 		ID:   fact.ID,
-		Text: text,
+		Text: fact.Text,
 		Kind: fact.Kind,
 	}
 	if source != nil {
@@ -152,17 +147,6 @@ func (e *MemoryEngine) mapFactForOutput(ctx context.Context, fact models.Fact, i
 		}
 	}
 	return returned, nil
-}
-
-// factTextContainsDate returns true if the fact text already contains the ISO date string
-// (YYYY-MM-DD) or the 4-digit year of the given time, so we don't double-annotate.
-func factTextContainsDate(text string, t time.Time) bool {
-	iso := t.Format("2006-01-02")
-	if strings.Contains(text, iso) {
-		return true
-	}
-	year := t.Format("2006")
-	return strings.Contains(text, year)
 }
 
 // ensureSourceCanMutateFact enforces the trust hierarchy: the calling source kind must have

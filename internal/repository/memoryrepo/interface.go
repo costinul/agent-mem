@@ -2,6 +2,7 @@ package memoryrepo
 
 import (
 	"context"
+	"time"
 
 	models "agentmem/internal/models"
 )
@@ -26,6 +27,10 @@ type Repository interface {
 	UpdateFact(ctx context.Context, fact models.Fact) error
 	DeleteFact(ctx context.Context, factID string) error
 	SupersedeFact(ctx context.Context, oldFactID string, newFact models.Fact) (*models.Fact, error)
+
+	// MaxSourceEventDateForThread returns the most recent event_date across all sources for the thread.
+	// Returns nil when the thread has no sources.
+	MaxSourceEventDateForThread(ctx context.Context, threadID string) (*time.Time, error)
 }
 
 type ListFactsParams struct {

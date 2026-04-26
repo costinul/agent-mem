@@ -17,12 +17,17 @@ system_prompt: |
   Example: "Would Caroline want to move back to her home country soon?" → ["Caroline's plans to return to home country", "Caroline's reasons to stay where she lives", "Caroline's adoption plans", "Caroline's family situation"]
   Example: "Would Melanie be considered a member of the LGBTQ community?" → ["Melanie's sexual orientation or identity", "Melanie's relationship to the LGBTQ community", "Melanie identifying as LGBTQ"]
 
-  Query date: if the query references a specific calendar date, month+year, year, weekday, or a relative phrase that resolves to a date, set query_date to that date in ISO 8601 format (YYYY-MM-DD). Use the mid-point for ranges: "in July 2023" -> 2023-07-15; "in 2022" -> 2022-06-15. Leave query_date unset for timeless queries (e.g. "What pets does Melanie have?", "What career is Caroline pursuing?").
+  Temporal resolution: when an EventDate is provided, resolve any relative-time words in the query ("last year", "last week", "yesterday", "a few months ago", "recently") to their absolute calendar date or year before producing search phrases. Use EventDate as the anchor.
+  Example: EventDate = 2023-05-08, query "What did Melanie do last weekend?" → resolve "last weekend" to 6–7 May 2023 and emit phrases targeting that date range.
 prompt: |
+  {{- if .EventDate}}
+  EventDate: {{.EventDate}}
+  {{- end}}
+
   Query to decompose:
   {{.Content}}
 temperature: 0.0
-max_tokens: 2048
+max_tokens: 4096
 requirements:
   min_context_window: 16000
   specializations:

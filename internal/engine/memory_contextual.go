@@ -21,6 +21,12 @@ func (e *MemoryEngine) ProcessContextual(ctx context.Context, input models.Memor
 		return models.WriteOutput{}, err
 	}
 
+	// Enforce monotonic event_date ordering within the thread to prevent the butterfly effect:
+	// inserting a past event retroactively invalidates the supersession chain for all later facts.
+	if err := e.enforceEventDateMonotonicity(ctx, input.ThreadID, input.Inputs); err != nil {
+		return models.WriteOutput{}, err
+	}
+
 	log.Printf("contextual pipeline start account=%s agent=%s thread=%s inputs=%d", input.AccountID, input.AgentID, input.ThreadID, len(input.Inputs))
 	threadID := input.ThreadID
 	event, err := e.repo.InsertEvent(ctx, models.Event{
@@ -56,7 +62,7 @@ func (e *MemoryEngine) ProcessContextual(ctx context.Context, input models.Memor
 		return models.WriteOutput{}, fmt.Errorf("evaluate facts: %w", err)
 	}
 
-	storedFacts, err := e.applyEvaluateResult(ctx, input, storedSources, evalInput, evalResult)
+	storedFacts, err := e.applyEvaluateResult(ctx, input, storedSources, evalResult)
 	if err != nil {
 		return models.WriteOutput{}, err
 	}
@@ -190,121 +196,138 @@ func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, ag
 	return facts, nil
 }
 
-// applyEvaluateResult persists the LLM evaluation decision: inserts new facts,
-// updates existing ones in-place, and supersedes evolved facts with a new version.
+// applyEvaluateResult persists the LLM evaluation decision.
 func (e *MemoryEngine) applyEvaluateResult(
 	ctx context.Context,
 	input models.MemoryInput,
 	storedSources []models.Source,
-	newFacts []models.ExtractedFact,
 	result models.EvaluateResult,
 ) ([]models.Fact, error) {
-	newTexts := make([]string, 0, len(result.FactsToStore))
-	for _, fact := range result.FactsToStore {
-		newTexts = append(newTexts, fact.Text)
+	stored, err := e.storeNewFacts(ctx, input, storedSources, result.FactsToStore)
+	if err != nil {
+		return nil, err
 	}
-	embeddings, err := e.ai.Embed(ctx, newTexts)
+	if err := e.updateExistingFacts(ctx, result.FactsToUpdate); err != nil {
+		return nil, err
+	}
+	evolved, err := e.evolveFacts(ctx, input, storedSources, result.FactsToEvolve)
+	if err != nil {
+		return nil, err
+	}
+	return append(stored, evolved...), nil
+}
+
+func (e *MemoryEngine) storeNewFacts(ctx context.Context, input models.MemoryInput, sources []models.Source, facts []models.Fact) ([]models.Fact, error) {
+	if len(facts) == 0 {
+		return nil, nil
+	}
+	texts := make([]string, len(facts))
+	for i, f := range facts {
+		texts[i] = f.Text
+	}
+	embeddings, err := e.ai.Embed(ctx, texts)
 	if err != nil {
 		return nil, fmt.Errorf("embed new facts: %w", err)
 	}
-	if len(embeddings) != len(newTexts) {
-		return nil, fmt.Errorf("embed new facts: expected %d embeddings, got %d", len(newTexts), len(embeddings))
+	if len(embeddings) != len(facts) {
+		return nil, fmt.Errorf("embed new facts: expected %d embeddings, got %d", len(facts), len(embeddings))
 	}
-
-	// Build a lookup so referenced_at from the original extracted facts can be
-	// carried through to the stored facts (the evaluate LLM doesn't echo dates).
-	referencedAtByText := make(map[string]*time.Time, len(newFacts))
-	for _, f := range newFacts {
-		if f.ReferencedAt != nil {
-			referencedAtByText[f.Text] = f.ReferencedAt
+	stored := make([]models.Fact, 0, len(facts))
+	for idx, fact := range facts {
+		if len(embeddings[idx]) == 0 {
+			return nil, fmt.Errorf("embed new facts: empty embedding for fact index %d", idx)
 		}
-	}
-
-	stored := make([]models.Fact, 0, len(result.FactsToStore))
-	for idx, fact := range result.FactsToStore {
-		sourceID := selectSourceIDForExtractedFact(storedSources, idx)
 		newFact := models.Fact{
 			AccountID:    input.AccountID,
 			AgentID:      ptrString(input.AgentID),
 			ThreadID:     ptrString(input.ThreadID),
-			SourceID:     sourceID,
+			SourceID:     selectSourceIDForExtractedFact(sources, idx),
 			Kind:         fact.Kind,
 			Text:         fact.Text,
-			ReferencedAt: referencedAtByText[fact.Text],
+			ReferencedAt: fact.ReferencedAt,
+			Embedding:    embeddings[idx],
 		}
-		if len(embeddings[idx]) == 0 {
-			return nil, fmt.Errorf("embed new facts: empty embedding for fact index %d", idx)
-		}
-		newFact.Embedding = embeddings[idx]
 		inserted, err := e.repo.InsertFact(ctx, newFact)
 		if err != nil {
-			return nil, fmt.Errorf("insert contextual fact: %w", err)
+			return nil, fmt.Errorf("insert fact: %w", err)
 		}
 		stored = append(stored, *inserted)
 	}
-
-	if len(result.FactsToUpdate) > 0 {
-		updateTexts := make([]string, 0, len(result.FactsToUpdate))
-		for idx := range result.FactsToUpdate {
-			result.FactsToUpdate[idx].Text = strings.TrimSpace(result.FactsToUpdate[idx].Text)
-			updateTexts = append(updateTexts, result.FactsToUpdate[idx].Text)
-		}
-		updateEmbeddings, err := e.ai.Embed(ctx, updateTexts)
-		if err != nil {
-			return nil, fmt.Errorf("embed updated facts: %w", err)
-		}
-		if len(updateEmbeddings) != len(result.FactsToUpdate) {
-			return nil, fmt.Errorf("embed updated facts: expected %d embeddings, got %d", len(result.FactsToUpdate), len(updateEmbeddings))
-		}
-		for idx := range result.FactsToUpdate {
-			if len(updateEmbeddings[idx]) == 0 {
-				return nil, fmt.Errorf("embed updated facts: empty embedding for fact index %d", idx)
-			}
-			result.FactsToUpdate[idx].Embedding = updateEmbeddings[idx]
-		}
-	}
-
-	for _, fact := range result.FactsToUpdate {
-		if err := e.repo.UpdateFact(ctx, fact); err != nil {
-			return nil, fmt.Errorf("update contextual fact: %w", err)
-		}
-	}
-
-	if len(result.FactsToEvolve) > 0 {
-		evolveTexts := make([]string, 0, len(result.FactsToEvolve))
-		for _, ev := range result.FactsToEvolve {
-			evolveTexts = append(evolveTexts, ev.NewText)
-		}
-		evolveEmbeddings, err := e.ai.Embed(ctx, evolveTexts)
-		if err != nil {
-			return nil, fmt.Errorf("embed evolved facts: %w", err)
-		}
-		if len(evolveEmbeddings) != len(result.FactsToEvolve) {
-			return nil, fmt.Errorf("embed evolved facts: expected %d embeddings, got %d", len(result.FactsToEvolve), len(evolveEmbeddings))
-		}
-		for idx, ev := range result.FactsToEvolve {
-			sourceID := selectSourceIDForExtractedFact(storedSources, 0)
-			successor := models.Fact{
-				AccountID: input.AccountID,
-				AgentID:   ptrString(input.AgentID),
-				ThreadID:  ptrString(input.ThreadID),
-				SourceID:  sourceID,
-				Kind:      ev.NewKind,
-				Text:      ev.NewText,
-			}
-			if len(evolveEmbeddings[idx]) == 0 {
-				return nil, fmt.Errorf("embed evolved facts: empty embedding for fact index %d", idx)
-			}
-			successor.Embedding = evolveEmbeddings[idx]
-			inserted, err := e.repo.SupersedeFact(ctx, ev.OldFactID, successor)
-			if err != nil {
-				return nil, fmt.Errorf("evolve fact %s: %w", ev.OldFactID, err)
-			}
-			stored = append(stored, *inserted)
-		}
-	}
-
 	return stored, nil
+}
+
+func (e *MemoryEngine) updateExistingFacts(ctx context.Context, facts []models.Fact) error {
+	if len(facts) == 0 {
+		return nil
+	}
+	texts := make([]string, len(facts))
+	for i, f := range facts {
+		texts[i] = strings.TrimSpace(f.Text)
+		facts[i].Text = texts[i]
+	}
+	embeddings, err := e.ai.Embed(ctx, texts)
+	if err != nil {
+		return fmt.Errorf("embed updated facts: %w", err)
+	}
+	if len(embeddings) != len(facts) {
+		return fmt.Errorf("embed updated facts: expected %d embeddings, got %d", len(facts), len(embeddings))
+	}
+	for idx := range facts {
+		if len(embeddings[idx]) == 0 {
+			return fmt.Errorf("embed updated facts: empty embedding for fact index %d", idx)
+		}
+		facts[idx].Embedding = embeddings[idx]
+		if err := e.repo.UpdateFact(ctx, facts[idx]); err != nil {
+			return fmt.Errorf("update fact %s: %w", facts[idx].ID, err)
+		}
+	}
+	return nil
+}
+
+// evolveFacts supersedes each old fact with a successor created from the current event's sources.
+// The first source is used as the successor's source; this is the non-obvious bit —
+// the evolve decision is driven by the most recent ingest, so the new source is always the current one.
+func (e *MemoryEngine) evolveFacts(ctx context.Context, input models.MemoryInput, sources []models.Source, evolutions []models.FactEvolution) ([]models.Fact, error) {
+	if len(evolutions) == 0 {
+		return nil, nil
+	}
+	texts := make([]string, len(evolutions))
+	for i, ev := range evolutions {
+		texts[i] = ev.NewText
+	}
+	embeddings, err := e.ai.Embed(ctx, texts)
+	if err != nil {
+		return nil, fmt.Errorf("embed evolved facts: %w", err)
+	}
+	if len(embeddings) != len(evolutions) {
+		return nil, fmt.Errorf("embed evolved facts: expected %d embeddings, got %d", len(evolutions), len(embeddings))
+	}
+	evolved := make([]models.Fact, 0, len(evolutions))
+	for idx, ev := range evolutions {
+		if len(embeddings[idx]) == 0 {
+			return nil, fmt.Errorf("embed evolved facts: empty embedding for fact index %d", idx)
+		}
+		successor := models.Fact{
+			AccountID: input.AccountID,
+			AgentID:   ptrString(input.AgentID),
+			ThreadID:  ptrString(input.ThreadID),
+			SourceID:  selectSourceIDForExtractedFact(sources, 0),
+			Kind:      ev.NewKind,
+			Text:      ev.NewText,
+			Embedding: embeddings[idx],
+		}
+		if ev.NewReferencedAt != "" {
+			if t, err := time.Parse("2006-01-02", ev.NewReferencedAt); err == nil {
+				successor.ReferencedAt = &t
+			}
+		}
+		inserted, err := e.repo.SupersedeFact(ctx, ev.OldFactID, successor)
+		if err != nil {
+			return nil, fmt.Errorf("evolve fact %s: %w", ev.OldFactID, err)
+		}
+		evolved = append(evolved, *inserted)
+	}
+	return evolved, nil
 }
 
 func printFacts(facts []models.Fact) {
@@ -317,3 +340,25 @@ func printFacts(facts []models.Fact) {
 	}
 }
 
+// enforceEventDateMonotonicity rejects the batch if any input's event_date is earlier
+// than the latest event_date already stored for the thread. This protects the fact
+// supersession chain from retroactive edits.
+func (e *MemoryEngine) enforceEventDateMonotonicity(ctx context.Context, threadID string, inputs []models.InputItem) error {
+	maxExisting, err := e.repo.MaxSourceEventDateForThread(ctx, threadID)
+	if err != nil {
+		return fmt.Errorf("check thread event date: %w", err)
+	}
+	if maxExisting == nil {
+		return nil
+	}
+	for _, item := range inputs {
+		if item.EventDate != nil && item.EventDate.Before(*maxExisting) {
+			return errs.NewValidation(
+				"event_date %s is earlier than the thread's latest event_date %s; backdating contextual events is not allowed",
+				item.EventDate.Format("2006-01-02"),
+				maxExisting.Format("2006-01-02"),
+			)
+		}
+	}
+	return nil
+}

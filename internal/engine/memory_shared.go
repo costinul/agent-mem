@@ -3,18 +3,16 @@ package engine
 import (
 	"context"
 	"fmt"
-	"log"
-	"regexp"
 	"strings"
+	"time"
 
 	models "agentmem/internal/models"
 )
 
-var properNounRe = regexp.MustCompile(`\b[A-Z][a-z]+\b`)
-
 // persistAndDecomposeSources saves each input as a Source record, then calls the LLM
 // to decompose it into extracted facts and search queries. Optionally loads recent
 // conversation history from the thread to provide context to the decomposer.
+// Each item's EventDate defaults to now() when not provided by the caller.
 func (e *MemoryEngine) persistAndDecomposeSources(ctx context.Context, eventID, threadID string, inputs []models.InputItem, withMessageHistory bool) ([]models.Source, []models.Decomposition, error) {
 	storedSources := make([]models.Source, 0, len(inputs))
 	contextHeader := buildEventContextHeader(inputs)
@@ -38,6 +36,11 @@ func (e *MemoryEngine) persistAndDecomposeSources(ctx context.Context, eventID, 
 	}
 
 	for _, item := range inputs {
+		eventDate := time.Now().UTC()
+		if item.EventDate != nil {
+			eventDate = item.EventDate.UTC()
+		}
+
 		content := strings.TrimSpace(item.Content)
 		var contentPtr *string
 		if content != "" {
@@ -49,6 +52,7 @@ func (e *MemoryEngine) persistAndDecomposeSources(ctx context.Context, eventID, 
 			Author:      item.Author,
 			Content:     contentPtr,
 			ContentType: defaultContentType(item.ContentType),
+			EventDate:   eventDate,
 		}
 		inserted, err := e.repo.InsertSource(ctx, source)
 		if err != nil {
@@ -61,26 +65,15 @@ func (e *MemoryEngine) persistAndDecomposeSources(ctx context.Context, eventID, 
 			Author:        item.Author,
 			Content:       item.Content,
 			ContextHeader: contextHeader,
+			EventDate:     eventDate.Format("Monday, 2 January 2006, 15:04 UTC"),
 		}
 		if item.Kind == models.SOURCE_USER || item.Kind == models.SOURCE_AGENT {
 			req.MessageHistory = msgHistory
-		}
-		if item.Timestamp != nil {
-			req.Timestamp = item.Timestamp.UTC().Format("Monday, 2 January 2006, 15:04 UTC")
 		}
 
 		decomposition, err := e.ai.Decompose(ctx, req)
 		if err != nil {
 			return nil, nil, fmt.Errorf("decompose source %s: %w", inserted.ID, err)
-		}
-
-		if len(decomposition.Facts) > 0 && containsProperNoun(item.Content) {
-			verified, verErr := e.ai.VerifyExtraction(ctx, item.Content, decomposition.Facts)
-			if verErr != nil {
-				log.Printf("verify_extraction skipped for source %s: %v", inserted.ID, verErr)
-			} else {
-				decomposition.Facts = verified
-			}
 		}
 
 		decompositions = append(decompositions, decomposition)
@@ -144,10 +137,4 @@ func ptrString(value string) *string {
 		return nil
 	}
 	return &trimmed
-}
-
-// containsProperNoun returns true when the text contains at least one capitalised word
-// that could be a proper noun. Used as a cheap pre-filter before the verify pass.
-func containsProperNoun(text string) bool {
-	return properNounRe.MatchString(text)
 }

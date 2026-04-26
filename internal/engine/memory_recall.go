@@ -27,7 +27,16 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 		return models.RecallOutput{}, errs.NewValidation("query is required")
 	}
 
-	decomposition, err := e.ai.DecomposeRecall(ctx, input.Query)
+	eventDate := time.Now().UTC()
+	if input.EventDate != nil {
+		eventDate = input.EventDate.UTC()
+	}
+	eventDateStr := eventDate.Format("2006-01-02")
+
+	decomposition, err := e.ai.DecomposeRecall(ctx, DecomposeRecallRequest{
+		Content:   input.Query,
+		EventDate: eventDateStr,
+	})
 	if err != nil {
 		return models.RecallOutput{}, fmt.Errorf("decompose recall query: %w", err)
 	}
@@ -60,15 +69,13 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 	log.Printf("recall expanded=%d", len(candidates))
 	expandedCount := len(candidates)
 
-	var inWindowCount, outOfWindowCount int
-	if decomposition.QueryDate != nil {
-		candidates, inWindowCount, outOfWindowCount = dateRerank(candidates, *decomposition.QueryDate, dateWindowDays)
-		log.Printf("recall date-reranked query_date=%s in_window=%d out_of_window=%d", decomposition.QueryDate.Format("2006-01-02"), inWindowCount, outOfWindowCount)
-	}
+	// Date-rerank using referenced_at proximity to the query event_date.
+	candidates, inWindowCount, outOfWindowCount := dateRerank(candidates, eventDate, dateWindowDays)
+	log.Printf("recall date-reranked event_date=%s in_window=%d out_of_window=%d", eventDateStr, inWindowCount, outOfWindowCount)
 
 	selected, err := e.ai.SelectFacts(ctx, SelectFactsRequest{
 		Query:      input.Query,
-		QueryDate:  decomposition.QueryDate,
+		EventDate:  eventDateStr,
 		Candidates: candidates,
 	})
 	if err != nil {
@@ -95,8 +102,8 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 		debugCandidates := make([]models.DebugCandidate, 0, len(candidates))
 		for _, f := range candidates {
 			inWindow := true
-			if decomposition.QueryDate != nil && f.ReferencedAt != nil {
-				diff := f.ReferencedAt.Sub(*decomposition.QueryDate)
+			if f.ReferencedAt != nil {
+				diff := f.ReferencedAt.Sub(eventDate)
 				if diff < 0 {
 					diff = -diff
 				}
@@ -106,11 +113,16 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 			if len(text) > 120 {
 				text = text[:120] + "…"
 			}
+			var factEventDate string
+			if f.EventDate != nil {
+				factEventDate = f.EventDate.Format("2006-01-02")
+			}
 			debugCandidates = append(debugCandidates, models.DebugCandidate{
 				ID:           f.ID,
 				Text:         text,
 				SourceID:     f.SourceID,
 				Kind:         f.Kind,
+				EventDate:    factEventDate,
 				ReferencedAt: f.ReferencedAt,
 				InWindow:     inWindow,
 				Selected:     selectedSet[f.ID],
@@ -120,7 +132,7 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 		dbg = &models.RecallDebug{
 			Query:            input.Query,
 			Phrases:          phrases,
-			QueryDate:        decomposition.QueryDate,
+			EventDate:        eventDateStr,
 			RetrievedCount:   retrievedCount,
 			ExpandedCount:    expandedCount,
 			InWindowCount:    inWindowCount,
@@ -199,9 +211,9 @@ outer:
 // dateRerank partitions candidates into those whose referenced_at is within windowDays
 // of queryDate (or have no referenced_at) and those that are clearly out-of-window.
 // In-window facts are returned first (preserving original order); out-of-window facts follow.
-// No candidates are dropped — a wrong query_date must not nuke recall.
+// No candidates are dropped — a wrong event_date must not nuke recall.
 // Returns the reordered slice plus in-window and out-of-window counts.
-func dateRerank(candidates []models.Fact, queryDate time.Time, windowDays int) ([]models.Fact, int, int) {
+func dateRerank(candidates []models.Fact, eventDate time.Time, windowDays int) ([]models.Fact, int, int) {
 	threshold := float64(windowDays) * 24 * float64(time.Hour)
 	inWindow := make([]models.Fact, 0, len(candidates))
 	outOfWindow := make([]models.Fact, 0)
@@ -210,7 +222,7 @@ func dateRerank(candidates []models.Fact, queryDate time.Time, windowDays int) (
 			inWindow = append(inWindow, f)
 			continue
 		}
-		diff := f.ReferencedAt.Sub(queryDate)
+		diff := f.ReferencedAt.Sub(eventDate)
 		if diff < 0 {
 			diff = -diff
 		}

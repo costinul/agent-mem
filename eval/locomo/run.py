@@ -171,8 +171,11 @@ async def evaluate_sample(
                 1 for _k, turns in sessions for t in turns if t.get("text", "").strip()
             )
             ingested = 0
+            last_session_iso: str | None = None
             for session_key, turns in sessions:
                 session_iso = _parse_session_datetime(conversation.get(f"{session_key}_date_time"))
+                if session_iso:
+                    last_session_iso = session_iso
                 for turn in turns:
                     text = turn.get("text", "").strip()
                     if not text:
@@ -194,6 +197,14 @@ async def evaluate_sample(
                 f"[sample={sample_id}] ingest done: {ingested} turns in {ingest_elapsed:.1f}s",
                 flush=True,
             )
+        else:
+            # When reusing a thread, use the last session date from the conversation as event_date for recall.
+            sessions = _sessions_in_order(conversation)
+            last_session_iso = None
+            for session_key, _turns in sessions:
+                iso = _parse_session_datetime(conversation.get(f"{session_key}_date_time"))
+                if iso:
+                    last_session_iso = iso
 
         # 2. Query + judge each QA pair
         qa_results = []
@@ -215,7 +226,7 @@ async def evaluate_sample(
             qa_t0 = time.time()
 
             try:
-                memory_output = await client.recall(thread_id, question)
+                memory_output = await client.recall(thread_id, question, when=last_session_iso)
                 facts = [f["text"] for f in memory_output.get("facts", [])]
                 recall_debug = memory_output.get("debug")
             except Exception as exc:

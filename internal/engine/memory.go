@@ -26,8 +26,8 @@ func (e *MemoryEngine) Decompose(ctx context.Context, req DecomposeRequest) (mod
 	return e.ai.Decompose(ctx, req)
 }
 
-func (e *MemoryEngine) DecomposeRecall(ctx context.Context, query string) (models.Decomposition, error) {
-	return e.ai.DecomposeRecall(ctx, query)
+func (e *MemoryEngine) DecomposeRecall(ctx context.Context, req DecomposeRecallRequest) (models.Decomposition, error) {
+	return e.ai.DecomposeRecall(ctx, req)
 }
 
 func (e *MemoryEngine) SearchWithScores(ctx context.Context, query string, params memoryrepo.SearchByEmbeddingParams) ([]memoryrepo.FactWithScore, error) {

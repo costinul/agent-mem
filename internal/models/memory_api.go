@@ -18,10 +18,10 @@ type MemoryInput struct {
 // Text inputs set Content. File inputs set Content as base64 and ContentType accordingly.
 type InputItem struct {
 	Kind        SourceKind `json:"kind"`
-	Author      *string    `json:"author,omitempty"`    // Optional: name of the person or entity that produced this turn (e.g. "Alex").
-	Content     string     `json:"content"`             // Text as string, files as base64.
-	ContentType string     `json:"content_type"`        // MIME type: text/plain, application/pdf, image/png, etc.
-	Timestamp   *time.Time `json:"timestamp,omitempty"` // Optional: wall-clock time when this message was produced. Used to anchor relative dates during fact extraction.
+	Author      *string    `json:"author,omitempty"`     // Optional: name of the person or entity that produced this turn (e.g. "Alex").
+	Content     string     `json:"content"`              // Text as string, files as base64.
+	ContentType string     `json:"content_type"`         // MIME type: text/plain, application/pdf, image/png, etc.
+	EventDate   *time.Time `json:"event_date,omitempty"` // When the message was authored. Used to anchor relative dates during fact extraction. Defaults to now().
 }
 
 // =====================
@@ -44,7 +44,7 @@ type RecallOutput struct {
 type RecallDebug struct {
 	Query            string           `json:"query"`
 	Phrases          []string         `json:"phrases"`
-	QueryDate        *time.Time       `json:"query_date,omitempty"`
+	EventDate        string           `json:"event_date,omitempty"`
 	RetrievedCount   int              `json:"retrieved_count"`
 	ExpandedCount    int              `json:"expanded_count"`
 	InWindowCount    int              `json:"in_window_count"`
@@ -61,6 +61,7 @@ type DebugCandidate struct {
 	Text         string     `json:"text"`
 	SourceID     string     `json:"source_id"`
 	Kind         FactKind   `json:"kind"`
+	EventDate    string     `json:"event_date,omitempty"`
 	ReferencedAt *time.Time `json:"referenced_at,omitempty"`
 	InWindow     bool       `json:"in_window"`
 	Selected     bool       `json:"selected"`
@@ -129,13 +130,14 @@ type FactListOutput struct {
 
 // RecallInput is the request body for read-only memory retrieval.
 type RecallInput struct {
-	AccountID      string `json:"-" swaggerignore:"true"`
-	AgentID        string `json:"agent_id"`
-	ThreadID       string `json:"thread_id"`
-	Query          string `json:"query"`
-	Limit          int    `json:"limit"`
-	IncludeSources bool   `json:"include_sources"`
-	Debug          bool   `json:"-" swaggerignore:"true"`
+	AccountID      string     `json:"-" swaggerignore:"true"`
+	AgentID        string     `json:"agent_id"`
+	ThreadID       string     `json:"thread_id"`
+	Query          string     `json:"query"`
+	EventDate      *time.Time `json:"event_date,omitempty"` // When the question is being asked. Used to resolve relative-time phrases in the query. Defaults to now().
+	Limit          int        `json:"limit"`
+	IncludeSources bool       `json:"include_sources"`
+	Debug          bool       `json:"-" swaggerignore:"true"`
 }
 
 type ThreadCreateBody struct {

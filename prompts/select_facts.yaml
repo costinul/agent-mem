@@ -18,16 +18,23 @@ system_prompt: |
   - HISTORICAL facts are the correct answer for questions about prior, original, former, previous, or earlier states (e.g. "What was X's original title?", "What did Y use to be?", "Where did Z live before?").
   - For questions about the current state, prefer the successor (non-historical) fact instead.
 
-  Date constraint:
-  - When a query date is provided, candidates whose ref date matches or is closest to that date are strongly preferred over semantically similar candidates with a different ref date.
-  - When a candidate has the correct ref date but a competing candidate has no ref date, strongly prefer the dated one.
-  - When two candidates are equally relevant but one has the correct ref date and the other does not, return only the one with the correct ref date.
-  - Do NOT exclude a clearly relevant candidate solely because it has no ref date.
+  Date fields per candidate:
+  - event_date: when the source message was authored (the wall-clock time of the conversation turn).
+  - ref: when the event described in the fact actually occurred (LLM-extracted; may be absent).
+
+  Temporal matching — when an Event date is provided, use it to resolve relative phrases in the query and match against candidate dates:
+  - "yesterday" / "N days ago": day-precision match on ref or event_date.
+  - "last week": 7-day window around Event date.
+  - "last month": calendar month containing Event date minus one month.
+  - "last year" / "N years ago": calendar year.
+  - "a few months ago": 2–6 month window before Event date.
+  When a candidate's ref date matches the resolved date, strongly prefer it over semantically similar candidates with a different or absent ref date.
+  Do NOT exclude a clearly relevant candidate solely because it has no ref or event_date.
 prompt: |
   Query:
   {{.Query}}
-  {{- if .QueryDate}}
-  Query date: {{.QueryDate}}
+  {{- if .EventDate}}
+  Event date: {{.EventDate}}
   {{- end}}
 
   Reminder: if the query asks for a list, return every relevant candidate, not just one.
@@ -35,13 +42,13 @@ prompt: |
   Candidate facts:
   {{- range .Candidates}}
   {{- if .SupersededBy}}
-  [{{.ID}}] (HISTORICAL -> {{.SupersededBy}}{{if .ReferencedAt}}, ref={{.ReferencedAt}}{{end}}) {{.Text}}
+  [{{.ID}}] (HISTORICAL -> {{.SupersededBy}}{{if .EventDate}}, event_date={{.EventDate}}{{end}}{{if .ReferencedAt}}, ref={{.ReferencedAt}}{{end}}) {{.Text}}
   {{- else}}
-  [{{.ID}}] ({{.Kind}}{{if .ReferencedAt}}, ref={{.ReferencedAt}}{{end}}) {{.Text}}
+  [{{.ID}}] ({{.Kind}}{{if .EventDate}}, event_date={{.EventDate}}{{end}}{{if .ReferencedAt}}, ref={{.ReferencedAt}}{{end}}) {{.Text}}
   {{- end}}
   {{- end}}
 temperature: 0.0
-max_tokens: 2048
+max_tokens: 8192
 requirements:
   min_context_window: 16000
   specializations:

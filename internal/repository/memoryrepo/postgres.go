@@ -75,14 +75,13 @@ func (r *PostgresRepository) InsertSource(ctx context.Context, source models.Sou
 		content    sql.NullString
 		bucketPath sql.NullString
 		sizeBytes  sql.NullInt64
-		createdAt  time.Time
 	)
 
 	err := r.db.QueryRowContext(
 		ctx,
-		`INSERT INTO sources (event_id, kind, author, content, content_type, bucket_path, size_bytes)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)
-		 RETURNING id, event_id, kind, author, content, content_type, bucket_path, size_bytes, created_at`,
+		`INSERT INTO sources (event_id, kind, author, content, content_type, bucket_path, size_bytes, event_date)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		 RETURNING id, event_id, kind, author, content, content_type, bucket_path, size_bytes, event_date, created_at`,
 		source.EventID,
 		source.Kind,
 		source.Author,
@@ -90,6 +89,7 @@ func (r *PostgresRepository) InsertSource(ctx context.Context, source models.Sou
 		source.ContentType,
 		source.BucketPath,
 		source.SizeBytes,
+		source.EventDate,
 	).Scan(
 		&stored.ID,
 		&stored.EventID,
@@ -99,7 +99,8 @@ func (r *PostgresRepository) InsertSource(ctx context.Context, source models.Sou
 		&stored.ContentType,
 		&bucketPath,
 		&sizeBytes,
-		&createdAt,
+		&stored.EventDate,
+		&stored.CreatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -109,7 +110,6 @@ func (r *PostgresRepository) InsertSource(ctx context.Context, source models.Sou
 	stored.Content = nullStringPtr(content)
 	stored.BucketPath = nullStringPtr(bucketPath)
 	stored.SizeBytes = nullInt64Ptr(sizeBytes)
-	stored.CreatedAt = createdAt
 	return &stored, nil
 }
 
@@ -124,7 +124,7 @@ func (r *PostgresRepository) GetSourceByID(ctx context.Context, sourceID string)
 
 	err := r.db.QueryRowContext(
 		ctx,
-		`SELECT id, event_id, kind, author, content, content_type, bucket_path, size_bytes, created_at
+		`SELECT id, event_id, kind, author, content, content_type, bucket_path, size_bytes, event_date, created_at
 		 FROM sources
 		 WHERE id = $1`,
 		sourceID,
@@ -137,6 +137,7 @@ func (r *PostgresRepository) GetSourceByID(ctx context.Context, sourceID string)
 		&source.ContentType,
 		&bucketPath,
 		&sizeBytes,
+		&source.EventDate,
 		&source.CreatedAt,
 	)
 	if err != nil {
@@ -156,7 +157,7 @@ func (r *PostgresRepository) GetSourceByID(ctx context.Context, sourceID string)
 func (r *PostgresRepository) ListSourcesByEventID(ctx context.Context, eventID string) ([]models.Source, error) {
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT id, event_id, kind, author, content, content_type, bucket_path, size_bytes, created_at
+		`SELECT id, event_id, kind, author, content, content_type, bucket_path, size_bytes, event_date, created_at
 		 FROM sources
 		 WHERE event_id = $1
 		 ORDER BY created_at ASC`,
@@ -185,6 +186,7 @@ func (r *PostgresRepository) ListSourcesByEventID(ctx context.Context, eventID s
 			&source.ContentType,
 			&bucketPath,
 			&sizeBytes,
+			&source.EventDate,
 			&source.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -205,7 +207,7 @@ func (r *PostgresRepository) ListConversationSourcesByThreadID(ctx context.Conte
 
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT s.id, s.event_id, s.kind, s.author, s.content, s.content_type, s.bucket_path, s.size_bytes, s.created_at
+		`SELECT s.id, s.event_id, s.kind, s.author, s.content, s.content_type, s.bucket_path, s.size_bytes, s.event_date, s.created_at
 		 FROM sources s
 		 JOIN events e ON e.id = s.event_id
 		 WHERE e.thread_id = $1
@@ -238,6 +240,7 @@ func (r *PostgresRepository) ListConversationSourcesByThreadID(ctx context.Conte
 			&source.ContentType,
 			&bucketPath,
 			&sizeBytes,
+			&source.EventDate,
 			&source.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -463,11 +466,12 @@ func (r *PostgresRepository) ListFactsBySourceIDs(ctx context.Context, accountID
 	}
 
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, account_id, agent_id, thread_id, source_id, kind, text,
-		        referenced_at, superseded_at, superseded_by, created_at, updated_at
-		 FROM facts
-		 WHERE account_id = $1
-		   AND source_id = ANY($2)`,
+		`SELECT f.id, f.account_id, f.agent_id, f.thread_id, f.source_id, f.kind, f.text,
+		        f.referenced_at, f.superseded_at, f.superseded_by, f.created_at, f.updated_at, s.event_date
+		 FROM facts f
+		 JOIN sources s ON s.id = f.source_id
+		 WHERE f.account_id = $1
+		   AND f.source_id = ANY($2)`,
 		accountID, pq.Array(sourceIDs),
 	)
 	if err != nil {
@@ -489,7 +493,7 @@ func (r *PostgresRepository) ListFactsBySourceIDs(ctx context.Context, accountID
 			&fact.ID, &fact.AccountID, &agent, &thread,
 			&fact.SourceID, &fact.Kind, &fact.Text,
 			&referencedAt, &supersededAt, &supersededBy,
-			&fact.CreatedAt, &fact.UpdatedAt,
+			&fact.CreatedAt, &fact.UpdatedAt, &fact.EventDate,
 		); err != nil {
 			return nil, err
 		}
@@ -573,15 +577,17 @@ func (r *PostgresRepository) SearchFactsByEmbedding(ctx context.Context, params 
 
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT id, account_id, agent_id, thread_id, source_id, kind, text, referenced_at, created_at, updated_at
-		 FROM facts
-		 WHERE account_id = $1
-		   AND (($2::uuid IS NULL AND agent_id IS NULL) OR agent_id = $2)
-		   AND (($3::uuid IS NULL AND thread_id IS NULL) OR thread_id = $3)
-		   AND embedding IS NOT NULL
-		   AND superseded_at IS NULL
-		   AND (1 - (embedding <=> $4::vector)) >= $5
-		 ORDER BY embedding <=> $4::vector ASC
+		`SELECT f.id, f.account_id, f.agent_id, f.thread_id, f.source_id, f.kind, f.text,
+		        f.referenced_at, f.created_at, f.updated_at, s.event_date
+		 FROM facts f
+		 JOIN sources s ON s.id = f.source_id
+		 WHERE f.account_id = $1
+		   AND (($2::uuid IS NULL AND f.agent_id IS NULL) OR f.agent_id = $2)
+		   AND (($3::uuid IS NULL AND f.thread_id IS NULL) OR f.thread_id = $3)
+		   AND f.embedding IS NOT NULL
+		   AND f.superseded_at IS NULL
+		   AND (1 - (f.embedding <=> $4::vector)) >= $5
+		 ORDER BY f.embedding <=> $4::vector ASC
 		 LIMIT $6`,
 		params.AccountID,
 		params.AgentID,
@@ -614,6 +620,7 @@ func (r *PostgresRepository) SearchFactsByEmbedding(ctx context.Context, params 
 			&referencedAt,
 			&fact.CreatedAt,
 			&fact.UpdatedAt,
+			&fact.EventDate,
 		); err != nil {
 			return nil, err
 		}
@@ -637,15 +644,17 @@ func (r *PostgresRepository) SearchFactsByEmbeddingWithScores(ctx context.Contex
 
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT id, account_id, agent_id, thread_id, source_id, kind, text, referenced_at, created_at, updated_at,
-		        1 - (embedding <=> $4::vector) AS score
-		 FROM facts
-		 WHERE account_id = $1
-		   AND (($2::uuid IS NULL AND agent_id IS NULL) OR agent_id = $2)
-		   AND (($3::uuid IS NULL AND thread_id IS NULL) OR thread_id = $3)
-		   AND embedding IS NOT NULL
-		   AND superseded_at IS NULL
-		 ORDER BY embedding <=> $4::vector ASC
+		`SELECT f.id, f.account_id, f.agent_id, f.thread_id, f.source_id, f.kind, f.text,
+		        f.referenced_at, f.created_at, f.updated_at, s.event_date,
+		        1 - (f.embedding <=> $4::vector) AS score
+		 FROM facts f
+		 JOIN sources s ON s.id = f.source_id
+		 WHERE f.account_id = $1
+		   AND (($2::uuid IS NULL AND f.agent_id IS NULL) OR f.agent_id = $2)
+		   AND (($3::uuid IS NULL AND f.thread_id IS NULL) OR f.thread_id = $3)
+		   AND f.embedding IS NOT NULL
+		   AND f.superseded_at IS NULL
+		 ORDER BY f.embedding <=> $4::vector ASC
 		 LIMIT $5`,
 		params.AccountID,
 		params.AgentID,
@@ -677,6 +686,7 @@ func (r *PostgresRepository) SearchFactsByEmbeddingWithScores(ctx context.Contex
 			&referencedAt,
 			&fs.CreatedAt,
 			&fs.UpdatedAt,
+			&fs.EventDate,
 			&fs.Score,
 		); err != nil {
 			return nil, err
@@ -709,6 +719,27 @@ func (r *PostgresRepository) SupersedeFact(ctx context.Context, oldFactID string
 		return nil, fmt.Errorf("supersede fact %s: %w", oldFactID, err)
 	}
 	return inserted, nil
+}
+
+// MaxSourceEventDateForThread returns the latest event_date stored across all sources
+// for the given thread, or nil when the thread has no sources yet.
+// Used to enforce monotonic ordering in contextual ingestion.
+func (r *PostgresRepository) MaxSourceEventDateForThread(ctx context.Context, threadID string) (*time.Time, error) {
+	var maxDate sql.NullTime
+	err := r.db.QueryRowContext(ctx,
+		`SELECT MAX(s.event_date)
+		 FROM sources s
+		 JOIN events e ON e.id = s.event_id
+		 WHERE e.thread_id = $1`,
+		threadID,
+	).Scan(&maxDate)
+	if err != nil {
+		return nil, err
+	}
+	if !maxDate.Valid {
+		return nil, nil
+	}
+	return &maxDate.Time, nil
 }
 
 func nullStringPtr(value sql.NullString) *string {

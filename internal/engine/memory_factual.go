@@ -55,7 +55,7 @@ func (e *MemoryEngine) AddFactual(ctx context.Context, input models.FactualInput
 		AgentID:   input.AgentID,
 		ThreadID:  threadID,
 	}
-	storedFacts, err := e.applyEvaluateResult(ctx, memInput, storedSources, evalInput, evalResult)
+	storedFacts, err := e.applyEvaluateResult(ctx, memInput, storedSources, evalResult)
 	if err != nil {
 		return models.WriteOutput{}, err
 	}

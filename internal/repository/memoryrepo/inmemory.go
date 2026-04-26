@@ -457,6 +457,21 @@ func (r *InMemoryRepository) SupersedeFact(_ context.Context, oldFactID string, 
 	return &stored, nil
 }
 
+func (r *InMemoryRepository) MaxSourceEventDateForThread(ctx context.Context, threadID string) (*time.Time, error) {
+	var max *time.Time
+	for _, s := range r.sources {
+		if e, ok := r.events[s.EventID]; ok {
+			if e.ThreadID != nil && *e.ThreadID == threadID {
+				t := s.EventDate
+				if max == nil || t.After(*max) {
+					max = &t
+				}
+			}
+		}
+	}
+	return max, nil
+}
+
 func cosineSimilarity(a, b []float64) float64 {
 	if len(a) == 0 || len(a) != len(b) {
 		return 0

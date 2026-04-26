@@ -870,7 +870,7 @@ func (h *Handler) playgroundDecompose(w http.ResponseWriter, r *http.Request) {
 
 	switch mode {
 	case "recall":
-		decomp, err := h.engine.DecomposeRecall(r.Context(), text)
+		decomp, err := h.engine.DecomposeRecall(r.Context(), engine.DecomposeRecallRequest{Content: text})
 		if err != nil {
 			slog.Error("playground decompose recall", "error", err)
 			result.Error = fmt.Sprintf("engine error: %v", err)

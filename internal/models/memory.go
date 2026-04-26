@@ -65,6 +65,7 @@ type Source struct {
 	ContentType string     `json:"content_type"`
 	BucketPath  *string    `json:"bucket_path"` // Populated for file inputs stored in S3-compatible bucket.
 	SizeBytes   *int64     `json:"size_bytes"`  // Size of the original payload in bytes.
+	EventDate   time.Time  `json:"event_date"`  // When the message was authored (caller-supplied, defaults to created_at).
 	CreatedAt   time.Time  `json:"created_at"`
 }
 
@@ -82,9 +83,10 @@ type Fact struct {
 	Kind         FactKind   `json:"kind"`
 	Text         string     `json:"text"`
 	Embedding    []float64  `json:"embedding"`
-	ReferencedAt *time.Time `json:"referenced_at,omitempty"` // Calendar date the fact's content refers to, extracted at decompose time.
-	SupersededAt *time.Time `json:"superseded_at"` // Non-nil means this fact has been evolved into a successor.
-	SupersededBy *string    `json:"superseded_by"` // ID of the successor fact.
+	EventDate    *time.Time `json:"event_date,omitempty"`    // When the source message was authored. Populated from sources.event_date via JOIN at read time; not a column on facts.
+	ReferencedAt *time.Time `json:"referenced_at,omitempty"` // Calendar date the fact's content refers to, LLM-extracted at decompose time.
+	SupersededAt *time.Time `json:"superseded_at"`           // Non-nil means this fact has been evolved into a successor.
+	SupersededBy *string    `json:"superseded_by"`           // ID of the successor fact.
 	CreatedAt    time.Time  `json:"created_at"`
 	UpdatedAt    time.Time  `json:"updated_at"`
 }
@@ -118,9 +120,10 @@ type ExtractedQuery struct {
 
 // FactEvolution describes a fact that should be superseded by a new version.
 type FactEvolution struct {
-	OldFactID string   `json:"old_fact_id"`
-	NewText   string   `json:"new_text"`
-	NewKind   FactKind `json:"new_kind"`
+	OldFactID      string   `json:"old_fact_id"`
+	NewText        string   `json:"new_text"`
+	NewKind        FactKind `json:"new_kind"`
+	NewReferencedAt string  `json:"new_referenced_at"` // ISO 8601 "YYYY-MM-DD" or ""; plain string for schema compliance.
 }
 
 // EvaluateResult is the output of the evaluate step.

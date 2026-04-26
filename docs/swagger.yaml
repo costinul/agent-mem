@@ -46,6 +46,25 @@ definitions:
       thread_id:
         type: string
     type: object
+  memory.DebugCandidate:
+    properties:
+      event_date:
+        type: string
+      id:
+        type: string
+      in_window:
+        type: boolean
+      kind:
+        $ref: '#/definitions/memory.FactKind'
+      referenced_at:
+        type: string
+      selected:
+        type: boolean
+      source_id:
+        type: string
+      text:
+        type: string
+    type: object
   memory.Fact:
     properties:
       account_id:
@@ -58,10 +77,18 @@ definitions:
         items:
           type: number
         type: array
+      event_date:
+        description: When the source message was authored. Populated from sources.event_date
+          via JOIN at read time; not a column on facts.
+        type: string
       id:
         type: string
       kind:
         $ref: '#/definitions/memory.FactKind'
+      referenced_at:
+        description: Calendar date the fact's content refers to, LLM-extracted at
+          decompose time.
+        type: string
       source_id:
         description: The source that produced this fact.
         type: string
@@ -130,13 +157,18 @@ definitions:
   memory.InputItem:
     properties:
       author:
-        description: Optional name of the person or entity that produced this turn (e.g. "Alex").
+        description: 'Optional: name of the person or entity that produced this turn
+          (e.g. "Alex").'
         type: string
       content:
         description: Text as string, files as base64.
         type: string
       content_type:
         description: 'MIME type: text/plain, application/pdf, image/png, etc.'
+        type: string
+      event_date:
+        description: When the message was authored. Used to anchor relative dates
+          during fact extraction. Defaults to now().
         type: string
       kind:
         $ref: '#/definitions/memory.SourceKind'
@@ -150,9 +182,46 @@ definitions:
       thread_id:
         type: string
     type: object
+  memory.RecallDebug:
+    properties:
+      candidates:
+        items:
+          $ref: '#/definitions/memory.DebugCandidate'
+        type: array
+      date_window_days:
+        type: integer
+      errors:
+        items:
+          type: string
+        type: array
+      event_date:
+        type: string
+      expanded_count:
+        type: integer
+      in_window_count:
+        type: integer
+      out_of_window_count:
+        type: integer
+      phrases:
+        items:
+          type: string
+        type: array
+      query:
+        type: string
+      retrieved_count:
+        type: integer
+      selected_ids:
+        items:
+          type: string
+        type: array
+    type: object
   memory.RecallInput:
     properties:
       agent_id:
+        type: string
+      event_date:
+        description: When the question is being asked. Used to resolve relative-time
+          phrases in the query. Defaults to now().
         type: string
       include_sources:
         type: boolean
@@ -165,6 +234,8 @@ definitions:
     type: object
   memory.RecallOutput:
     properties:
+      debug:
+        $ref: '#/definitions/memory.RecallDebug'
       facts:
         items:
           $ref: '#/definitions/memory.ReturnedFact'
