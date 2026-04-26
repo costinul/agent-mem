@@ -249,6 +249,10 @@ func (m *mockRepo) ListAPIKeysByPrefix(ctx context.Context, prefix string) ([]mo
 	return m.listByPrefixFn(ctx, prefix)
 }
 
+func (m *mockRepo) ListAPIKeysByAccountID(context.Context, string) ([]models.APIKey, error) {
+	return nil, nil
+}
+
 func newMockService() (*Service, *mockRepo) {
 	repo := &mockRepo{}
 	return NewService(repo), repo

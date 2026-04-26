@@ -213,6 +213,10 @@ func (m *mockAccountRepo) ListAPIKeysByPrefix(_ context.Context, prefix string) 
 	}, nil
 }
 
+func (m *mockAccountRepo) ListAPIKeysByAccountID(context.Context, string) ([]models.APIKey, error) {
+	return nil, nil
+}
+
 type mockAgentRepo struct{}
 
 func (m *mockAgentRepo) CreateAgent(context.Context, string, string) (*models.Agent, error) {
