@@ -182,13 +182,22 @@ async def evaluate_sample(
                         continue
                     ingested += 1
                     role = _speaker_to_role(turn.get("speaker", ""), conversation)
+                    blip = (turn.get("blip_caption") or "").strip() or None
+                    suffix = f"  +img: \"{_preview(blip)}\"" if blip else ""
                     print(
                         f"  [{sample_id} {short_tid} {session_key} turn {ingested}/{total_turns}]"
-                        f" {role}: \"{_preview(text)}\"",
+                        f" {role}: \"{_preview(text)}\"{suffix}",
                         flush=True,
                     )
                     try:
-                        await client.ingest(thread_id, role, text, author=turn.get("speaker") or None, when=session_iso)
+                        await client.ingest(
+                            thread_id,
+                            role,
+                            text,
+                            author=turn.get("speaker") or None,
+                            when=session_iso,
+                            image_caption=blip,
+                        )
                     except Exception as exc:
                         print(f"  [WARN] ingest error in sample {sample_id}: {exc}", flush=True)
 

@@ -9,6 +9,12 @@ system_prompt: |
   - Omit facts that are clearly off-topic.
   - Output only the fact IDs. Do not invent IDs that are not in the candidate list.
 
+  Type alignment for category questions:
+  When the query asks about a specific kind of thing (e.g. "What workshop...", "What setback...", "What book...", "What painting...", "Which song...", "What pet...", "What race..."), the head noun is a hard category constraint, not a soft hint. Only return candidates whose text actually describes an instance of that category. A candidate that is date-relevant or topic-adjacent but describes a different kind of thing is OFF-TOPIC and must NOT be selected.
+  - Example: query "What workshop did Caroline attend recently?" — a candidate "Caroline went to a poetry reading on 6 October 2023" is NOT a workshop. Pick the older "LGBTQ+ counseling workshop on 23 June 2023" fact instead, even though the poetry reading is more recent.
+  - Example: query "What setback did Melanie face in October 2023?" — "Melanie's son got into an accident" is about her son, not a setback Melanie personally faced. Pick the fact that explicitly says "Melanie had a setback" (e.g. her pottery break) even if the date is slightly off, because it is the only candidate that matches the category.
+  - It is better to return zero facts than to return a wrong-category fact. (Inference queries are the exception — see below.)
+
   Completion context:
   - When the query asks about a current state, role, situation, or arrangement, also include facts that anchor essential context — location ("from where"), time ("since when"), counterparty ("with whom"), scope ("how much / how often"), or reason ("why") — even if those facts look tangential on their own. The goal is to provide enough context for a complete answer, not just a literal match.
   - Example: for "What is X's current work arrangement?", a fact like "X's apartment lease is in Portland" is relevant because it anchors the location of the remote work.

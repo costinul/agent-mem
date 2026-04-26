@@ -56,23 +56,40 @@ class MemoryAPIClient:
         self._raise_with_body(resp)
         return resp.json()
 
-    async def ingest(self, thread_id: str, role: str, content: str, author: str | None = None, when: str | None = None) -> dict:
+    async def ingest(
+        self,
+        thread_id: str,
+        role: str,
+        content: str,
+        author: str | None = None,
+        when: str | None = None,
+        image_caption: str | None = None,
+    ) -> dict:
         """Send a single conversation turn to /memory/contextual for ingestion.
 
         Args:
             when: ISO 8601 timestamp string for when the message was produced.
                   Sent as event_date; used to resolve relative dates in fact extraction.
+            image_caption: Optional description of an image attached to this turn.
+                  When set, sent as a coordinated second InputItem under the same
+                  EventDate / role / author so the decomposer treats it as part of
+                  the same conversational moment.
         """
         kind = _ROLE_TO_KIND.get(role.lower(), role.upper())
-        item: dict = {"kind": kind, "content": content, "content_type": "text/plain"}
-        if author:
-            item["author"] = author
-        if when:
-            item["event_date"] = when
-        payload = {
-            "thread_id": thread_id,
-            "inputs": [item],
-        }
+
+        def _make_item(text: str) -> dict:
+            it: dict = {"kind": kind, "content": text, "content_type": "text/plain"}
+            if author:
+                it["author"] = author
+            if when:
+                it["event_date"] = when
+            return it
+
+        items: list[dict] = [_make_item(content)]
+        if image_caption:
+            items.append(_make_item(f"[image attached: {image_caption}]"))
+
+        payload = {"thread_id": thread_id, "inputs": items}
         resp = await self._client_or_raise().post(f"{self.base_url}/memory/contextual", json=payload)
         self._raise_with_body(resp)
         return resp.json()
