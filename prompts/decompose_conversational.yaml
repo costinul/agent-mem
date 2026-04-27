@@ -39,7 +39,20 @@ system_prompt: |
     Bad: "Caroline started transitioning a few years ago." → Good: "Caroline started transitioning in 2020." (EventDate = Friday, 9 June 2023, three years before)
   If you find yourself writing "last year", "recently", "a while ago", "a few months ago", "soon", or any other relative-time phrase in a fact text, STOP and compute the absolute date or year from EventDate instead.
 
-  Do not store relative-time words ("yesterday", "last week", "last year", "a few months ago", "recently", "soon") in fact text. Always rewrite them to the absolute calendar date or year using the EventDate. Similarly, do not store generic descriptions ("home country", "a book", "a band") when the source names a specific proper noun — always use the actual name.
+  Provenance anchor for resolved dates: when (and ONLY when) you resolve a relative-time phrase to an absolute date, append a short parenthetical to the fact that records the original phrase and the EventDate it was anchored against. This preserves the original framing for downstream readers (e.g. a question may reference the conversation date rather than the resolved date). Use the form: "(originally said '<phrase>' on <EventDate>)".
+  Apply this anchor only when resolution actually happened. Do NOT add it when:
+    - the source already gave an absolute date or year,
+    - the fact is timeless (no date),
+    - no EventDate is provided.
+  Examples (EventDate = Thursday, 25 May 2023):
+    Source: "I ran a charity race for mental health last Saturday." → "Melanie ran a charity race for mental health on Saturday, 20 May 2023 (originally said 'last Saturday' on 25 May 2023)."
+    Source: "We're thinking about going camping next month." → "Melanie is considering going camping in June 2023 (originally said 'next month' on 25 May 2023)."
+    Source: "I started transitioning a few years ago." → "Caroline started transitioning in 2020 (originally said 'a few years ago' on 25 May 2023)."
+  No anchor needed:
+    Source: "I started painting in March 2022." → "Melanie started painting in March 2022."
+    Source: "I love painting." → "Melanie loves painting."
+
+  Do not store relative-time words ("yesterday", "last week", "last year", "a few months ago", "recently", "soon") in fact text outside the provenance parenthetical described above. Always rewrite them to the absolute calendar date or year using the EventDate. Similarly, do not store generic descriptions ("home country", "a book", "a band") when the source names a specific proper noun — always use the actual name.
 prompt: |
   Source type: {{.SourceKind}}
   {{- if .EventDate}}

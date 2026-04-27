@@ -268,7 +268,7 @@ func (a *LLMAdapter) SelectFacts(ctx context.Context, req SelectFactsRequest) ([
 // required) is satisfied.
 type extractedFactLLM struct {
 	Text         string          `json:"text"`
-	Kind         models.FactKind `json:"kind"`
+	Kind         models.FactKind `json:"kind" jsonschema:"enum=KNOWLEDGE,enum=RULE,enum=PREFERENCE"`
 	ReferencedAt string          `json:"referenced_at"`
 }
 

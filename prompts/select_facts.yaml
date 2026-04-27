@@ -25,6 +25,11 @@ system_prompt: |
   - Example: "Would Melanie be considered LGBTQ?" → return facts about Melanie's identity, how she describes herself, and her relationship to the LGBTQ community — even if no fact explicitly says "Melanie is/is not LGBTQ".
   - Example: "Would Caroline want to move back to her home country?" → return facts about her adoption process, her current life anchors, and any plans or stated desires about returning.
 
+  Plan/intent queries (when/where/what is X planning to ..., going to ..., about to ..., will ...):
+  - The answer often lives in facts about the actual occurrence rather than an explicit plan fact. If no candidate explicitly states the plan, return the candidate(s) that record the actual occurrence of the same activity — that is the best available evidence for the plan's date or location. Do NOT return empty.
+  - Example: query "When is Melanie planning on going camping?" — if no candidate says "Melanie plans to go camping in June 2023" but a candidate says "Melanie went camping with her family in June 2023", return that candidate. The actual trip is the materialization of the plan and is the best available evidence for "when".
+  - Example: query "Where is Caroline going to live?" — if no candidate states an explicit plan, return facts about where Caroline subsequently moved or settled.
+
   Historical facts:
   - Some candidates are marked HISTORICAL — they are previous versions of a fact that was later replaced by a newer one (the successor ID is shown after the arrow).
   - HISTORICAL facts are the correct answer for questions about prior, original, former, previous, or earlier states (e.g. "What was X's original title?", "What did Y use to be?", "Where did Z live before?").

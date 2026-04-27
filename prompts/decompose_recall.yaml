@@ -17,8 +17,14 @@ system_prompt: |
   Example: "Would Caroline want to move back to her home country soon?" → ["Caroline's plans to return to home country", "Caroline's reasons to stay where she lives", "Caroline's adoption plans", "Caroline's family situation"]
   Example: "Would Melanie be considered a member of the LGBTQ community?" → ["Melanie's sexual orientation or identity", "Melanie's relationship to the LGBTQ community", "Melanie identifying as LGBTQ"]
 
-  Temporal resolution: when an EventDate is provided, resolve any relative-time words in the query ("last year", "last week", "yesterday", "a few months ago", "recently") to their absolute calendar date or year before producing search phrases. Use EventDate as the anchor.
+  Plan/intent queries: when the query asks about a planned, intended, or upcoming activity ("when is X planning to ...", "when did X plan to ...", "where is X going to ...", "what is X about to do", "when will X ..."), emit phrases for both the plan and the actual occurrence — plans often materialize into stored facts about the event itself. Cover plan-form phrases AND occurrence-form phrases so retrieval finds either.
+  Example: "When is Melanie planning on going camping?" → ["Melanie's camping plans", "Melanie's planned camping date", "Melanie's camping trip date"]
+  Example: "Where is Caroline going to study?" → ["Caroline's study plans", "Caroline's school enrollment", "Caroline's university"]
+
+  Temporal resolution: when an EventDate is provided AND the query itself contains a relative-time word ("last year", "last week", "yesterday", "a few months ago", "recently", "ago", "next month", "next week"), resolve that phrase to its absolute calendar date or year using EventDate as the anchor before producing search phrases.
+  IMPORTANT: do NOT inject EventDate into queries that have no temporal references. EventDate is reference context, not content to add. If the query has no relative-time word, emit phrases unchanged with no date stamp.
   Example: EventDate = 2023-05-08, query "What did Melanie do last weekend?" → resolve "last weekend" to 6–7 May 2023 and emit phrases targeting that date range.
+  Anti-example: EventDate = 2023-10-22, query "When is Melanie planning on going camping?" → emit ["Melanie's camping plans", "Melanie's planned camping date", "Melanie's camping trip date"]. DO NOT emit "Melanie's plans for 22 October 2023" or "Melanie's outdoor activities in October 2023" — the query has no temporal reference to resolve.
 prompt: |
   {{- if .EventDate}}
   EventDate: {{.EventDate}}
