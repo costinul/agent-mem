@@ -26,6 +26,10 @@ func (e *MemoryEngine) Decompose(ctx context.Context, req DecomposeRequest) (mod
 	return e.ai.Decompose(ctx, req)
 }
 
+func (e *MemoryEngine) DecomposeQueries(ctx context.Context, req DecomposeRequest) ([]models.ExtractedQuery, error) {
+	return e.ai.DecomposeQueries(ctx, req)
+}
+
 func (e *MemoryEngine) DecomposeRecall(ctx context.Context, req DecomposeRecallRequest) (models.Decomposition, error) {
 	return e.ai.DecomposeRecall(ctx, req)
 }

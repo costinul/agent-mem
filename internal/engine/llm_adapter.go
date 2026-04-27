@@ -79,14 +79,16 @@ func (a *LLMAdapter) Embed(ctx context.Context, texts []string) ([][]float64, er
 	return result, nil
 }
 
-// Decompose extracts facts (and queries for USER/AGENT sources) from a source using the LLM.
+// Decompose extracts facts from a source using the LLM. Queries are produced by
+// DecomposeQueries in a separate, single-purpose call so that fact extraction does
+// not have to share attention with query planning.
 func (a *LLMAdapter) Decompose(ctx context.Context, req DecomposeRequest) (models.Decomposition, error) {
 	promptName := "decompose_content"
 	if req.SourceKind == models.SOURCE_USER || req.SourceKind == models.SOURCE_AGENT {
 		promptName = "decompose_conversational"
 	}
 
-	out := &decompositionOutput{}
+	out := &factsOnlyOutput{}
 	err := a.client.ExecuteAs(ctx, uuid.New(), promptName, a.schemaModel, &bwai.PromptData{
 		Data: req,
 	}, out)
@@ -98,10 +100,20 @@ func (a *LLMAdapter) Decompose(ctx context.Context, req DecomposeRequest) (model
 	for i, f := range out.Facts {
 		facts[i] = f.toModel()
 	}
-	return models.Decomposition{
-		Facts:   facts,
-		Queries: out.Queries,
-	}, nil
+	return models.Decomposition{Facts: facts}, nil
+}
+
+// DecomposeQueries plans the search phrases used during ingest to find related stored
+// memory. Single-purpose call so the model can focus on query phrasing.
+func (a *LLMAdapter) DecomposeQueries(ctx context.Context, req DecomposeRequest) ([]models.ExtractedQuery, error) {
+	out := &queriesOnlyOutput{}
+	err := a.client.ExecuteAs(ctx, uuid.New(), "decompose_queries", a.schemaModel, &bwai.PromptData{
+		Data: req,
+	}, out)
+	if err != nil {
+		return nil, fmt.Errorf("decompose queries: %w", err)
+	}
+	return out.Queries, nil
 }
 
 // DecomposeRecall breaks a recall query into atomic search phrases via the LLM.
@@ -277,6 +289,8 @@ type factUpdateLLM struct {
 	ReferencedAt string `json:"referenced_at"` // ISO 8601 "YYYY-MM-DD" or ""; plain string for schema compliance.
 }
 
+// decompositionOutput is the legacy combined shape, retained only for decompose_recall
+// which currently emits both fields (facts is always empty in practice).
 type decompositionOutput struct {
 	Facts   []extractedFactLLM      `json:"facts"`
 	Queries []models.ExtractedQuery `json:"queries"`
@@ -299,6 +313,48 @@ func (o *decompositionOutput) Validate() error {
 }
 
 func (o *decompositionOutput) Unmarshal(data []byte) error {
+	return json.Unmarshal(data, o)
+}
+
+// factsOnlyOutput is the wire shape for the facts-only ingest decompose call.
+type factsOnlyOutput struct {
+	Facts []extractedFactLLM `json:"facts"`
+}
+
+func (o *factsOnlyOutput) SchemaDescription() string {
+	return "Atomic, self-contained facts extracted from the source content."
+}
+
+func (o *factsOnlyOutput) Validate() error {
+	for i, f := range o.Facts {
+		if f.Text == "" {
+			return fmt.Errorf("facts[%d].text is empty", i)
+		}
+		if f.Kind != models.FACT_KIND_KNOWLEDGE && f.Kind != models.FACT_KIND_RULE && f.Kind != models.FACT_KIND_PREFERENCE {
+			return fmt.Errorf("facts[%d].kind %q is invalid", i, f.Kind)
+		}
+	}
+	return nil
+}
+
+func (o *factsOnlyOutput) Unmarshal(data []byte) error {
+	return json.Unmarshal(data, o)
+}
+
+// queriesOnlyOutput is the wire shape for the queries-only ingest decompose call.
+type queriesOnlyOutput struct {
+	Queries []models.ExtractedQuery `json:"queries"`
+}
+
+func (o *queriesOnlyOutput) SchemaDescription() string {
+	return "Concise search phrases used to find related existing memory for this source."
+}
+
+func (o *queriesOnlyOutput) Validate() error {
+	return nil
+}
+
+func (o *queriesOnlyOutput) Unmarshal(data []byte) error {
 	return json.Unmarshal(data, o)
 }
 

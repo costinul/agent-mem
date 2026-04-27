@@ -974,6 +974,7 @@ func (h *Handler) playgroundRecall(w http.ResponseWriter, r *http.Request) {
 	agentID := strings.TrimSpace(r.FormValue("agent_id"))
 	threadID := strings.TrimSpace(r.FormValue("thread_id"))
 	query := strings.TrimSpace(r.FormValue("query"))
+	eventDateRaw := strings.TrimSpace(r.FormValue("event_date"))
 	limitStr := strings.TrimSpace(r.FormValue("limit"))
 	includeSources := r.FormValue("include_sources") == "on"
 
@@ -989,11 +990,23 @@ func (h *Handler) playgroundRecall(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var eventDate *time.Time
+	if eventDateRaw != "" {
+		parsed, err := time.Parse("2006-01-02", eventDateRaw)
+		if err != nil {
+			h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Recall", Error: "event_date must be in YYYY-MM-DD format"})
+			return
+		}
+		utc := parsed.UTC()
+		eventDate = &utc
+	}
+
 	input := models.RecallInput{
 		AccountID:      accountID,
 		AgentID:        agentID,
 		ThreadID:       threadID,
 		Query:          query,
+		EventDate:      eventDate,
 		Limit:          limit,
 		IncludeSources: includeSources,
 	}
@@ -1088,16 +1101,23 @@ func (h *Handler) playgroundDecompose(w http.ResponseWriter, r *http.Request) {
 			result.Queries = decomp.Queries
 		}
 	case "conversational":
-		decomp, err := h.engine.Decompose(r.Context(), engine.DecomposeRequest{
+		req := engine.DecomposeRequest{
 			SourceKind: models.SOURCE_USER,
 			Content:    text,
-		})
+		}
+		decomp, err := h.engine.Decompose(r.Context(), req)
 		if err != nil {
 			slog.Error("playground decompose conversational", "error", err)
 			result.Error = fmt.Sprintf("engine error: %v", err)
 		} else {
 			result.Facts = decomp.Facts
-			result.Queries = decomp.Queries
+			queries, qerr := h.engine.DecomposeQueries(r.Context(), req)
+			if qerr != nil {
+				slog.Error("playground decompose queries", "error", qerr)
+				result.Error = fmt.Sprintf("engine error: %v", qerr)
+			} else {
+				result.Queries = queries
+			}
 		}
 	default: // "content"
 		decomp, err := h.engine.Decompose(r.Context(), engine.DecomposeRequest{
@@ -1109,7 +1129,6 @@ func (h *Handler) playgroundDecompose(w http.ResponseWriter, r *http.Request) {
 			result.Error = fmt.Sprintf("engine error: %v", err)
 		} else {
 			result.Facts = decomp.Facts
-			result.Queries = decomp.Queries
 		}
 	}
 

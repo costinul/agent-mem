@@ -3,11 +3,18 @@ package engine
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
+	"unicode"
 
 	models "agentmem/internal/models"
 )
+
+// maxDecomposeChunkChars is the upper bound (in runes) on the content size sent to
+// a single decompose call. Long messages are split into chunks below this size so
+// the LLM keeps full attention on each piece and drops fewer details.
+const maxDecomposeChunkChars = 500
 
 // persistAndDecomposeSources saves each input as a Source record, then calls the LLM
 // to decompose it into extracted facts and search queries. Optionally loads recent
@@ -60,26 +67,139 @@ func (e *MemoryEngine) persistAndDecomposeSources(ctx context.Context, eventID, 
 		}
 		storedSources = append(storedSources, *inserted)
 
-		req := DecomposeRequest{
-			SourceKind:    item.Kind,
-			Author:        item.Author,
-			Content:       item.Content,
-			ContextHeader: contextHeader,
-			EventDate:     eventDate.Format("Monday, 2 January 2006, 15:04 UTC"),
-		}
-		if item.Kind == models.SOURCE_USER || item.Kind == models.SOURCE_AGENT {
-			req.MessageHistory = msgHistory
+		isConversational := item.Kind == models.SOURCE_USER || item.Kind == models.SOURCE_AGENT
+		formattedEventDate := eventDate.Format("Monday, 2 January 2006, 15:04 UTC")
+
+		chunks := chunkContent(item.Content, maxDecomposeChunkChars)
+		if len(chunks) > 1 {
+			log.Printf("decompose chunked source=%s kind=%s chunks=%d", inserted.ID, item.Kind, len(chunks))
 		}
 
-		decomposition, err := e.ai.Decompose(ctx, req)
-		if err != nil {
-			return nil, nil, fmt.Errorf("decompose source %s: %w", inserted.ID, err)
+		var allFacts []models.ExtractedFact
+		for _, chunk := range chunks {
+			req := DecomposeRequest{
+				SourceKind:    item.Kind,
+				Author:        item.Author,
+				Content:       chunk,
+				ContextHeader: contextHeader,
+				EventDate:     formattedEventDate,
+			}
+			if isConversational {
+				req.MessageHistory = msgHistory
+			}
+
+			partial, err := e.ai.Decompose(ctx, req)
+			if err != nil {
+				return nil, nil, fmt.Errorf("decompose source %s: %w", inserted.ID, err)
+			}
+			allFacts = append(allFacts, partial.Facts...)
+		}
+
+		decomposition := models.Decomposition{Facts: allFacts}
+
+		// Queries planning runs once per source, on the full content, only for conversational sources.
+		// Content sources never produce queries.
+		if isConversational && strings.TrimSpace(item.Content) != "" {
+			qReq := DecomposeRequest{
+				SourceKind:     item.Kind,
+				Author:         item.Author,
+				Content:        item.Content,
+				ContextHeader:  contextHeader,
+				EventDate:      formattedEventDate,
+				MessageHistory: msgHistory,
+			}
+			queries, err := e.ai.DecomposeQueries(ctx, qReq)
+			if err != nil {
+				return nil, nil, fmt.Errorf("decompose queries source %s: %w", inserted.ID, err)
+			}
+			decomposition.Queries = queries
 		}
 
 		decompositions = append(decompositions, decomposition)
 	}
 
 	return storedSources, decompositions, nil
+}
+
+// chunkContent splits content into pieces no larger than maxChars runes, preferring
+// structural delimiters that exist in any language: paragraph break ("\n\n"), then
+// line break ("\n"), then any Unicode whitespace, finally a hard rune-boundary cut.
+// No regex, no language-specific punctuation, no proper-noun detection.
+func chunkContent(content string, maxChars int) []string {
+	trimmed := strings.TrimSpace(content)
+	if trimmed == "" {
+		return []string{trimmed}
+	}
+	if maxChars <= 0 {
+		return []string{trimmed}
+	}
+	if runeLen(trimmed) <= maxChars {
+		return []string{trimmed}
+	}
+
+	if parts := splitNonEmpty(trimmed, "\n\n"); len(parts) > 1 {
+		return chunkPieces(parts, maxChars)
+	}
+	if parts := splitNonEmpty(trimmed, "\n"); len(parts) > 1 {
+		return chunkPieces(parts, maxChars)
+	}
+	return hardCutByRunes(trimmed, maxChars)
+}
+
+func chunkPieces(parts []string, maxChars int) []string {
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		out = append(out, chunkContent(p, maxChars)...)
+	}
+	return out
+}
+
+// splitNonEmpty splits s by sep and returns the trimmed, non-empty pieces.
+func splitNonEmpty(s, sep string) []string {
+	raw := strings.Split(s, sep)
+	out := make([]string, 0, len(raw))
+	for _, r := range raw {
+		if t := strings.TrimSpace(r); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// hardCutByRunes cuts a single piece at maxChars rune boundaries, preferring
+// the nearest preceding whitespace within the second half of the window.
+func hardCutByRunes(s string, maxChars int) []string {
+	runes := []rune(s)
+	out := make([]string, 0, (len(runes)/maxChars)+1)
+	for len(runes) > 0 {
+		if len(runes) <= maxChars {
+			if t := strings.TrimSpace(string(runes)); t != "" {
+				out = append(out, t)
+			}
+			break
+		}
+		cut := maxChars
+		for i := maxChars; i > maxChars/2; i-- {
+			if unicode.IsSpace(runes[i]) {
+				cut = i
+				break
+			}
+		}
+		piece := strings.TrimSpace(string(runes[:cut]))
+		if piece != "" {
+			out = append(out, piece)
+		}
+		runes = runes[cut:]
+	}
+	return out
+}
+
+func runeLen(s string) int {
+	n := 0
+	for range s {
+		n++
+	}
+	return n
 }
 
 // buildEventContextHeader concatenates the content of USER and AGENT inputs
