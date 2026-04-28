@@ -62,7 +62,7 @@ func (e *MemoryEngine) ProcessContextual(ctx context.Context, input models.Memor
 		return models.WriteOutput{}, fmt.Errorf("evaluate facts: %w", err)
 	}
 
-	storedFacts, err := e.applyEvaluateResult(ctx, input, storedSources, evalResult)
+	storedFacts, err := e.applyEvaluateResult(ctx, input, storedSources, retrieved, evalResult)
 	if err != nil {
 		return models.WriteOutput{}, err
 	}
@@ -125,23 +125,45 @@ func (e *MemoryEngine) retrieveFacts(ctx context.Context, accountID, agentID, th
 }
 
 // retrieveFactsWithLimit is the same as retrieveFacts but with a configurable result cap.
-// It queries three scopes in order (thread → agent → account) and deduplicates by highest score.
+// It queries three scopes in order (thread → agent → account) per phrase and deduplicates
+// by highest score.
+//
+// Per-phrase budget: each phrase is guaranteed a slice of the final budget (perPhraseLimit
+// = limit / nPhrases). Without this, a single phrase whose embedding produces a tight
+// cluster of high-similarity hits can squeeze every other phrase out of the top-`limit`
+// after global sort. That breaks plan/intent recall, where a verb-form phrase
+// ("Melanie thinking about going camping") may rank lower than a noun-form phrase
+// ("Melanie's camping plans") yet produce the only candidate that actually answers
+// the question.
 func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, agentID, threadID string, embeddings [][]float64, limit int) ([]models.Fact, error) {
 	if limit <= 0 {
 		limit = 10
 	}
 	aid := ptrString(agentID)
 	tid := ptrString(threadID)
-	scored := map[string]memoryrepo.FactWithScore{}
 
-	collect := func(results []memoryrepo.FactWithScore) {
-		for _, r := range results {
-			if r.Fact.ID == "" {
-				continue
-			}
-			if existing, ok := scored[r.Fact.ID]; !ok || r.Score > existing.Score {
-				scored[r.Fact.ID] = r
-			}
+	nonEmptyPhrases := 0
+	for _, emb := range embeddings {
+		if len(emb) > 0 {
+			nonEmptyPhrases++
+		}
+	}
+	if nonEmptyPhrases == 0 {
+		return nil, nil
+	}
+
+	perPhraseLimit := limit / nonEmptyPhrases
+	if perPhraseLimit < 1 {
+		perPhraseLimit = 1
+	}
+
+	scored := map[string]memoryrepo.FactWithScore{}
+	mergeIntoGlobal := func(fs memoryrepo.FactWithScore) {
+		if fs.Fact.ID == "" {
+			return
+		}
+		if existing, ok := scored[fs.Fact.ID]; !ok || fs.Score > existing.Score {
+			scored[fs.Fact.ID] = fs
 		}
 	}
 
@@ -149,6 +171,19 @@ func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, ag
 		if len(emb) == 0 {
 			continue
 		}
+
+		phraseScored := map[string]memoryrepo.FactWithScore{}
+		collect := func(results []memoryrepo.FactWithScore) {
+			for _, r := range results {
+				if r.Fact.ID == "" {
+					continue
+				}
+				if existing, ok := phraseScored[r.Fact.ID]; !ok || r.Score > existing.Score {
+					phraseScored[r.Fact.ID] = r
+				}
+			}
+		}
+
 		params := memoryrepo.SearchByEmbeddingParams{
 			AccountID: accountID,
 			Embedding: emb,
@@ -176,6 +211,20 @@ func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, ag
 			return nil, fmt.Errorf("search account facts: %w", err)
 		}
 		collect(accountResults)
+
+		phraseSorted := make([]memoryrepo.FactWithScore, 0, len(phraseScored))
+		for _, fs := range phraseScored {
+			phraseSorted = append(phraseSorted, fs)
+		}
+		sort.Slice(phraseSorted, func(i, j int) bool {
+			return phraseSorted[i].Score > phraseSorted[j].Score
+		})
+		if len(phraseSorted) > perPhraseLimit {
+			phraseSorted = phraseSorted[:perPhraseLimit]
+		}
+		for _, fs := range phraseSorted {
+			mergeIntoGlobal(fs)
+		}
 	}
 
 	sorted := make([]memoryrepo.FactWithScore, 0, len(scored))
@@ -196,14 +245,17 @@ func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, ag
 	return facts, nil
 }
 
-// applyEvaluateResult persists the LLM evaluation decision.
+// applyEvaluateResult persists the LLM evaluation decision. The retrieved set
+// (the existing in-scope facts that were passed to Evaluate) is forwarded to
+// storeNewFacts as a deterministic dedup safety net against LLM evaluator misses.
 func (e *MemoryEngine) applyEvaluateResult(
 	ctx context.Context,
 	input models.MemoryInput,
 	storedSources []models.Source,
+	retrieved []models.Fact,
 	result models.EvaluateResult,
 ) ([]models.Fact, error) {
-	stored, err := e.storeNewFacts(ctx, input, storedSources, result.FactsToStore)
+	stored, err := e.storeNewFacts(ctx, input, storedSources, retrieved, result.FactsToStore)
 	if err != nil {
 		return nil, err
 	}
@@ -217,26 +269,58 @@ func (e *MemoryEngine) applyEvaluateResult(
 	return append(stored, evolved...), nil
 }
 
-func (e *MemoryEngine) storeNewFacts(ctx context.Context, input models.MemoryInput, sources []models.Source, facts []models.Fact) ([]models.Fact, error) {
+// storeNewFacts persists each new fact that does not collide with an existing
+// retrieved fact or with another new fact already inserted in this batch.
+// Collision is decided by normalizeFactText: identical normalized text means
+// the same statement, regardless of provenance suffix or formatting noise.
+func (e *MemoryEngine) storeNewFacts(ctx context.Context, input models.MemoryInput, sources []models.Source, retrieved []models.Fact, facts []models.Fact) ([]models.Fact, error) {
 	if len(facts) == 0 {
 		return nil, nil
 	}
-	texts := make([]string, len(facts))
+
+	seenText := make(map[string]struct{}, len(retrieved)+len(facts))
+	for _, r := range retrieved {
+		if key := normalizeFactText(r.Text); key != "" {
+			seenText[key] = struct{}{}
+		}
+	}
+
+	keepIdx := make([]int, 0, len(facts))
 	for i, f := range facts {
-		texts[i] = f.Text
+		key := normalizeFactText(f.Text)
+		if key == "" {
+			keepIdx = append(keepIdx, i)
+			continue
+		}
+		if _, dup := seenText[key]; dup {
+			log.Printf("storeNewFacts: skipping duplicate fact (matches existing or earlier new fact) text=%q", f.Text)
+			continue
+		}
+		seenText[key] = struct{}{}
+		keepIdx = append(keepIdx, i)
+	}
+	if len(keepIdx) == 0 {
+		return nil, nil
+	}
+
+	texts := make([]string, len(keepIdx))
+	for i, idx := range keepIdx {
+		texts[i] = facts[idx].Text
 	}
 	embeddings, err := e.ai.Embed(ctx, texts)
 	if err != nil {
 		return nil, fmt.Errorf("embed new facts: %w", err)
 	}
-	if len(embeddings) != len(facts) {
-		return nil, fmt.Errorf("embed new facts: expected %d embeddings, got %d", len(facts), len(embeddings))
+	if len(embeddings) != len(keepIdx) {
+		return nil, fmt.Errorf("embed new facts: expected %d embeddings, got %d", len(keepIdx), len(embeddings))
 	}
-	stored := make([]models.Fact, 0, len(facts))
-	for idx, fact := range facts {
-		if len(embeddings[idx]) == 0 {
+
+	stored := make([]models.Fact, 0, len(keepIdx))
+	for i, idx := range keepIdx {
+		if len(embeddings[i]) == 0 {
 			return nil, fmt.Errorf("embed new facts: empty embedding for fact index %d", idx)
 		}
+		fact := facts[idx]
 		newFact := models.Fact{
 			AccountID:    input.AccountID,
 			AgentID:      ptrString(input.AgentID),
@@ -245,7 +329,7 @@ func (e *MemoryEngine) storeNewFacts(ctx context.Context, input models.MemoryInp
 			Kind:         fact.Kind,
 			Text:         fact.Text,
 			ReferencedAt: fact.ReferencedAt,
-			Embedding:    embeddings[idx],
+			Embedding:    embeddings[i],
 		}
 		inserted, err := e.repo.InsertFact(ctx, newFact)
 		if err != nil {

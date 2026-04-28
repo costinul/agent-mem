@@ -17,9 +17,13 @@ system_prompt: |
   Example: "Would Caroline want to move back to her home country soon?" → ["Caroline's plans to return to home country", "Caroline's reasons to stay where she lives", "Caroline's adoption plans", "Caroline's family situation"]
   Example: "Would Melanie be considered a member of the LGBTQ community?" → ["Melanie's sexual orientation or identity", "Melanie's relationship to the LGBTQ community", "Melanie identifying as LGBTQ"]
 
-  Plan/intent queries: when the query asks about a planned, intended, or upcoming activity ("when is X planning to ...", "when did X plan to ...", "where is X going to ...", "what is X about to do", "when will X ..."), emit phrases for both the plan and the actual occurrence — plans often materialize into stored facts about the event itself. Cover plan-form phrases AND occurrence-form phrases so retrieval finds either.
-  Example: "When is Melanie planning on going camping?" → ["Melanie's camping plans", "Melanie's planned camping date", "Melanie's camping trip date"]
-  Example: "Where is Caroline going to study?" → ["Caroline's study plans", "Caroline's school enrollment", "Caroline's university"]
+  Plan/intent queries: when the query asks about a planned, intended, or upcoming activity ("when is X planning to ...", "when did X plan to ...", "where is X going to ...", "what is X about to do", "when will X ..."), emit phrases in BOTH noun and verb form, plus an occurrence form. Plans are stored in memory using natural verb-form wording ("X is thinking about ...", "X wants to ...", "X is considering ..."), so noun-form alone ("X's plans") often misses them on cosine similarity. Always emit at least one phrase using each of the verb-form intent verbs that fits ("thinking about", "wants to", "considering", "planning to") so the embedding has a direct lexical match against stored plan facts. Plans also often materialize into stored facts about the actual event, so include the occurrence form.
+  Required forms for plan/intent queries (emit at least one of each that fits):
+    - noun form: "<X>'s <activity> plans", "<X>'s planned <activity> date"
+    - verb form: "<X> thinking about <activity>", "<X> wants to <activity>", "<X> considering <activity>", "<X> planning to <activity>"
+    - occurrence form: "<X>'s <activity> date"
+  Example: "When is Melanie planning on going camping?" → ["Melanie's camping plans", "Melanie thinking about going camping", "Melanie wants to go camping", "Melanie considering camping", "Melanie's camping trip date"]
+  Example: "Where is Caroline going to study?" → ["Caroline's study plans", "Caroline thinking about studying", "Caroline planning to study", "Caroline's school enrollment", "Caroline's university"]
 
   Temporal resolution: when an EventDate is provided AND the query itself contains a relative-time word ("last year", "last week", "yesterday", "a few months ago", "recently", "ago", "next month", "next week"), resolve that phrase to its absolute calendar date or year using EventDate as the anchor before producing search phrases.
   IMPORTANT: do NOT inject EventDate into queries that have no temporal references. EventDate is reference context, not content to add. If the query has no relative-time word, emit phrases unchanged with no date stamp.

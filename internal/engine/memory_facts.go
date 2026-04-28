@@ -136,7 +136,7 @@ func (e *MemoryEngine) mapFactForOutput(ctx context.Context, fact models.Fact, i
 	}
 	returned := models.ReturnedFact{
 		ID:   fact.ID,
-		Text: fact.Text,
+		Text: withProvenanceSuffix(fact),
 		Kind: fact.Kind,
 	}
 	if source != nil {
@@ -147,6 +147,34 @@ func (e *MemoryEngine) mapFactForOutput(ctx context.Context, fact models.Fact, i
 		}
 	}
 	return returned, nil
+}
+
+// withProvenanceSuffix appends a deterministic "(as mentioned on YYYY-MM-DD)" tail
+// to the fact text when the fact references a different calendar day than the one
+// the source message was authored on. This bridges the absolute date stored in the
+// fact text back to the conversation date a question may reference (e.g. a question
+// asking "before 25 May 2023" can match a fact about an event on 20 May).
+//
+// The suffix is skipped when the fact text already carries provenance from the
+// extraction prompt (e.g. "(originally said 'last Saturday' on 25 May 2023)") or
+// from a prior render pass — making this idempotent.
+func withProvenanceSuffix(fact models.Fact) string {
+	text := fact.Text
+	if fact.EventDate == nil || fact.ReferencedAt == nil {
+		return text
+	}
+	event := fact.EventDate.UTC()
+	ref := fact.ReferencedAt.UTC()
+	if event.Year() == ref.Year() && event.YearDay() == ref.YearDay() {
+		return text
+	}
+	lower := strings.ToLower(text)
+	if strings.Contains(lower, "as mentioned on") ||
+		strings.Contains(lower, "originally said") ||
+		strings.Contains(lower, "(as of ") {
+		return text
+	}
+	return fmt.Sprintf("%s (as mentioned on %s)", text, event.Format("2006-01-02"))
 }
 
 // ensureSourceCanMutateFact enforces the trust hierarchy: the calling source kind must have

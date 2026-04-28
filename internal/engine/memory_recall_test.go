@@ -166,6 +166,117 @@ func TestMaxCosine_ParallelIsOne(t *testing.T) {
 	}
 }
 
+// ── normalizeFactText ─────────────────────────────────────────────
+
+func TestNormalizeFactText_StripsAsMentionedOn(t *testing.T) {
+	in := "Melanie ran a charity race for mental health on Saturday, 20 May 2023 (as mentioned on 2023-05-25)"
+	want := "melanie ran a charity race for mental health on saturday, 20 may 2023"
+	if got := normalizeFactText(in); got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestNormalizeFactText_StripsOriginallySaid(t *testing.T) {
+	in := "Melanie took her family camping in the mountains in the week before 27 June 2023 (originally said 'last week' on 27 June 2023)."
+	want := "melanie took her family camping in the mountains in the week before 27 june 2023"
+	if got := normalizeFactText(in); got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestNormalizeFactText_StripsAsOf(t *testing.T) {
+	in := "Caroline lives in Portland (as of 2023-05-25)"
+	want := "caroline lives in portland"
+	if got := normalizeFactText(in); got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestNormalizeFactText_VerbatimAndProvenanceCompareEqual(t *testing.T) {
+	a := "Melanie went camping with her family two weekends before Monday, 17 July 2023."
+	b := "Melanie went camping with her family two weekends before Monday, 17 July 2023. (as mentioned on 2023-07-17)"
+	if normalizeFactText(a) != normalizeFactText(b) {
+		t.Fatalf("expected equal normalizations, got %q vs %q", normalizeFactText(a), normalizeFactText(b))
+	}
+}
+
+func TestNormalizeFactText_CollapsesWhitespace(t *testing.T) {
+	in := "  Melanie  loves    camping  "
+	want := "melanie loves camping"
+	if got := normalizeFactText(in); got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestNormalizeFactText_PreservesNonProvenanceParenthetical(t *testing.T) {
+	in := "Melanie went camping (with her kids) in June 2023"
+	want := "melanie went camping (with her kids) in june 2023"
+	if got := normalizeFactText(in); got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestNormalizeFactText_DifferentSubjectsStayDifferent(t *testing.T) {
+	a := "Melanie always looks forward to her family camping trip"
+	b := "Melanie and her family always look forward to their family camping trip"
+	if normalizeFactText(a) == normalizeFactText(b) {
+		t.Fatalf("expected different normalizations to remain different, both became %q", normalizeFactText(a))
+	}
+}
+
+// ── dedupByText ───────────────────────────────────────────────────
+
+func TestDedupByText_DropsVerbatimDuplicate(t *testing.T) {
+	a := models.Fact{ID: "a", Text: "Melanie took her family camping (originally said 'last week' on 27 June 2023)"}
+	b := models.Fact{ID: "b", Text: "Melanie took her family camping (originally said 'last week' on 27 June 2023)"}
+	c := models.Fact{ID: "c", Text: "Melanie took her family camping (originally said 'last week' on 27 June 2023)"}
+	got := dedupByText([]models.Fact{a, b, c})
+	if len(got) != 1 || got[0].ID != "a" {
+		t.Fatalf("expected only a kept, got %v", factIDSlice(got))
+	}
+}
+
+func TestDedupByText_KeepsFirstOccurrence(t *testing.T) {
+	high := models.Fact{ID: "high-score", Text: "Melanie went camping in June 2023"}
+	low := models.Fact{ID: "low-score", Text: "Melanie went camping in June 2023 (as mentioned on 2023-06-30)"}
+	got := dedupByText([]models.Fact{high, low})
+	if len(got) != 1 || got[0].ID != "high-score" {
+		t.Fatalf("expected first occurrence kept, got %v", factIDSlice(got))
+	}
+}
+
+func TestDedupByText_PreservesDistinctFacts(t *testing.T) {
+	a := models.Fact{ID: "a", Text: "Melanie went camping in June 2023"}
+	b := models.Fact{ID: "b", Text: "Melanie went camping in July 2023"}
+	got := dedupByText([]models.Fact{a, b})
+	if len(got) != 2 {
+		t.Fatalf("expected both kept, got %v", factIDSlice(got))
+	}
+}
+
+func TestDedupByText_EmptyInput(t *testing.T) {
+	if got := dedupByText(nil); len(got) != 0 {
+		t.Fatalf("expected empty, got %v", got)
+	}
+}
+
+func TestDedupByText_SingleFactPassesThrough(t *testing.T) {
+	f := models.Fact{ID: "only", Text: "Melanie went camping"}
+	got := dedupByText([]models.Fact{f})
+	if len(got) != 1 || got[0].ID != "only" {
+		t.Fatalf("expected single fact kept, got %v", factIDSlice(got))
+	}
+}
+
+func TestDedupByText_EmptyTextNotCoalesced(t *testing.T) {
+	a := models.Fact{ID: "a", Text: ""}
+	b := models.Fact{ID: "b", Text: ""}
+	got := dedupByText([]models.Fact{a, b})
+	if len(got) != 2 {
+		t.Fatalf("empty-text facts must not be coalesced, got %v", factIDSlice(got))
+	}
+}
+
 // ── helpers ───────────────────────────────────────────────────────
 
 func mustParseDate(s string) time.Time {

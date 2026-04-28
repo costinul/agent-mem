@@ -74,6 +74,16 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 	// source-grouped facts that may not be in similarity order.
 	candidates = cosineRerank(candidates, embeddings)
 
+	// Drop near-duplicate candidates whose normalized text matches an
+	// already-kept candidate. This compensates for ingest-time dedup gaps
+	// (the LLM evaluator occasionally lets identical facts through, especially
+	// when a USER message and the AGENT echo produce the same statement).
+	beforeDedup := len(candidates)
+	candidates = dedupByText(candidates)
+	if dropped := beforeDedup - len(candidates); dropped > 0 {
+		log.Printf("recall dedup-by-text dropped=%d remaining=%d", dropped, len(candidates))
+	}
+
 	// Temporal rerank: demote facts whose referenced_at is after the query event_date
 	// (future facts). Timeless facts and past/present facts retain embedding order.
 	candidates, eligibleCount, futureCount := dateRerank(candidates, eventDate)
@@ -150,10 +160,14 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 // seed fact. Recall queries often embed against a thought that decompose split into
 // multiple atomic facts; pulling in siblings re-glues that context.
 //
-// Siblings are added in seed-rank order: the highest-ranked seed contributes its
-// siblings first, then the next, and so on. This guarantees the most relevant hits'
-// neighborhoods survive the budget cap. Superseded siblings are included so that
-// historical context (e.g. "original job title") is reachable.
+// Round-robin expansion: pass r adds the r-th sibling from each ranked source before
+// any source gets its (r+1)-th. This guarantees that every seed source contributes at
+// least one sibling before the budget is consumed by a single source's long sibling
+// list. Without this, a high-rank source with many siblings can monopolize the budget
+// and starve lower-rank sources whose siblings carry the actual answer.
+//
+// Superseded siblings are included so that historical context (e.g. "original job
+// title") is reachable.
 func (e *MemoryEngine) expandBySource(ctx context.Context, accountID string, seeds []models.Fact, budget int) ([]models.Fact, error) {
 	if len(seeds) == 0 || budget <= 0 {
 		return seeds, nil
@@ -187,19 +201,29 @@ func (e *MemoryEngine) expandBySource(ctx context.Context, accountID string, see
 		bySource[s.SourceID] = append(bySource[s.SourceID], s)
 	}
 
-	added := 0
-outer:
+	maxLen := 0
 	for _, sid := range rankedSourceIDs {
-		for _, sib := range bySource[sid] {
+		if n := len(bySource[sid]); n > maxLen {
+			maxLen = n
+		}
+	}
+
+	added := 0
+	for round := 0; round < maxLen && added < budget; round++ {
+		for _, sid := range rankedSourceIDs {
+			if added >= budget {
+				break
+			}
+			if round >= len(bySource[sid]) {
+				continue
+			}
+			sib := bySource[sid][round]
 			if _, dup := existing[sib.ID]; dup {
 				continue
 			}
 			seeds = append(seeds, sib)
 			existing[sib.ID] = struct{}{}
 			added++
-			if added >= budget {
-				break outer
-			}
 		}
 	}
 	if added > 0 {
@@ -228,6 +252,34 @@ func dateRerank(candidates []models.Fact, eventDate time.Time) ([]models.Fact, i
 		}
 	}
 	return append(eligible, future...), len(eligible), len(future)
+}
+
+// dedupByText removes candidates whose normalized text equals a candidate
+// earlier in the slice. The first occurrence is kept (which, after cosineRerank,
+// is the highest-scoring representative of each duplicate cluster).
+//
+// Comparison is purely textual after normalizeFactText, so this only collapses
+// statements that carry identical information. Paraphrases with non-trivial
+// wording differences are preserved — semantic dedup is the SelectFacts LLM's job.
+func dedupByText(candidates []models.Fact) []models.Fact {
+	if len(candidates) <= 1 {
+		return candidates
+	}
+	seen := make(map[string]struct{}, len(candidates))
+	out := make([]models.Fact, 0, len(candidates))
+	for _, f := range candidates {
+		key := normalizeFactText(f.Text)
+		if key == "" {
+			out = append(out, f)
+			continue
+		}
+		if _, dup := seen[key]; dup {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, f)
+	}
+	return out
 }
 
 // cosineRerank sorts candidates by their maximum cosine similarity against any of the

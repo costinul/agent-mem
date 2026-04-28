@@ -4,12 +4,41 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 	"time"
 	"unicode"
 
 	models "agentmem/internal/models"
 )
+
+// provenanceSuffixRe matches any trailing parenthetical that carries provenance
+// metadata (added either by the deterministic mapFactForOutput suffix or by the
+// decompose-conversational prompt). Used by normalizeFactText to compare facts
+// by their semantic body, not by their provenance tail.
+var provenanceSuffixRe = regexp.MustCompile(`(?i)\s*\([^)]*(?:as mentioned on|originally said|as of)[^)]*\)\.?\s*$`)
+
+// normalizeFactText returns a canonical form of a fact's text suitable for
+// equality-based duplicate detection. It strips trailing provenance suffixes
+// (which can be added by the renderer or by extraction prompts), lowercases,
+// collapses interior whitespace, and trims trailing terminal punctuation.
+//
+// Two facts whose normalized text is identical describe the same statement and
+// are safe to dedupe: identical strings carry identical information.
+func normalizeFactText(s string) string {
+	s = strings.TrimSpace(s)
+	for {
+		next := provenanceSuffixRe.ReplaceAllString(s, "")
+		if next == s {
+			break
+		}
+		s = next
+	}
+	s = strings.ToLower(s)
+	s = strings.Join(strings.Fields(s), " ")
+	s = strings.TrimRight(s, " .;,!?")
+	return s
+}
 
 // maxDecomposeChunkChars is the upper bound (in runes) on the content size sent to
 // a single decompose call. Long messages are split into chunks below this size so
