@@ -827,6 +827,7 @@ type PlaygroundResult struct {
 	Facts       []models.ReturnedFact
 	Error       string
 	NewThreadID string
+	Debug       *models.RecallDebug
 }
 
 type DecomposeResult struct {
@@ -1011,6 +1012,7 @@ func (h *Handler) playgroundRecall(w http.ResponseWriter, r *http.Request) {
 		EventDate:      eventDate,
 		Limit:          limit,
 		IncludeSources: includeSources,
+		Debug:          true,
 	}
 	out, err := h.engine.Recall(r.Context(), input)
 	if err != nil {
@@ -1020,7 +1022,7 @@ func (h *Handler) playgroundRecall(w http.ResponseWriter, r *http.Request) {
 	}
 	d := out.Duration
 	slog.Info("playground recall duration", "db_ms", d.DBMs, "db_calls", d.DBCalls, "ai_ms", d.AIMs, "ai_calls", d.AICalls)
-	h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Recall", Facts: out.Facts})
+	h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Recall", Facts: out.Facts, Debug: out.Debug})
 }
 
 func (h *Handler) renderPlaygroundResult(w http.ResponseWriter, result *PlaygroundResult) {
@@ -1041,30 +1043,107 @@ func (h *Handler) renderPlaygroundResult(w http.ResponseWriter, result *Playgrou
       <span class="text-xs text-indigo-600 font-medium font-mono">new thread: {{.NewThreadID}}</span>
       {{end}}
     </div>
-    {{if .Facts}}
-    <ul class="divide-y divide-gray-100">
-      {{range .Facts}}
-      <li class="px-4 py-3">
-        <div class="flex items-start gap-3">
-          <span class="inline-flex shrink-0 px-2 py-0.5 text-xs font-medium rounded-full mt-0.5
-            {{if eq (printf "%s" .Kind) "KNOWLEDGE"}}bg-blue-100 text-blue-700
-            {{else if eq (printf "%s" .Kind) "RULE"}}bg-purple-100 text-purple-700
-            {{else}}bg-amber-100 text-amber-700{{end}}">{{.Kind}}</span>
-          <span class="inline-flex shrink-0 px-2 py-0.5 text-xs font-medium rounded-full mt-0.5
-            {{if eq (printf "%s" .SourceKind) "text"}}bg-gray-100 text-gray-600
-            {{else if eq (printf "%s" .SourceKind) "tool"}}bg-teal-100 text-teal-700
-            {{else}}bg-orange-100 text-orange-700{{end}}">{{.SourceKind}}</span>
-          <p class="text-sm text-gray-900 flex-1">{{.Text}}</p>
-        </div>
-        <p class="mt-1 text-xs font-mono text-gray-400 pl-0">{{.ID}}</p>
-        {{if .OriginalSource}}
-        <p class="mt-1 text-xs text-gray-500 italic pl-0">Source: {{.OriginalSource}}</p>
+    
+    {{if .Debug}}
+    <div class="border-b border-gray-200 bg-white px-4 pt-2">
+        <nav class="-mb-px flex gap-4">
+            <button type="button" onclick="switchResultTab('facts')" id="res-tab-btn-facts"
+                    class="py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600 transition-colors">
+                Facts
+            </button>
+            <button type="button" onclick="switchResultTab('debug')" id="res-tab-btn-debug"
+                    class="py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors">
+                Debug
+            </button>
+        </nav>
+    </div>
+    <script>
+    function switchResultTab(tab) {
+        document.getElementById('res-tab-btn-facts').className = tab === 'facts' 
+            ? 'py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600 transition-colors'
+            : 'py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors';
+        
+        document.getElementById('res-tab-btn-debug').className = tab === 'debug'
+            ? 'py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600 transition-colors'
+            : 'py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors';
+        
+        document.getElementById('res-tab-panel-facts').style.display = tab === 'facts' ? 'block' : 'none';
+        document.getElementById('res-tab-panel-debug').style.display = tab === 'debug' ? 'block' : 'none';
+    }
+    </script>
+    {{end}}
+
+    <div id="res-tab-panel-facts">
+      {{if .Facts}}
+      <ul class="divide-y divide-gray-100">
+        {{range .Facts}}
+        <li class="px-4 py-3">
+          <div class="flex items-start gap-3">
+            <span class="inline-flex shrink-0 px-2 py-0.5 text-xs font-medium rounded-full mt-0.5
+              {{if eq (printf "%s" .Kind) "KNOWLEDGE"}}bg-blue-100 text-blue-700
+              {{else if eq (printf "%s" .Kind) "RULE"}}bg-purple-100 text-purple-700
+              {{else}}bg-amber-100 text-amber-700{{end}}">{{.Kind}}</span>
+            <span class="inline-flex shrink-0 px-2 py-0.5 text-xs font-medium rounded-full mt-0.5
+              {{if eq (printf "%s" .SourceKind) "text"}}bg-gray-100 text-gray-600
+              {{else if eq (printf "%s" .SourceKind) "tool"}}bg-teal-100 text-teal-700
+              {{else}}bg-orange-100 text-orange-700{{end}}">{{.SourceKind}}</span>
+            <p class="text-sm text-gray-900 flex-1">{{.Text}}</p>
+          </div>
+          <p class="mt-1 text-xs font-mono text-gray-400 pl-0">{{.ID}}</p>
+          {{if .OriginalSource}}
+          <p class="mt-1 text-xs text-gray-500 italic pl-0">Source: {{.OriginalSource}}</p>
+          {{end}}
+        </li>
         {{end}}
-      </li>
+      </ul>
+      {{else if eq .Op "Recall"}}
+      <p class="px-4 py-3 text-sm text-gray-400">No facts returned.</p>
       {{end}}
-    </ul>
-    {{else if eq .Op "Recall"}}
-    <p class="px-4 py-3 text-sm text-gray-400">No facts returned.</p>
+    </div>
+
+    {{if .Debug}}
+    <div id="res-tab-panel-debug" style="display: none;" class="p-4 text-sm text-gray-700 space-y-4">
+      <div>
+        <h4 class="font-semibold text-gray-900 mb-1">Search Phrases</h4>
+        <ul class="list-disc pl-5">
+          {{range .Debug.Phrases}}
+          <li>{{.}}</li>
+          {{end}}
+        </ul>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <span class="font-medium">Retrieved:</span> {{.Debug.RetrievedCount}}
+        </div>
+        <div>
+          <span class="font-medium">Expanded:</span> {{.Debug.ExpandedCount}}
+        </div>
+        <div>
+          <span class="font-medium">In Window:</span> {{.Debug.InWindowCount}}
+        </div>
+        <div>
+          <span class="font-medium">Out of Window:</span> {{.Debug.OutOfWindowCount}}
+        </div>
+      </div>
+      <div>
+        <h4 class="font-semibold text-gray-900 mb-2">Candidates</h4>
+        <ul class="divide-y divide-gray-100 border border-gray-200 rounded-md">
+          {{range .Debug.Candidates}}
+          <li class="px-3 py-2 {{if .Selected}}bg-green-50{{else}}bg-gray-50{{end}}">
+            <div class="flex items-start gap-2">
+              <span class="inline-flex shrink-0 px-2 py-0.5 text-[10px] font-medium rounded-full mt-0.5 bg-gray-200 text-gray-700">{{.Kind}}</span>
+              <p class="text-xs text-gray-800 flex-1">{{.Text}}</p>
+              {{if .Selected}}
+              <span class="inline-flex shrink-0 px-2 py-0.5 text-[10px] font-medium rounded-full mt-0.5 bg-green-100 text-green-700">Selected</span>
+              {{else}}
+              <span class="inline-flex shrink-0 px-2 py-0.5 text-[10px] font-medium rounded-full mt-0.5 bg-gray-200 text-gray-500">Filtered</span>
+              {{end}}
+            </div>
+          </li>
+          {{end}}
+        </ul>
+      </div>
+    </div>
     {{end}}
   </div>
   {{end}}
