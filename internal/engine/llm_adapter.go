@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	models "agentmem/internal/models"
@@ -59,11 +60,20 @@ func NewLLMAdapter(client *bwaiclient.BWAIClient, schemaModel, embeddingModel st
 	}
 }
 
+func observeAI(ctx context.Context, op string, start time.Time) {
+	elapsed := time.Since(start)
+	log.Printf("ai call op=%s duration=%dms", op, elapsed.Milliseconds())
+	if t := getTracker(ctx); t != nil {
+		t.addAI(elapsed)
+	}
+}
+
 // Embed generates vector embeddings for the given texts.
 func (a *LLMAdapter) Embed(ctx context.Context, texts []string) ([][]float64, error) {
 	if len(texts) == 0 {
 		return nil, nil
 	}
+	defer observeAI(ctx, "embed", time.Now())
 	raw, err := a.client.GetEmbeddings(ctx, uuid.New(), a.embeddingModel, texts)
 	if err != nil {
 		return nil, fmt.Errorf("get embeddings: %w", err)
@@ -83,6 +93,7 @@ func (a *LLMAdapter) Embed(ctx context.Context, texts []string) ([][]float64, er
 // DecomposeQueries in a separate, single-purpose call so that fact extraction does
 // not have to share attention with query planning.
 func (a *LLMAdapter) Decompose(ctx context.Context, req DecomposeRequest) (models.Decomposition, error) {
+	defer observeAI(ctx, "decompose", time.Now())
 	promptName := "decompose_content"
 	if req.SourceKind == models.SOURCE_USER || req.SourceKind == models.SOURCE_AGENT {
 		promptName = "decompose_conversational"
@@ -106,6 +117,7 @@ func (a *LLMAdapter) Decompose(ctx context.Context, req DecomposeRequest) (model
 // DecomposeQueries plans the search phrases used during ingest to find related stored
 // memory. Single-purpose call so the model can focus on query phrasing.
 func (a *LLMAdapter) DecomposeQueries(ctx context.Context, req DecomposeRequest) ([]models.ExtractedQuery, error) {
+	defer observeAI(ctx, "decompose_queries", time.Now())
 	out := &queriesOnlyOutput{}
 	err := a.client.ExecuteAs(ctx, uuid.New(), "decompose_queries", a.schemaModel, &bwai.PromptData{
 		Data: req,
@@ -118,6 +130,7 @@ func (a *LLMAdapter) DecomposeQueries(ctx context.Context, req DecomposeRequest)
 
 // DecomposeRecall breaks a recall query into atomic search phrases via the LLM.
 func (a *LLMAdapter) DecomposeRecall(ctx context.Context, req DecomposeRecallRequest) (models.Decomposition, error) {
+	defer observeAI(ctx, "decompose_recall", time.Now())
 	out := &decompositionOutput{}
 	err := a.client.ExecuteAs(ctx, uuid.New(), "decompose_recall", a.schemaModel, &bwai.PromptData{
 		Data: req,
@@ -141,7 +154,7 @@ func (a *LLMAdapter) Evaluate(ctx context.Context, req EvaluateRequest) (models.
 	if len(req.NewFacts) == 0 && len(req.RetrievedFacts) == 0 {
 		return models.EvaluateResult{}, nil
 	}
-
+	defer observeAI(ctx, "evaluate", time.Now())
 	out := &evaluateOutput{}
 	err := a.client.ExecuteAs(ctx, uuid.New(), "evaluate", a.schemaModel, &bwai.PromptData{
 		Data: req,
@@ -201,6 +214,7 @@ func (a *LLMAdapter) SelectFacts(ctx context.Context, req SelectFactsRequest) ([
 	if len(req.Candidates) == 0 {
 		return nil, nil
 	}
+	defer observeAI(ctx, "select_facts", time.Now())
 
 	// Build a template-friendly representation so the prompt can access pre-formatted dates.
 	type candidateView struct {

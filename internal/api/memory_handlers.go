@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"log/slog"
 	"net/http"
 	"runtime/debug"
@@ -56,6 +57,8 @@ func contextualHandler(memEngine *engine.MemoryEngine, agentSvc *agent.Service) 
 			writeEngineError(w, r, err)
 			return
 		}
+		d := output.Duration
+		log.Printf("contextual duration db=%dms db_calls=%d ai=%dms ai_calls=%d", d.DBMs, d.DBCalls, d.AIMs, d.AICalls)
 		writeJSON(w, http.StatusOK, output)
 	}
 }
@@ -95,6 +98,8 @@ func factualHandler(memEngine *engine.MemoryEngine, agentSvc *agent.Service) htt
 			writeEngineError(w, r, err)
 			return
 		}
+		d := output.Duration
+		log.Printf("factual duration db=%dms db_calls=%d ai=%dms ai_calls=%d", d.DBMs, d.DBCalls, d.AIMs, d.AICalls)
 		writeJSON(w, http.StatusOK, output)
 	}
 }
@@ -143,6 +148,8 @@ func recallHandler(memEngine *engine.MemoryEngine, agentSvc *agent.Service) http
 			writeEngineError(w, r, err)
 			return
 		}
+		d := output.Duration
+		log.Printf("recall duration db=%dms db_calls=%d ai=%dms ai_calls=%d", d.DBMs, d.DBCalls, d.AIMs, d.AICalls)
 		writeJSON(w, http.StatusOK, output)
 	}
 }

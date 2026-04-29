@@ -17,7 +17,7 @@ type MemoryEngine struct {
 
 func NewMemoryEngine(client *bwaiclient.BWAIClient, repo memoryrepo.Repository, schemaModel, embeddingModel string) *MemoryEngine {
 	return &MemoryEngine{
-		repo: repo,
+		repo: &repoWrapper{inner: repo},
 		ai:   NewLLMAdapter(client, schemaModel, embeddingModel),
 	}
 }

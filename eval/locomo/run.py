@@ -10,8 +10,9 @@ Usage:
 
 Environment variables:
     MEMORY_API_URL      Base URL of the memory API  (default: http://localhost:8080)
-    MEMORY_API_KEY      API key for the account     (required)
-    MEMORY_AGENT_ID     Agent ID for test runs      (required)
+    MEMORY_API_KEY      API key for the account     (required for --target our_api)
+    MEMORY_AGENT_ID     Agent ID for test runs      (required for --target our_api)
+    MEM0_API_KEY        API key for mem0            (required for --target mem0)
     OPENAI_API_KEY      OpenAI key for the judge    (required)
 
 Options:
@@ -24,6 +25,7 @@ Options:
     --out FILE          Output file path            (default: results.json)
     --data FILE         Path to locomo10.json       (default: ./data/locomo10.json,
                                                      auto-downloaded if missing)
+    --target TARGET     Target API: 'our_api' (default) or 'mem0'
 
 Debug workflow (fast iteration without re-ingesting):
     1. Flag your dev API key in Postgres:
@@ -67,7 +69,7 @@ load_dotenv(dotenv_path=env_path)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from shared.api_client import MemoryAPIClient
+from shared.api_client import MemoryAPIClient, Mem0APIClient
 from shared.evaluator import Evaluator
 
 LOCOMO_DATA_URL = (
@@ -144,7 +146,7 @@ def _preview(text: str) -> str:
 
 async def evaluate_sample(
     sample: dict,
-    client: MemoryAPIClient,
+    client: MemoryAPIClient | Mem0APIClient,
     evaluator: Evaluator | None,
     semaphore: asyncio.Semaphore,
     reuse_thread_id: str | None = None,
@@ -161,6 +163,9 @@ async def evaluate_sample(
 
     conversation = sample["conversation"]
     qa_pairs = sample.get("qa", [])
+
+    ingest_durations: list[float] = []
+    recall_durations: list[float] = []
 
     async with semaphore:
         if not reuse_thread_id:
@@ -190,6 +195,7 @@ async def evaluate_sample(
                         flush=True,
                     )
                     try:
+                        t0_ingest = time.time()
                         await client.ingest(
                             thread_id,
                             role,
@@ -198,6 +204,7 @@ async def evaluate_sample(
                             when=session_iso,
                             image_caption=blip,
                         )
+                        ingest_durations.append(time.time() - t0_ingest)
                     except Exception as exc:
                         print(f"  [WARN] ingest error in sample {sample_id}: {exc}", flush=True)
 
@@ -235,7 +242,9 @@ async def evaluate_sample(
             qa_t0 = time.time()
 
             try:
+                t0_recall = time.time()
                 memory_output = await client.recall(thread_id, question, when=last_session_iso)
+                recall_durations.append(time.time() - t0_recall)
                 facts = [f["text"] for f in memory_output.get("facts", [])]
                 recall_debug = memory_output.get("debug")
             except Exception as exc:
@@ -278,7 +287,13 @@ async def evaluate_sample(
             flush=True,
         )
 
-    return {"sample_id": sample_id, "thread_id": thread_id, "qa": qa_results}
+    return {
+        "sample_id": sample_id,
+        "thread_id": thread_id,
+        "qa": qa_results,
+        "ingest_durations": ingest_durations,
+        "recall_durations": recall_durations,
+    }
 
 
 # ── summary ────────────────────────────────────────────────────────────────────
@@ -344,14 +359,37 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--cleanup", action="store_true", help="Delete ingested facts after run")
     p.add_argument("--out", default="results.json", help="Output JSON file")
     p.add_argument("--data", default=str(DATA_DEFAULT), help="Path to locomo10.json")
+    p.add_argument(
+        "--target",
+        choices=["our_api", "mem0"],
+        default="our_api",
+        help="Target API to test against: 'our_api' (default) or 'mem0'",
+    )
     return p.parse_args()
 
 
 def _write_output(out_path: str, results: list, elapsed: float, data_path: str) -> None:
+    all_ingest = [d for r in results for d in r.get("ingest_durations", [])]
+    all_recall = [d for r in results for d in r.get("recall_durations", [])]
+
+    timing = {
+        "total_ingest_duration_seconds": round(sum(all_ingest), 3),
+        "avg_ingest_duration_seconds": round(sum(all_ingest) / len(all_ingest), 3) if all_ingest else 0,
+        "total_recall_duration_seconds": round(sum(all_recall), 3),
+        "avg_recall_duration_seconds": round(sum(all_recall) / len(all_recall), 3) if all_recall else 0,
+    }
+
+    # Strip the raw duration lists from the per-conversation output to keep it clean
+    conversations = [
+        {k: v for k, v in r.items() if k not in ("ingest_durations", "recall_durations")}
+        for r in results
+    ]
+
     output = {
         "dataset": Path(data_path).stem,
         "elapsed_seconds": round(elapsed, 1),
-        "conversations": list(results),
+        "timing": timing,
+        "conversations": conversations,
     }
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
@@ -361,9 +399,16 @@ def _write_output(out_path: str, results: list, elapsed: float, data_path: str) 
 async def main() -> None:
     args = parse_args()
 
-    api_url = os.environ.get("MEMORY_API_URL", "http://localhost:8080")
-    api_key = os.environ["MEMORY_API_KEY"]
-    agent_id = os.environ["MEMORY_AGENT_ID"]
+    if args.target == "mem0":
+        mem0_api_key = os.environ["MEM0_API_KEY"]
+        api_url = ""
+        api_key = ""
+        agent_id = ""
+    else:
+        api_url = os.environ.get("MEMORY_API_URL", "http://localhost:8080")
+        api_key = os.environ["MEMORY_API_KEY"]
+        agent_id = os.environ["MEMORY_AGENT_ID"]
+        mem0_api_key = ""
 
     samples = load_dataset(Path(args.data))
     if args.start:
@@ -386,7 +431,10 @@ async def main() -> None:
     print(f"  total QAs   : {total_qa}")
     print(f"  concurrency : {args.concurrency}")
     print(f"  judge       : {'disabled (--no-judge)' if args.no_judge else 'enabled'}")
-    print(f"  API         : {api_url}  agent={agent_id}")
+    if args.target == "mem0":
+        print(f"  API         : mem0 (https://api.mem0.ai/v3)")
+    else:
+        print(f"  API         : {api_url}  agent={agent_id}")
     print("=" * 60 + "\n")
 
     evaluator: Evaluator | None = None
@@ -401,8 +449,14 @@ async def main() -> None:
     start = time.time()
     results: list[dict] = []
 
+    client_ctx = (
+        Mem0APIClient(mem0_api_key)
+        if args.target == "mem0"
+        else MemoryAPIClient(api_url, api_key, agent_id)
+    )
+
     try:
-        async with MemoryAPIClient(api_url, api_key, agent_id) as client:
+        async with client_ctx as client:
             tasks = [
                 evaluate_sample(sample, client, evaluator, semaphore, reuse_thread_id=args.reuse_thread)
                 for sample in samples

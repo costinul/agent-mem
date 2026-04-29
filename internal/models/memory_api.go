@@ -28,16 +28,27 @@ type InputItem struct {
 // API — Output
 // =====================
 
+// DurationStats holds cumulative timing information for a single memory operation.
+type DurationStats struct {
+	DBMs    int64 `json:"db_ms"`
+	DBCalls int   `json:"db_calls"`
+	AIMs    int64 `json:"ai_ms"`
+	AICalls int   `json:"ai_calls"`
+}
+
 // WriteOutput is the acknowledgement returned by contextual/factual write pipelines.
 // Writes are fire-and-forget: the caller delegates fact extraction/storage to the
 // memory manager and does not receive the resulting facts. Use the recall or
 // fact-listing endpoints to inspect what is stored.
-type WriteOutput struct{}
+type WriteOutput struct {
+	Duration DurationStats `json:"duration"`
+}
 
 // RecallOutput is the response from the recall (read-only retrieval) endpoint.
 type RecallOutput struct {
-	Facts []ReturnedFact `json:"facts"`
-	Debug *RecallDebug   `json:"debug,omitempty"`
+	Facts    []ReturnedFact `json:"facts"`
+	Duration DurationStats  `json:"duration"`
+	Debug    *RecallDebug   `json:"debug,omitempty"`
 }
 
 // RecallDebug holds verbose diagnostic information emitted only when the API key has debug=true.

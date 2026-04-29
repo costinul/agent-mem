@@ -28,6 +28,9 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 		return models.RecallOutput{}, errs.NewValidation("query is required")
 	}
 
+	tracker := &CallTracker{}
+	ctx = withTracker(ctx, tracker)
+
 	eventDate := time.Now().UTC()
 	if input.EventDate != nil {
 		eventDate = input.EventDate.UTC()
@@ -153,7 +156,12 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 		}
 	}
 
-	return e.buildRecallOutput(ctx, input, selected, dbg)
+	out, err := e.buildRecallOutput(ctx, input, selected, dbg)
+	if err != nil {
+		return models.RecallOutput{}, err
+	}
+	out.Duration = tracker.Stats()
+	return out, nil
 }
 
 // expandBySource augments the candidate set with facts that share a source_id with any

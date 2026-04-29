@@ -933,7 +933,8 @@ func (h *Handler) playgroundContextual(w http.ResponseWriter, r *http.Request) {
 		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Contextual", Error: fmt.Sprintf("engine error: %v", err)})
 		return
 	}
-	_ = out
+	d := out.Duration
+	slog.Info("playground contextual duration", "db_ms", d.DBMs, "db_calls", d.DBCalls, "ai_ms", d.AIMs, "ai_calls", d.AICalls)
 	h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Contextual", NewThreadID: newThreadID})
 }
 
@@ -965,7 +966,8 @@ func (h *Handler) playgroundFactual(w http.ResponseWriter, r *http.Request) {
 		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Factual", Error: fmt.Sprintf("engine error: %v", err)})
 		return
 	}
-	_ = out
+	d := out.Duration
+	slog.Info("playground factual duration", "db_ms", d.DBMs, "db_calls", d.DBCalls, "ai_ms", d.AIMs, "ai_calls", d.AICalls)
 	h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Factual", NewThreadID: newThreadID})
 }
 
@@ -1016,6 +1018,8 @@ func (h *Handler) playgroundRecall(w http.ResponseWriter, r *http.Request) {
 		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Recall", Error: fmt.Sprintf("engine error: %v", err)})
 		return
 	}
+	d := out.Duration
+	slog.Info("playground recall duration", "db_ms", d.DBMs, "db_calls", d.DBCalls, "ai_ms", d.AIMs, "ai_calls", d.AICalls)
 	h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Recall", Facts: out.Facts})
 }
 
