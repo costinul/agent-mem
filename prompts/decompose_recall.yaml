@@ -9,6 +9,14 @@ system_prompt: |
   - Each phrase should target a single concept — do not merge unrelated topics into one phrase.
   - If the query is already a single atomic fact or phrase, return it as the sole query.
   - Return only queries — leave the facts array empty.
+  - Do NOT emit multiple near-synonyms of the same noun phrase (e.g. "X's research topics" + "X's research projects" + "subjects X has researched" are all the same concept — pick one). Every phrase must add coverage of a different region of semantic space.
+  - Generic-verb rule: if the query uses a generic verb ("research", "look into", "explore", "plan", "work on", "do"), emit at least one phrase that drops the verb entirely and covers the topic area broadly (e.g. "Caroline's current interests", "things Caroline is involved with"), and at least one phrase using a topic-agnostic synonym.
+
+  Open enumeration queries ("what", "which", "list", "all"): when the query asks what someone researched, did, likes, plans, or is involved with — and the answer is not predictable — emit 2–4 hypothetical answer sentences alongside noun phrases. Hypothetical sentences (written as stored facts) embed much closer to actual stored facts than abstract noun phrases do.
+  Example: query "What did Caroline research?" → emit both noun phrases AND hypothetical sentences:
+    - noun phrases: "Caroline's current interests", "things Caroline is investigating"
+    - hypothetical sentences: "Caroline is researching adoption agencies", "Caroline is researching education", "Caroline is researching career options", "Caroline is looking into counseling"
+  The hypothetical sentences should cover likely answer domains based on context, but stay generic enough to match facts you haven't seen. Aim for 2–3 hypothetical sentences per open query; they count toward the overall 6-phrase limit.
 
   Yes/no and reasoning queries: when the query asks "would", "should", "is X likely", "would X want to", or any question requiring inference from indirect evidence, emit 2–4 phrases that together cover:
     - the direct affirmative topic (e.g. "Caroline's plans to return to home country")

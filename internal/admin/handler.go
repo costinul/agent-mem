@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -94,6 +95,20 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, adminMw func(http.Handler) 
 	mux.Handle("/admin/", adminMw(protected))
 }
 
+// eventRow aggregates an Event with its Sources for display in the thread detail page.
+type eventRow struct {
+	models.Event
+	Sources    []models.Source
+	SourceText string // concatenated content from all sources for filtering
+}
+
+// factsFilter carries active filter state for the facts section.
+type factsFilter struct {
+	Query        string
+	SourceFilter string
+	EventID      string
+}
+
 type pageData struct {
 	Title string
 	Nav   string
@@ -108,8 +123,8 @@ type pageData struct {
 	Agents        []models.Agent
 	Threads       []models.Thread
 	Thread        *models.Thread
-	Events        []models.Event
-	Facts         []models.Fact
+	EventRows     []eventRow
+	FactRows      []factRow
 	Users         []models.User
 	FilterAccount string
 	FilterAgent   string
@@ -481,7 +496,6 @@ func (h *Handler) listThreads(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) threadDetail(w http.ResponseWriter, r *http.Request) {
 	threadID := r.PathValue("id")
 
-	// We need to find the thread across all accounts for admin view
 	threads, err := h.agentRepo.ListAllThreads(r.Context(), "", nil)
 	if err != nil {
 		http.Error(w, "failed to list threads", http.StatusInternalServerError)
@@ -499,10 +513,10 @@ func (h *Handler) threadDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	events, err := h.memoryRepo.ListEventsByThreadID(r.Context(), threadID)
+	evRows, err := h.loadEventRows(r.Context(), threadID)
 	if err != nil {
-		slog.Error("list events", "error", err)
-		http.Error(w, "failed to list events", http.StatusInternalServerError)
+		slog.Error("load event rows", "error", err)
+		http.Error(w, "failed to load events", http.StatusInternalServerError)
 		return
 	}
 
@@ -512,11 +526,15 @@ func (h *Handler) threadDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to list facts", http.StatusInternalServerError)
 		return
 	}
+	factRows := make([]factRow, len(facts))
+	for i, f := range facts {
+		factRows[i] = factRow{Fact: f}
+	}
 
 	data := h.page(r, "Thread Detail", "threads")
 	data.Thread = thread
-	data.Events = events
-	data.Facts = facts
+	data.EventRows = evRows
+	data.FactRows = factRows
 	h.render(w, "thread_detail.html", data)
 }
 
@@ -540,9 +558,92 @@ type factRow struct {
 	Score string // formatted score, or "" if not scored
 }
 
+// loadEventRows fetches all events for a thread and augments each with its sources
+// and a concatenated source text string used for wildcard filtering.
+func (h *Handler) loadEventRows(ctx context.Context, threadID string) ([]eventRow, error) {
+	events, err := h.memoryRepo.ListEventsByThreadID(ctx, threadID)
+	if err != nil {
+		return nil, err
+	}
+	rows := make([]eventRow, 0, len(events))
+	for _, ev := range events {
+		sources, err := h.memoryRepo.ListSourcesByEventID(ctx, ev.ID)
+		if err != nil {
+			return nil, err
+		}
+		var parts []string
+		for _, s := range sources {
+			if s.Content != nil {
+				parts = append(parts, *s.Content)
+			}
+		}
+		rows = append(rows, eventRow{
+			Event:      ev,
+			Sources:    sources,
+			SourceText: strings.Join(parts, " "),
+		})
+	}
+	return rows, nil
+}
+
+// wildcardToRegex converts a wildcard pattern (* = any chars, ? = single char) to a
+// case-insensitive anchored regexp.
+func wildcardToRegex(pattern string) *regexp.Regexp {
+	var sb strings.Builder
+	sb.WriteString("(?i)^")
+	for _, ch := range pattern {
+		switch ch {
+		case '*':
+			sb.WriteString(".*")
+		case '?':
+			sb.WriteString(".")
+		default:
+			sb.WriteString(regexp.QuoteMeta(string(ch)))
+		}
+	}
+	sb.WriteString("$")
+	return regexp.MustCompile(sb.String())
+}
+
+// resolveSourceIDs determines the set of source IDs that satisfy the active event/source
+// filter. Returns (ids, filterActive, error). When filterActive is true but ids is empty,
+// no sources matched and the fact list should be empty.
+func (h *Handler) resolveSourceIDs(ctx context.Context, threadID, sourceFilter, eventID string) ([]string, bool, error) {
+	if eventID != "" {
+		sources, err := h.memoryRepo.ListSourcesByEventID(ctx, eventID)
+		if err != nil {
+			return nil, true, err
+		}
+		ids := make([]string, len(sources))
+		for i, s := range sources {
+			ids[i] = s.ID
+		}
+		return ids, true, nil
+	}
+	if sourceFilter != "" {
+		evRows, err := h.loadEventRows(ctx, threadID)
+		if err != nil {
+			return nil, true, err
+		}
+		re := wildcardToRegex(sourceFilter)
+		var ids []string
+		for _, row := range evRows {
+			if re.MatchString(row.SourceText) {
+				for _, s := range row.Sources {
+					ids = append(ids, s.ID)
+				}
+			}
+		}
+		return ids, true, nil
+	}
+	return nil, false, nil
+}
+
 func (h *Handler) threadSimilarity(w http.ResponseWriter, r *http.Request) {
 	threadID := r.PathValue("id")
 	query := strings.TrimSpace(r.FormValue("query"))
+	sourceFilter := strings.TrimSpace(r.FormValue("source_filter"))
+	eventID := strings.TrimSpace(r.FormValue("event_id"))
 
 	threads, err := h.agentRepo.ListAllThreads(r.Context(), "", nil)
 	if err != nil {
@@ -561,15 +662,35 @@ func (h *Handler) threadSimilarity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	allFacts, err := h.memoryRepo.ListFactsByThreadID(r.Context(), threadID)
+	scopeSourceIDs, filterActive, err := h.resolveSourceIDs(r.Context(), threadID, sourceFilter, eventID)
 	if err != nil {
-		slog.Error("thread similarity list facts", "error", err)
-		http.Error(w, "failed to load facts", http.StatusInternalServerError)
+		slog.Error("resolve source IDs", "error", err)
+		http.Error(w, "failed to resolve filter", http.StatusInternalServerError)
 		return
 	}
 
+	var allFacts []models.Fact
+	if filterActive {
+		if len(scopeSourceIDs) > 0 {
+			allFacts, err = h.memoryRepo.ListFactsBySourceIDs(r.Context(), thread.AccountID, scopeSourceIDs)
+			if err != nil {
+				slog.Error("list facts by source IDs", "error", err)
+				http.Error(w, "failed to load facts", http.StatusInternalServerError)
+				return
+			}
+		}
+		// when filterActive but scopeSourceIDs is empty, no events matched → allFacts stays nil
+	} else {
+		allFacts, err = h.memoryRepo.ListFactsByThreadID(r.Context(), threadID)
+		if err != nil {
+			slog.Error("thread similarity list facts", "error", err)
+			http.Error(w, "failed to load facts", http.StatusInternalServerError)
+			return
+		}
+	}
+
 	scores := map[string]float64{}
-	if query != "" {
+	if query != "" && (!filterActive || len(scopeSourceIDs) > 0) {
 		agentID := thread.AgentID
 		tid := thread.ID
 		scored, err := h.engine.SearchWithScores(r.Context(), query, memoryrepo.SearchByEmbeddingParams{
@@ -578,6 +699,7 @@ func (h *Handler) threadSimilarity(w http.ResponseWriter, r *http.Request) {
 			ThreadID:      &tid,
 			MinSimilarity: 0,
 			Limit:         200,
+			SourceIDs:     scopeSourceIDs,
 		})
 		if err != nil {
 			slog.Error("thread similarity search", "error", err)
@@ -588,7 +710,6 @@ func (h *Handler) threadSimilarity(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Build rows sorted by score desc (scored facts first, then unsuperseded, then superseded).
 	rows := make([]factRow, 0, len(allFacts))
 	for _, f := range allFacts {
 		row := factRow{Fact: f}
@@ -598,11 +719,11 @@ func (h *Handler) threadSimilarity(w http.ResponseWriter, r *http.Request) {
 		rows = append(rows, row)
 	}
 	if len(scores) > 0 {
-		// Sort: scored facts by score desc, unscored at bottom.
 		sortFactRows(rows)
 	}
 
-	h.renderFactsSection(w, thread, rows, query)
+	filter := factsFilter{Query: query, SourceFilter: sourceFilter, EventID: eventID}
+	h.renderFactsSection(w, thread, rows, filter)
 }
 
 func sortFactRows(rows []factRow) {
@@ -623,18 +744,33 @@ func sortFactRows(rows []factRow) {
 	}
 }
 
-func (h *Handler) renderFactsSection(w http.ResponseWriter, thread *models.Thread, rows []factRow, query string) {
+func (h *Handler) renderFactsSection(w http.ResponseWriter, thread *models.Thread, rows []factRow, filter factsFilter) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	tmplStr := `{{define "facts-section"}}
 <div id="facts-section">
   <div class="flex items-center justify-between mb-3">
-    <h3 class="text-md font-semibold text-gray-800">Facts ({{len .Rows}})</h3>
+    <div class="flex items-center gap-3">
+      <h3 class="text-md font-semibold text-gray-800">Facts ({{len .Rows}})</h3>
+      {{if .EventID}}
+      <span class="inline-flex items-center gap-2 text-xs bg-amber-50 border border-amber-200 text-amber-700 rounded-full px-2.5 py-0.5">
+        Event filter active
+        <button hx-post="/admin/threads/{{.ThreadID}}/similarity"
+                hx-target="#facts-section"
+                hx-swap="outerHTML"
+                hx-include="#sim-query,#source-filter"
+                hx-vals='{"event_id": ""}'
+                class="text-blue-600 hover:underline font-medium">Reset</button>
+      </span>
+      {{end}}
+    </div>
     <form hx-post="/admin/threads/{{.ThreadID}}/similarity"
           hx-target="#facts-section"
           hx-swap="outerHTML"
           hx-indicator="#spinner-sim"
+          hx-include="#source-filter"
           class="flex gap-2 items-center">
-      <input name="query" type="text" value="{{.Query}}" placeholder="Similarity check…"
+      <input type="hidden" name="event_id" value="{{.EventID}}">
+      <input id="sim-query" name="query" type="text" value="{{.Query}}" placeholder="Similarity check…"
              class="w-64 border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
       <button type="submit"
               class="inline-flex items-center gap-1.5 bg-blue-600 text-white text-sm font-medium px-3 py-1.5 rounded-md hover:bg-blue-700 transition-colors whitespace-nowrap">
@@ -695,10 +831,16 @@ func (h *Handler) renderFactsSection(w http.ResponseWriter, thread *models.Threa
 	type data struct {
 		ThreadID string
 		Query    string
+		EventID  string
 		Rows     []factRow
 	}
 	t := template.Must(template.New("facts-section").Parse(tmplStr))
-	_ = t.ExecuteTemplate(w, "facts-section", data{ThreadID: thread.ID, Query: query, Rows: rows})
+	_ = t.ExecuteTemplate(w, "facts-section", data{
+		ThreadID: thread.ID,
+		Query:    filter.Query,
+		EventID:  filter.EventID,
+		Rows:     rows,
+	})
 }
 
 func (h *Handler) listUsers(w http.ResponseWriter, r *http.Request) {

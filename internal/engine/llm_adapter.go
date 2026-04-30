@@ -114,6 +114,30 @@ func (a *LLMAdapter) Decompose(ctx context.Context, req DecomposeRequest) (model
 	return models.Decomposition{Facts: facts}, nil
 }
 
+// DecomposeWithQueries extracts facts AND search queries from a conversational source
+// in a single LLM call. Used for unchunked conversational sources to save one round-trip.
+// The prompt is decompose_conversational (extended to produce both outputs); the output
+// schema includes both facts and queries.
+func (a *LLMAdapter) DecomposeWithQueries(ctx context.Context, req DecomposeRequest) (models.Decomposition, error) {
+	defer observeAI(ctx, "decompose_with_queries", time.Now())
+	out := &decompositionOutput{}
+	err := a.client.ExecuteAs(ctx, uuid.New(), "decompose_conversational", a.schemaModel, &bwai.PromptData{
+		Data: req,
+	}, out)
+	if err != nil {
+		return models.Decomposition{}, fmt.Errorf("decompose conversational with queries: %w", err)
+	}
+
+	facts := make([]models.ExtractedFact, len(out.Facts))
+	for i, f := range out.Facts {
+		facts[i] = f.toModel()
+	}
+	return models.Decomposition{
+		Facts:   facts,
+		Queries: out.Queries,
+	}, nil
+}
+
 // DecomposeQueries plans the search phrases used during ingest to find related stored
 // memory. Single-purpose call so the model can focus on query phrasing.
 func (a *LLMAdapter) DecomposeQueries(ctx context.Context, req DecomposeRequest) ([]models.ExtractedQuery, error) {

@@ -1,8 +1,17 @@
 name: decompose_conversational
 system_prompt: |
-  You are a memory extraction engine. Your single job is to extract atomic, self-contained facts from a conversation message. Do not produce search queries — that is a separate step handled by another prompt.
+  You are a memory extraction engine. Your job is to extract atomic, self-contained facts from a conversation message, and to produce search phrases that will be used to find existing related memory in a vector store.
+
+  ── FACT EXTRACTION ────────────────────────────────────────────────
 
   Facts must be fully self-contained — resolve all ambiguous references (pronouns, "it", "that", "the project", etc.) using the conversation context so each fact can stand alone without the original message.
+
+  Scope rule: the Reference context is provided ONLY to resolve pronouns and ambiguous references in the Message. Do NOT add attributes, qualifiers, categories, eligibility constraints, or specifications to a fact unless they are stated in the Message itself. The Message is the sole source of fact content.
+  Anti-example (scope violation):
+    Message: "Researching adoption agencies — it's been a dream to have a family and give a loving home to kids who need it."
+    Reference context mentions speaker is LGBTQ.
+    Bad: "Caroline is researching adoption agencies that specifically support LGBTQ+ individuals." ← qualifier not in Message
+    Good: "Caroline is researching adoption agencies."
 
   Preserve quantitative and intensity modifiers verbatim — words like "fully", "exclusively", "almost", "barely", "twice", "every", "never", "only", "mostly", "all", "none" carry semantic meaning and must not be normalized away or paraphrased into a weaker form. For example, "go fully remote" must become "fully remote", not just "remote".
 
@@ -27,7 +36,7 @@ system_prompt: |
   - RULE: a constraint or instruction that should always be followed (e.g. "Never use semicolons")
   - PREFERENCE: a soft preference for decisions (e.g. "User prefers Python over Java")
 
-  Hallucination guard: every proper noun (name of a person, pet, place, organization, brand, song, book, band) in your output facts must appear verbatim somewhere in the Message or Recent conversation. Do NOT invent names. If a pet is mentioned without a name, write "Melanie's pet" or "Melanie's dog" — never fabricate a name that does not appear in the input.
+  Hallucination guard: every proper noun (name of a person, pet, place, organization, brand, song, book, band) AND every qualifier (categorical, demographic, eligibility, attribute, or descriptive modifier) in your output facts must appear verbatim or as a clear paraphrase in the Message itself — not in Reference context. Do NOT invent names. Do NOT import qualifiers from prior conversation. If a pet is mentioned without a name, write "Melanie's pet" or "Melanie's dog" — never fabricate a name that does not appear in the Message.
 
   Referenced date: when a fact describes an event or state with a clear calendar date (after temporal resolution), set referenced_at to that date in ISO 8601 format (YYYY-MM-DD). For events spanning a weekend, use the Saturday. Leave referenced_at unset for timeless facts (e.g. "Caroline likes painting") and for facts whose date is unclear.
 
@@ -53,6 +62,18 @@ system_prompt: |
     Source: "I love painting." → "Melanie loves painting."
 
   Do not store relative-time words ("yesterday", "last week", "last year", "a few months ago", "recently", "soon") in fact text outside the provenance parenthetical described above. Always rewrite them to the absolute calendar date or year using the EventDate. Similarly, do not store generic descriptions ("home country", "a book", "a band") when the source names a specific proper noun — always use the actual name.
+
+  ── SEARCH PHRASES ─────────────────────────────────────────────────
+
+  Also produce concise search phrases that will be used to find existing related memory in a vector store. Each phrase should be written the way a stored fact would be worded (e.g. "Caroline's home country", "Melanie's wedding date", "user's preferred programming language"). Phrases must be self-contained: resolve pronouns and vague references using the conversation context.
+
+  Guidelines:
+  - Each phrase targets a single concept — do not merge unrelated topics into one phrase.
+  - Cover both the explicit topic of the message and any closely-related state that would help re-glue context for the same entity.
+  - Write 2 to 6 phrases. Do NOT emit multiple near-synonyms of the same noun phrase (e.g. "Caroline's research topics" + "Caroline's research projects" + "subjects Caroline has researched" are all the same — pick one).
+  - Each phrase must add coverage of a different region of semantic space.
+  - Resolve relative-time words ("yesterday", "last week", "recently") to the absolute calendar date or year using EventDate before producing phrases.
+  - Use proper nouns verbatim when present (names, places, titled works).
 prompt: |
   Source type: {{.SourceKind}}
   {{- if .EventDate}}
@@ -61,9 +82,16 @@ prompt: |
   {{- if .Author}}
   Author: {{.Author}}
   {{- end}}
+
+  Message to process:
+  {{.Content}}
+  {{- if .Author}}
+
+  When writing facts, refer to the author by name ("{{.Author}}") rather than "the user" or "the agent" (e.g. "{{.Author}} works at TechCorp" not "The user works at TechCorp").
+  {{- end}}
   {{- if .MessageHistory}}
 
-  Recent conversation:
+  Reference context (do not extract from this — use only to resolve pronouns and references in the Message above):
   {{- range .MessageHistory}}
   {{.}}
   {{- end}}
@@ -72,13 +100,6 @@ prompt: |
 
   Context from this event:
   {{.ContextHeader}}
-  {{- end}}
-
-  Message to process:
-  {{.Content}}
-  {{- if .Author}}
-
-  When writing facts, refer to the author by name ("{{.Author}}") rather than "the user" or "the agent" (e.g. "{{.Author}} works at TechCorp" not "The user works at TechCorp").
   {{- end}}
 temperature: 0.0
 max_tokens: 8192

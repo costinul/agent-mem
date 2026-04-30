@@ -332,6 +332,11 @@ func (r *InMemoryRepository) SearchFactsByEmbedding(_ context.Context, params Se
 		params.MinSimilarity = 0.65
 	}
 
+	sourceSet := make(map[string]struct{}, len(params.SourceIDs))
+	for _, id := range params.SourceIDs {
+		sourceSet[id] = struct{}{}
+	}
+
 	type candidate struct {
 		fact       models.Fact
 		similarity float64
@@ -351,6 +356,11 @@ func (r *InMemoryRepository) SearchFactsByEmbedding(_ context.Context, params Se
 		}
 		if params.ThreadID != nil {
 			if fact.ThreadID == nil || *fact.ThreadID != *params.ThreadID {
+				continue
+			}
+		}
+		if len(sourceSet) > 0 {
+			if _, ok := sourceSet[fact.SourceID]; !ok {
 				continue
 			}
 		}
@@ -389,6 +399,11 @@ func (r *InMemoryRepository) SearchFactsByEmbeddingWithScores(_ context.Context,
 		params.Limit = 20
 	}
 
+	sourceSet := make(map[string]struct{}, len(params.SourceIDs))
+	for _, id := range params.SourceIDs {
+		sourceSet[id] = struct{}{}
+	}
+
 	type candidate struct {
 		fact  models.Fact
 		score float64
@@ -408,6 +423,11 @@ func (r *InMemoryRepository) SearchFactsByEmbeddingWithScores(_ context.Context,
 		}
 		if params.ThreadID != nil {
 			if fact.ThreadID == nil || *fact.ThreadID != *params.ThreadID {
+				continue
+			}
+		}
+		if len(sourceSet) > 0 {
+			if _, ok := sourceSet[fact.SourceID]; !ok {
 				continue
 			}
 		}

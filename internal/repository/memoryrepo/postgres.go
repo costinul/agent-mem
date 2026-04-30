@@ -575,9 +575,7 @@ func (r *PostgresRepository) SearchFactsByEmbedding(ctx context.Context, params 
 		params.MinSimilarity = 0.65
 	}
 
-	rows, err := r.db.QueryContext(
-		ctx,
-		`SELECT f.id, f.account_id, f.agent_id, f.thread_id, f.source_id, f.kind, f.text,
+	q := `SELECT f.id, f.account_id, f.agent_id, f.thread_id, f.source_id, f.kind, f.text,
 		        f.referenced_at, f.created_at, f.updated_at, s.event_date
 		 FROM facts f
 		 JOIN sources s ON s.id = f.source_id
@@ -586,16 +584,15 @@ func (r *PostgresRepository) SearchFactsByEmbedding(ctx context.Context, params 
 		   AND (($3::uuid IS NULL AND f.thread_id IS NULL) OR f.thread_id = $3)
 		   AND f.embedding IS NOT NULL
 		   AND f.superseded_at IS NULL
-		   AND (1 - (f.embedding <=> $4::vector)) >= $5
-		 ORDER BY f.embedding <=> $4::vector ASC
-		 LIMIT $6`,
-		params.AccountID,
-		params.AgentID,
-		params.ThreadID,
-		vectorLiteral(params.Embedding),
-		params.MinSimilarity,
-		params.Limit,
-	)
+		   AND (1 - (f.embedding <=> $4::vector)) >= $5`
+	args := []any{params.AccountID, params.AgentID, params.ThreadID, vectorLiteral(params.Embedding), params.MinSimilarity, params.Limit}
+	if len(params.SourceIDs) > 0 {
+		q += ` AND f.source_id = ANY($7)`
+		args = append(args, pq.Array(params.SourceIDs))
+	}
+	q += ` ORDER BY f.embedding <=> $4::vector ASC LIMIT $6`
+
+	rows, err := r.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -642,9 +639,7 @@ func (r *PostgresRepository) SearchFactsByEmbeddingWithScores(ctx context.Contex
 		params.Limit = 20
 	}
 
-	rows, err := r.db.QueryContext(
-		ctx,
-		`SELECT f.id, f.account_id, f.agent_id, f.thread_id, f.source_id, f.kind, f.text,
+	q := `SELECT f.id, f.account_id, f.agent_id, f.thread_id, f.source_id, f.kind, f.text,
 		        f.referenced_at, f.created_at, f.updated_at, s.event_date,
 		        1 - (f.embedding <=> $4::vector) AS score
 		 FROM facts f
@@ -653,15 +648,15 @@ func (r *PostgresRepository) SearchFactsByEmbeddingWithScores(ctx context.Contex
 		   AND (($2::uuid IS NULL AND f.agent_id IS NULL) OR f.agent_id = $2)
 		   AND (($3::uuid IS NULL AND f.thread_id IS NULL) OR f.thread_id = $3)
 		   AND f.embedding IS NOT NULL
-		   AND f.superseded_at IS NULL
-		 ORDER BY f.embedding <=> $4::vector ASC
-		 LIMIT $5`,
-		params.AccountID,
-		params.AgentID,
-		params.ThreadID,
-		vectorLiteral(params.Embedding),
-		params.Limit,
-	)
+		   AND f.superseded_at IS NULL`
+	args := []any{params.AccountID, params.AgentID, params.ThreadID, vectorLiteral(params.Embedding), params.Limit}
+	if len(params.SourceIDs) > 0 {
+		q += ` AND f.source_id = ANY($6)`
+		args = append(args, pq.Array(params.SourceIDs))
+	}
+	q += ` ORDER BY f.embedding <=> $4::vector ASC LIMIT $5`
+
+	rows, err := r.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}

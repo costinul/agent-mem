@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	recallCandidateK    = 60
+	recallCandidateK    = 100
 	recallSiblingBudget = 35
 )
 

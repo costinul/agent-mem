@@ -24,21 +24,76 @@
 
 <!-- Events -->
 <div class="mb-8">
-    <h3 class="text-md font-semibold text-gray-800 mb-3">Events ({{len .Events}})</h3>
-    {{if .Events}}
+    <div class="flex items-center justify-between mb-3">
+        <h3 class="text-md font-semibold text-gray-800">Events ({{len .EventRows}})</h3>
+        <input id="source-filter" name="source_filter" type="text" placeholder="Filter events by source text (e.g. *hello*)"
+               oninput="filterEvents()"
+               class="w-72 border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+    </div>
+    {{if .EventRows}}
     <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <table class="w-full text-sm">
+        <table class="w-full text-sm" id="events-table">
             <thead class="bg-gray-50 border-b border-gray-200">
                 <tr>
+                    <th class="w-6 px-3 py-2"></th>
                     <th class="text-left px-4 py-2 font-medium text-gray-500">Event ID</th>
                     <th class="text-left px-4 py-2 font-medium text-gray-500">Created</th>
+                    <th class="text-left px-4 py-2 font-medium text-gray-500">Sources</th>
+                    <th class="px-4 py-2"></th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
-                {{range .Events}}
-                <tr>
+                {{range .EventRows}}
+                <tr class="event-row cursor-pointer hover:bg-gray-50"
+                    data-source-text="{{.SourceText}}"
+                    onclick="toggleEvent('{{.ID}}')">
+                    <td class="px-3 py-2 text-gray-400">
+                        <svg id="toggle-icon-{{.ID}}" class="w-3 h-3 transition-transform duration-150" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                        </svg>
+                    </td>
                     <td class="px-4 py-2 font-mono text-xs text-gray-600">{{.ID}}</td>
-                    <td class="px-4 py-2 text-gray-500">{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
+                    <td class="px-4 py-2 text-gray-500 text-xs whitespace-nowrap">{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
+                    <td class="px-4 py-2 text-xs text-gray-500 max-w-sm truncate">{{.SourceText}}</td>
+                    <td class="px-4 py-2 text-right">
+                        <button onclick="event.stopPropagation()"
+                                hx-post="/admin/threads/{{$.Thread.ID}}/similarity"
+                                hx-target="#facts-section"
+                                hx-swap="outerHTML"
+                                hx-vals='{"event_id": "{{.ID}}"}'
+                                hx-include="#sim-query,#source-filter"
+                                class="text-xs text-blue-600 hover:underline font-medium">Filter facts</button>
+                    </td>
+                </tr>
+                <tr id="event-detail-{{.ID}}" class="hidden bg-gray-50 border-t border-gray-100">
+                    <td></td>
+                    <td colspan="4" class="px-4 py-3">
+                        {{if .Sources}}
+                        <div class="space-y-2">
+                            {{range .Sources}}
+                            <div class="text-xs">
+                                <div class="flex items-center gap-2 mb-0.5">
+                                    <span class="inline-flex px-1.5 py-0.5 rounded text-xs font-medium
+                                        {{if eq (printf "%s" .Kind) "USER"}}bg-blue-100 text-blue-700
+                                        {{else if eq (printf "%s" .Kind) "AGENT"}}bg-green-100 text-green-700
+                                        {{else if eq (printf "%s" .Kind) "TOOL"}}bg-teal-100 text-teal-700
+                                        {{else if eq (printf "%s" .Kind) "SYSTEM"}}bg-gray-100 text-gray-600
+                                        {{else}}bg-purple-100 text-purple-700{{end}}">{{.Kind}}</span>
+                                    {{if .Author}}<span class="text-gray-400">by {{derefString .Author}}</span>{{end}}
+                                    <span class="text-gray-300">{{.CreatedAt.Format "15:04:05"}}</span>
+                                </div>
+                                {{if .Content}}
+                                <p class="text-gray-700 whitespace-pre-wrap pl-1">{{derefString .Content}}</p>
+                                {{else if .BucketPath}}
+                                <p class="text-gray-400 italic pl-1">file: {{derefString .BucketPath}}</p>
+                                {{end}}
+                            </div>
+                            {{end}}
+                        </div>
+                        {{else}}
+                        <p class="text-xs text-gray-400">No sources</p>
+                        {{end}}
+                    </td>
                 </tr>
                 {{end}}
             </tbody>
@@ -52,13 +107,15 @@
 <!-- Facts -->
 <div id="facts-section">
     <div class="flex items-center justify-between mb-3">
-        <h3 class="text-md font-semibold text-gray-800">Facts ({{len .Facts}})</h3>
+        <h3 class="text-md font-semibold text-gray-800">Facts ({{len .FactRows}})</h3>
         <form hx-post="/admin/threads/{{.Thread.ID}}/similarity"
               hx-target="#facts-section"
               hx-swap="outerHTML"
               hx-indicator="#spinner-sim"
+              hx-include="#source-filter"
               class="flex gap-2 items-center">
-            <input name="query" type="text" placeholder="Similarity check…"
+            <input type="hidden" name="event_id" value="">
+            <input id="sim-query" name="query" type="text" placeholder="Similarity check…"
                    class="w-64 border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
             <button type="submit"
                     class="inline-flex items-center gap-1.5 bg-blue-600 text-white text-sm font-medium px-3 py-1.5 rounded-md hover:bg-blue-700 transition-colors whitespace-nowrap">
@@ -72,7 +129,7 @@
             </button>
         </form>
     </div>
-    {{if .Facts}}
+    {{if .FactRows}}
     <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <table class="w-full text-sm">
             <thead class="bg-gray-50 border-b border-gray-200">
@@ -87,7 +144,7 @@
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
-                {{range .Facts}}
+                {{range .FactRows}}
                 <tr class="{{if .SupersededAt}}opacity-50{{end}}">
                     <td class="px-4 py-2 font-mono text-xs text-gray-600">{{.ID}}</td>
                     <td class="px-4 py-2">
@@ -110,7 +167,7 @@
                         {{if .ReferencedAt}}{{.ReferencedAt.Format "2006-01-02"}}{{else}}<span class="text-gray-300">—</span>{{end}}
                     </td>
                     <td class="px-4 py-2 text-gray-500 text-xs">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
-                    <td class="px-4 py-2 text-right font-mono text-xs text-gray-400"></td>
+                    <td class="px-4 py-2 text-right font-mono text-xs text-gray-400">{{.Score}}</td>
                 </tr>
                 {{end}}
             </tbody>
@@ -120,4 +177,52 @@
     <p class="text-sm text-gray-400">No facts</p>
     {{end}}
 </div>
+
+<script>
+function toggleEvent(id) {
+    const detail = document.getElementById('event-detail-' + id);
+    const icon = document.getElementById('toggle-icon-' + id);
+    const hidden = detail.classList.toggle('hidden');
+    icon.style.transform = hidden ? '' : 'rotate(90deg)';
+}
+
+function filterEvents() {
+    const raw = document.getElementById('source-filter').value.trim();
+    const rows = document.querySelectorAll('#events-table .event-row');
+    rows.forEach(function(row) {
+        const next = row.nextElementSibling; // detail row
+        if (!raw) {
+            row.classList.remove('hidden');
+            return;
+        }
+        const text = (row.dataset.sourceText || '').toLowerCase();
+        const pattern = raw.toLowerCase();
+        const match = wildcardMatch(pattern, text);
+        row.classList.toggle('hidden', !match);
+        // collapse hidden event detail rows
+        if (!match && next && next.id && next.id.startsWith('event-detail-')) {
+            next.classList.add('hidden');
+            const icon = next.previousElementSibling.querySelector('svg');
+            if (icon) icon.style.transform = '';
+        }
+    });
+}
+
+function wildcardMatch(pattern, text) {
+    // Convert wildcard pattern to regex: * → .*, ? → .
+    let regStr = '^';
+    for (let i = 0; i < pattern.length; i++) {
+        const c = pattern[i];
+        if (c === '*') regStr += '.*';
+        else if (c === '?') regStr += '.';
+        else regStr += c.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+    }
+    regStr += '$';
+    try {
+        return new RegExp(regStr, 'i').test(text);
+    } catch(e) {
+        return text.includes(pattern);
+    }
+}
+</script>
 {{end}}

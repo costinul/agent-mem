@@ -104,44 +104,63 @@ func (e *MemoryEngine) persistAndDecomposeSources(ctx context.Context, eventID, 
 			log.Printf("decompose chunked source=%s kind=%s chunks=%d", inserted.ID, item.Kind, len(chunks))
 		}
 
-		var allFacts []models.ExtractedFact
-		for _, chunk := range chunks {
+		var decomposition models.Decomposition
+
+		// Unchunked conversational: single combined call produces facts + queries.
+		// Chunked conversational: per-chunk fact extraction + one separate query call (old path).
+		// Non-conversational: per-chunk fact extraction only, no queries.
+		if isConversational && len(chunks) == 1 && strings.TrimSpace(item.Content) != "" {
 			req := DecomposeRequest{
-				SourceKind:    item.Kind,
-				Author:        item.Author,
-				Content:       chunk,
-				ContextHeader: contextHeader,
-				EventDate:     formattedEventDate,
-			}
-			if isConversational {
-				req.MessageHistory = msgHistory
-			}
-
-			partial, err := e.ai.Decompose(ctx, req)
-			if err != nil {
-				return nil, nil, fmt.Errorf("decompose source %s: %w", inserted.ID, err)
-			}
-			allFacts = append(allFacts, partial.Facts...)
-		}
-
-		decomposition := models.Decomposition{Facts: allFacts}
-
-		// Queries planning runs once per source, on the full content, only for conversational sources.
-		// Content sources never produce queries.
-		if isConversational && strings.TrimSpace(item.Content) != "" {
-			qReq := DecomposeRequest{
 				SourceKind:     item.Kind,
 				Author:         item.Author,
-				Content:        item.Content,
+				Content:        chunks[0],
 				ContextHeader:  contextHeader,
 				EventDate:      formattedEventDate,
 				MessageHistory: msgHistory,
 			}
-			queries, err := e.ai.DecomposeQueries(ctx, qReq)
+			combined, err := e.ai.DecomposeWithQueries(ctx, req)
 			if err != nil {
-				return nil, nil, fmt.Errorf("decompose queries source %s: %w", inserted.ID, err)
+				return nil, nil, fmt.Errorf("decompose source %s: %w", inserted.ID, err)
 			}
-			decomposition.Queries = queries
+			decomposition = combined
+		} else {
+			var allFacts []models.ExtractedFact
+			for _, chunk := range chunks {
+				req := DecomposeRequest{
+					SourceKind:    item.Kind,
+					Author:        item.Author,
+					Content:       chunk,
+					ContextHeader: contextHeader,
+					EventDate:     formattedEventDate,
+				}
+				if isConversational {
+					req.MessageHistory = msgHistory
+				}
+
+				partial, err := e.ai.Decompose(ctx, req)
+				if err != nil {
+					return nil, nil, fmt.Errorf("decompose source %s: %w", inserted.ID, err)
+				}
+				allFacts = append(allFacts, partial.Facts...)
+			}
+			decomposition.Facts = allFacts
+
+			// Separate query planning for chunked conversational sources.
+			if isConversational && strings.TrimSpace(item.Content) != "" {
+				qReq := DecomposeRequest{
+					SourceKind:     item.Kind,
+					Author:         item.Author,
+					Content:        item.Content,
+					ContextHeader:  contextHeader,
+					EventDate:      formattedEventDate,
+					MessageHistory: msgHistory,
+				}
+				queries, err := e.ai.DecomposeQueries(ctx, qReq)
+				if err != nil {
+					return nil, nil, fmt.Errorf("decompose queries source %s: %w", inserted.ID, err)
+				}
+				decomposition.Queries = queries
+			}
 		}
 
 		decompositions = append(decompositions, decomposition)

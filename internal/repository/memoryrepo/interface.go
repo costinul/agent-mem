@@ -54,4 +54,5 @@ type SearchByEmbeddingParams struct {
 	Embedding     []float64
 	MinSimilarity float64
 	Limit         int
+	SourceIDs     []string // optional; when non-empty, restricts scoring to facts from these sources
 }

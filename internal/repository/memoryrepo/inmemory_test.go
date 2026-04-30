@@ -266,6 +266,84 @@ func TestInMemorySearchFactsByEmbedding(t *testing.T) {
 	}
 }
 
+func TestSearchFactsByEmbeddingWithScores_SourceIDs(t *testing.T) {
+	repo := NewInMemory()
+	ctx := context.Background()
+
+	agentID := "agent-1"
+	threadID := "thread-1"
+
+	// Two facts on different sources.
+	_, err := repo.InsertFact(ctx, models.Fact{
+		AccountID: "acct-1",
+		AgentID:   &agentID,
+		ThreadID:  &threadID,
+		SourceID:  "src-a",
+		Kind:      models.FACT_KIND_KNOWLEDGE,
+		Text:      "fact from source A",
+		Embedding: []float64{1, 0, 0},
+	})
+	if err != nil {
+		t.Fatalf("InsertFact src-a: %v", err)
+	}
+	_, err = repo.InsertFact(ctx, models.Fact{
+		AccountID: "acct-1",
+		AgentID:   &agentID,
+		ThreadID:  &threadID,
+		SourceID:  "src-b",
+		Kind:      models.FACT_KIND_KNOWLEDGE,
+		Text:      "fact from source B",
+		Embedding: []float64{1, 0, 0},
+	})
+	if err != nil {
+		t.Fatalf("InsertFact src-b: %v", err)
+	}
+
+	params := SearchByEmbeddingParams{
+		AccountID: "acct-1",
+		AgentID:   &agentID,
+		ThreadID:  &threadID,
+		Embedding: []float64{1, 0, 0},
+		Limit:     10,
+		SourceIDs: []string{"src-a"},
+	}
+
+	// WithScores variant.
+	scored, err := repo.SearchFactsByEmbeddingWithScores(ctx, params)
+	if err != nil {
+		t.Fatalf("SearchFactsByEmbeddingWithScores() error = %v", err)
+	}
+	if len(scored) != 1 {
+		t.Fatalf("SearchFactsByEmbeddingWithScores() len = %d, want 1", len(scored))
+	}
+	if scored[0].SourceID != "src-a" {
+		t.Fatalf("SearchFactsByEmbeddingWithScores() source = %q, want src-a", scored[0].SourceID)
+	}
+
+	// Plain search variant.
+	params.MinSimilarity = 0.5
+	plain, err := repo.SearchFactsByEmbedding(ctx, params)
+	if err != nil {
+		t.Fatalf("SearchFactsByEmbedding() error = %v", err)
+	}
+	if len(plain) != 1 {
+		t.Fatalf("SearchFactsByEmbedding() len = %d, want 1", len(plain))
+	}
+	if plain[0].SourceID != "src-a" {
+		t.Fatalf("SearchFactsByEmbedding() source = %q, want src-a", plain[0].SourceID)
+	}
+
+	// Empty SourceIDs → both facts returned.
+	params.SourceIDs = nil
+	all, err := repo.SearchFactsByEmbeddingWithScores(ctx, params)
+	if err != nil {
+		t.Fatalf("SearchFactsByEmbeddingWithScores(no filter) error = %v", err)
+	}
+	if len(all) != 2 {
+		t.Fatalf("SearchFactsByEmbeddingWithScores(no filter) len = %d, want 2", len(all))
+	}
+}
+
 func TestInMemorySourceAuthor(t *testing.T) {
 	repo := NewInMemory()
 	ctx := context.Background()

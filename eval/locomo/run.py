@@ -55,6 +55,7 @@ import urllib.request
 from collections import defaultdict
 from pathlib import Path
 from datetime import timezone
+from typing import Awaitable, Callable, TypeVar
 from dotenv import load_dotenv
 
 try:
@@ -78,6 +79,9 @@ LOCOMO_DATA_URL = (
 DATA_DEFAULT = Path(__file__).parent / "data" / "locomo10.json"
 
 _PREVIEW_LEN = 80
+_MAX_RETRIES = 3
+_RETRY_WAIT_SECONDS = 5.0
+_T = TypeVar("_T")
 
 
 def _parse_session_datetime(raw: str | None) -> str | None:
@@ -144,6 +148,37 @@ def _preview(text: str) -> str:
 
 # ── evaluation logic ───────────────────────────────────────────────────────────
 
+async def _run_with_retries(
+    label: str,
+    sample_id: str,
+    action: Callable[[], Awaitable[_T]],
+    retries: int = _MAX_RETRIES,
+    wait_seconds: float = _RETRY_WAIT_SECONDS,
+) -> tuple[_T | None, float | None, int, int, Exception | None]:
+    attempts = retries + 1
+    transient_errors = 0
+    for attempt in range(1, attempts + 1):
+        try:
+            started = time.time()
+            result = await action()
+            return result, time.time() - started, transient_errors, 0, None
+        except Exception as exc:
+            if attempt < attempts:
+                transient_errors += 1
+                print(
+                    f"  [WARN] {label} error in sample {sample_id} (attempt {attempt}/{attempts}): {exc}. "
+                    f"Retrying in {wait_seconds:.0f}s...",
+                    flush=True,
+                )
+                await asyncio.sleep(wait_seconds)
+                continue
+            print(
+                f"  [WARN] {label} error in sample {sample_id} (attempt {attempt}/{attempts}): {exc}",
+                flush=True,
+            )
+            return None, None, 0, 1, exc
+    return None, None, 0, 1, RuntimeError("unreachable retry state")
+
 async def evaluate_sample(
     sample: dict,
     client: MemoryAPIClient | Mem0APIClient,
@@ -166,6 +201,8 @@ async def evaluate_sample(
 
     ingest_durations: list[float] = []
     recall_durations: list[float] = []
+    soft_errors = 0
+    hard_errors = 0
 
     async with semaphore:
         if not reuse_thread_id:
@@ -194,19 +231,22 @@ async def evaluate_sample(
                         f" {role}: \"{_preview(text)}\"{suffix}",
                         flush=True,
                     )
-                    try:
-                        t0_ingest = time.time()
-                        await client.ingest(
+                    _, ingest_elapsed, soft_inc, hard_inc, _ = await _run_with_retries(
+                        label=f"ingest ({session_key} turn {ingested}/{total_turns})",
+                        sample_id=sample_id,
+                        action=lambda: client.ingest(
                             thread_id,
                             role,
                             text,
                             author=turn.get("speaker") or None,
                             when=session_iso,
                             image_caption=blip,
-                        )
-                        ingest_durations.append(time.time() - t0_ingest)
-                    except Exception as exc:
-                        print(f"  [WARN] ingest error in sample {sample_id}: {exc}", flush=True)
+                        ),
+                    )
+                    soft_errors += soft_inc
+                    hard_errors += hard_inc
+                    if hard_inc == 0 and ingest_elapsed is not None:
+                        ingest_durations.append(ingest_elapsed)
 
             ingest_elapsed = time.time() - ingest_start
             print(
@@ -241,29 +281,53 @@ async def evaluate_sample(
             )
             qa_t0 = time.time()
 
-            try:
-                t0_recall = time.time()
-                memory_output = await client.recall(thread_id, question, when=last_session_iso)
-                recall_durations.append(time.time() - t0_recall)
+            memory_output, recall_elapsed, soft_inc, hard_inc, recall_exc = await _run_with_retries(
+                label=f"recall (qa {qi}/{total_qa})",
+                sample_id=sample_id,
+                action=lambda: client.recall(thread_id, question, when=last_session_iso),
+            )
+            soft_errors += soft_inc
+            hard_errors += hard_inc
+            if hard_inc == 0 and memory_output is not None:
+                if recall_elapsed is not None:
+                    recall_durations.append(recall_elapsed)
                 facts = [f["text"] for f in memory_output.get("facts", [])]
                 recall_debug = memory_output.get("debug")
-            except Exception as exc:
-                print(f"  [WARN] query error in sample {sample_id}: {exc}", flush=True)
+            else:
                 facts = []
-                recall_debug = {"error": str(exc)}
+                recall_debug = {"error": str(recall_exc) if recall_exc else "unknown recall error"}
 
             if evaluator is None:
                 score = "skipped"
                 reason = "--no-judge"
             else:
-                try:
-                    result = await evaluator.judge(question, ground_truth, facts)
+                result, _, soft_inc, hard_inc, judge_exc = await _run_with_retries(
+                    label=f"judge (qa {qi}/{total_qa})",
+                    sample_id=sample_id,
+                    action=lambda: evaluator.judge(question, ground_truth, facts),
+                )
+                soft_errors += soft_inc
+                hard_errors += hard_inc
+                if hard_inc == 0 and result is not None:
                     score = result.score
                     reason = result.reason
-                except Exception as exc:
-                    print(f"  [WARN] judge error in sample {sample_id}: {exc}", flush=True)
+                else:
                     score = "fail"
-                    reason = str(exc)
+                    reason = str(judge_exc) if judge_exc else "unknown judge error"
+
+            if score == "fail" and evaluator is not None:
+                revised = qa.get("answer_revised")
+                if revised:
+                    retry, _, soft_inc, hard_inc, _ = await _run_with_retries(
+                        label=f"judge-revised (qa {qi}/{total_qa})",
+                        sample_id=sample_id,
+                        action=lambda: evaluator.judge(question, str(revised), facts),
+                    )
+                    soft_errors += soft_inc
+                    hard_errors += hard_inc
+                    if hard_inc == 0 and retry is not None:
+                        score = retry.score
+                        reason = retry.reason
 
             elapsed_qa = time.time() - qa_t0
             print(
@@ -293,6 +357,8 @@ async def evaluate_sample(
         "qa": qa_results,
         "ingest_durations": ingest_durations,
         "recall_durations": recall_durations,
+        "soft_errors": soft_errors,
+        "hard_errors": hard_errors,
     }
 
 
@@ -302,6 +368,8 @@ def print_summary(results: list[dict]) -> None:
     totals: dict[str, int] = defaultdict(int)
     by_category: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     failed_or_partial: list[dict] = []
+    soft_errors_total = sum(int(sample.get("soft_errors", 0)) for sample in results)
+    hard_errors_total = sum(int(sample.get("hard_errors", 0)) for sample in results)
 
     for sample in results:
         for qa in sample["qa"]:
@@ -320,12 +388,16 @@ def print_summary(results: list[dict]) -> None:
     total = sum(totals.values())
     if total == 0:
         print("No QA results.")
+        print(f"Soft errors: {soft_errors_total}")
+        print(f"Hard errors: {hard_errors_total}")
         return
 
     print("\n" + "=" * 50)
     print("EVALUATION SUMMARY")
     print("=" * 50)
     print(f"Total questions : {total}")
+    print(f"Soft errors     : {soft_errors_total}")
+    print(f"Hard errors     : {hard_errors_total}")
     for score_key in ("pass", "partial", "fail", "skipped"):
         if totals[score_key]:
             pct = 100 * totals[score_key] // total
@@ -371,6 +443,8 @@ def parse_args() -> argparse.Namespace:
 def _write_output(out_path: str, results: list, elapsed: float, data_path: str) -> None:
     all_ingest = [d for r in results for d in r.get("ingest_durations", [])]
     all_recall = [d for r in results for d in r.get("recall_durations", [])]
+    soft_errors_total = sum(int(sample.get("soft_errors", 0)) for sample in results)
+    hard_errors_total = sum(int(sample.get("hard_errors", 0)) for sample in results)
 
     timing = {
         "total_ingest_duration_seconds": round(sum(all_ingest), 3),
@@ -389,6 +463,12 @@ def _write_output(out_path: str, results: list, elapsed: float, data_path: str) 
         "dataset": Path(data_path).stem,
         "elapsed_seconds": round(elapsed, 1),
         "timing": timing,
+        "error_stats": {
+            "soft_errors": soft_errors_total,
+            "hard_errors": hard_errors_total,
+            "max_retries": _MAX_RETRIES,
+            "retry_wait_seconds": _RETRY_WAIT_SECONDS,
+        },
         "conversations": conversations,
     }
     with open(out_path, "w", encoding="utf-8") as f:
