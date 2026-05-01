@@ -71,25 +71,27 @@ class MemoryAPIClient:
             when: ISO 8601 timestamp string for when the message was produced.
                   Sent as event_date; used to resolve relative dates in fact extraction.
             image_caption: Optional description of an image attached to this turn.
-                  When set, sent as a coordinated second InputItem under the same
-                  EventDate / role / author so the decomposer treats it as part of
-                  the same conversational moment.
+                  Inlined into the same InputItem as the text (rather than a
+                  separate item) so the decomposer sees text + image as one
+                  coherent message in a single LLM call. A separate item gets
+                  decomposed in isolation and the BLIP caption — the only place
+                  some descriptive attributes appear (e.g. "sunset with a pink
+                  sky") — can get dropped.
         """
         kind = _ROLE_TO_KIND.get(role.lower(), role.upper())
 
-        def _make_item(text: str) -> dict:
-            it: dict = {"kind": kind, "content": text, "content_type": "text/plain"}
-            if author:
-                it["author"] = author
-            if when:
-                it["event_date"] = when
-            return it
-
-        items: list[dict] = [_make_item(content)]
+        text = content
         if image_caption:
-            items.append(_make_item(f"[image attached: {image_caption}]"))
+            attribution = author or "speaker"
+            text = f"{content}\n\n[{attribution} shared an image: {image_caption}]"
 
-        payload = {"thread_id": thread_id, "inputs": items}
+        item: dict = {"kind": kind, "content": text, "content_type": "text/plain"}
+        if author:
+            item["author"] = author
+        if when:
+            item["event_date"] = when
+
+        payload = {"thread_id": thread_id, "inputs": [item]}
         resp = await self._client_or_raise().post(f"{self.base_url}/memory/contextual", json=payload)
         self._raise_with_body(resp)
         return resp.json()

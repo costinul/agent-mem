@@ -1077,7 +1077,7 @@ func (h *Handler) playgroundContextual(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d := out.Duration
-	slog.Info("playground contextual duration", "db_ms", d.DBMs, "db_calls", d.DBCalls, "ai_ms", d.AIMs, "ai_calls", d.AICalls)
+	slog.Info("playground contextual duration", "db_ms", d.DBMs, "db_calls", d.DBCalls, "llm_ms", d.LLMMs, "llm_calls", d.LLMCalls, "embed_ms", d.EmbedMs, "embed_calls", d.EmbedCalls)
 	h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Contextual", NewThreadID: newThreadID})
 }
 
@@ -1110,7 +1110,7 @@ func (h *Handler) playgroundFactual(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d := out.Duration
-	slog.Info("playground factual duration", "db_ms", d.DBMs, "db_calls", d.DBCalls, "ai_ms", d.AIMs, "ai_calls", d.AICalls)
+	slog.Info("playground factual duration", "db_ms", d.DBMs, "db_calls", d.DBCalls, "llm_ms", d.LLMMs, "llm_calls", d.LLMCalls, "embed_ms", d.EmbedMs, "embed_calls", d.EmbedCalls)
 	h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Factual", NewThreadID: newThreadID})
 }
 
@@ -1163,7 +1163,7 @@ func (h *Handler) playgroundRecall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d := out.Duration
-	slog.Info("playground recall duration", "db_ms", d.DBMs, "db_calls", d.DBCalls, "ai_ms", d.AIMs, "ai_calls", d.AICalls)
+	slog.Info("playground recall duration", "db_ms", d.DBMs, "db_calls", d.DBCalls, "llm_ms", d.LLMMs, "llm_calls", d.LLMCalls, "embed_ms", d.EmbedMs, "embed_calls", d.EmbedCalls)
 	h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Recall", Facts: out.Facts, Debug: out.Debug})
 }
 

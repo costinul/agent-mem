@@ -60,11 +60,19 @@ func NewLLMAdapter(client *bwaiclient.BWAIClient, schemaModel, embeddingModel st
 	}
 }
 
-func observeAI(ctx context.Context, op string, start time.Time) {
+func observeLLM(ctx context.Context, op string, start time.Time) {
 	elapsed := time.Since(start)
-	log.Printf("ai call op=%s duration=%dms", op, elapsed.Milliseconds())
+	log.Printf("llm call op=%s duration=%dms", op, elapsed.Milliseconds())
 	if t := getTracker(ctx); t != nil {
-		t.addAI(elapsed)
+		t.addLLM(elapsed)
+	}
+}
+
+func observeEmbed(ctx context.Context, start time.Time) {
+	elapsed := time.Since(start)
+	log.Printf("embed call duration=%dms", elapsed.Milliseconds())
+	if t := getTracker(ctx); t != nil {
+		t.addEmbed(elapsed)
 	}
 }
 
@@ -73,7 +81,7 @@ func (a *LLMAdapter) Embed(ctx context.Context, texts []string) ([][]float64, er
 	if len(texts) == 0 {
 		return nil, nil
 	}
-	defer observeAI(ctx, "embed", time.Now())
+	defer observeEmbed(ctx, time.Now())
 	raw, err := a.client.GetEmbeddings(ctx, uuid.New(), a.embeddingModel, texts)
 	if err != nil {
 		return nil, fmt.Errorf("get embeddings: %w", err)
@@ -93,7 +101,7 @@ func (a *LLMAdapter) Embed(ctx context.Context, texts []string) ([][]float64, er
 // DecomposeQueries in a separate, single-purpose call so that fact extraction does
 // not have to share attention with query planning.
 func (a *LLMAdapter) Decompose(ctx context.Context, req DecomposeRequest) (models.Decomposition, error) {
-	defer observeAI(ctx, "decompose", time.Now())
+	defer observeLLM(ctx, "decompose", time.Now())
 	promptName := "decompose_content"
 	if req.SourceKind == models.SOURCE_USER || req.SourceKind == models.SOURCE_AGENT {
 		promptName = "decompose_conversational"
@@ -119,7 +127,7 @@ func (a *LLMAdapter) Decompose(ctx context.Context, req DecomposeRequest) (model
 // The prompt is decompose_conversational (extended to produce both outputs); the output
 // schema includes both facts and queries.
 func (a *LLMAdapter) DecomposeWithQueries(ctx context.Context, req DecomposeRequest) (models.Decomposition, error) {
-	defer observeAI(ctx, "decompose_with_queries", time.Now())
+	defer observeLLM(ctx, "decompose_with_queries", time.Now())
 	out := &decompositionOutput{}
 	err := a.client.ExecuteAs(ctx, uuid.New(), "decompose_conversational", a.schemaModel, &bwai.PromptData{
 		Data: req,
@@ -141,7 +149,7 @@ func (a *LLMAdapter) DecomposeWithQueries(ctx context.Context, req DecomposeRequ
 // DecomposeQueries plans the search phrases used during ingest to find related stored
 // memory. Single-purpose call so the model can focus on query phrasing.
 func (a *LLMAdapter) DecomposeQueries(ctx context.Context, req DecomposeRequest) ([]models.ExtractedQuery, error) {
-	defer observeAI(ctx, "decompose_queries", time.Now())
+	defer observeLLM(ctx, "decompose_queries", time.Now())
 	out := &queriesOnlyOutput{}
 	err := a.client.ExecuteAs(ctx, uuid.New(), "decompose_queries", a.schemaModel, &bwai.PromptData{
 		Data: req,
@@ -154,7 +162,7 @@ func (a *LLMAdapter) DecomposeQueries(ctx context.Context, req DecomposeRequest)
 
 // DecomposeRecall breaks a recall query into atomic search phrases via the LLM.
 func (a *LLMAdapter) DecomposeRecall(ctx context.Context, req DecomposeRecallRequest) (models.Decomposition, error) {
-	defer observeAI(ctx, "decompose_recall", time.Now())
+	defer observeLLM(ctx, "decompose_recall", time.Now())
 	out := &decompositionOutput{}
 	err := a.client.ExecuteAs(ctx, uuid.New(), "decompose_recall", a.schemaModel, &bwai.PromptData{
 		Data: req,
@@ -178,7 +186,7 @@ func (a *LLMAdapter) Evaluate(ctx context.Context, req EvaluateRequest) (models.
 	if len(req.NewFacts) == 0 && len(req.RetrievedFacts) == 0 {
 		return models.EvaluateResult{}, nil
 	}
-	defer observeAI(ctx, "evaluate", time.Now())
+	defer observeLLM(ctx, "evaluate", time.Now())
 	out := &evaluateOutput{}
 	err := a.client.ExecuteAs(ctx, uuid.New(), "evaluate", a.schemaModel, &bwai.PromptData{
 		Data: req,
@@ -238,7 +246,7 @@ func (a *LLMAdapter) SelectFacts(ctx context.Context, req SelectFactsRequest) ([
 	if len(req.Candidates) == 0 {
 		return nil, nil
 	}
-	defer observeAI(ctx, "select_facts", time.Now())
+	defer observeLLM(ctx, "select_facts", time.Now())
 
 	// Build a template-friendly representation so the prompt can access pre-formatted dates.
 	type candidateView struct {

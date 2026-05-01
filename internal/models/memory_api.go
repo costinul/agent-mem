@@ -30,10 +30,12 @@ type InputItem struct {
 
 // DurationStats holds cumulative timing information for a single memory operation.
 type DurationStats struct {
-	DBMs    int64 `json:"db_ms"`
-	DBCalls int   `json:"db_calls"`
-	AIMs    int64 `json:"ai_ms"`
-	AICalls int   `json:"ai_calls"`
+	DBMs       int64 `json:"db_ms"`
+	DBCalls    int   `json:"db_calls"`
+	LLMMs      int64 `json:"llm_ms"`
+	LLMCalls   int   `json:"llm_calls"`
+	EmbedMs    int64 `json:"embed_ms"`
+	EmbedCalls int   `json:"embed_calls"`
 }
 
 // WriteOutput is the acknowledgement returned by contextual/factual write pipelines.

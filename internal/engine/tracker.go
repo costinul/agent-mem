@@ -11,12 +11,14 @@ import (
 
 type trackerKey struct{}
 
-// CallTracker accumulates DB and AI call durations and counts for a single operation.
+// CallTracker accumulates DB, LLM, and embedding call durations and counts for a single operation.
 type CallTracker struct {
-	dbMs    atomic.Int64
-	dbCalls atomic.Int64
-	aiMs    atomic.Int64
-	aiCalls atomic.Int64
+	dbMs       atomic.Int64
+	dbCalls    atomic.Int64
+	llmMs      atomic.Int64
+	llmCalls   atomic.Int64
+	embedMs    atomic.Int64
+	embedCalls atomic.Int64
 }
 
 func (t *CallTracker) addDB(d time.Duration) {
@@ -24,17 +26,24 @@ func (t *CallTracker) addDB(d time.Duration) {
 	t.dbCalls.Add(1)
 }
 
-func (t *CallTracker) addAI(d time.Duration) {
-	t.aiMs.Add(d.Milliseconds())
-	t.aiCalls.Add(1)
+func (t *CallTracker) addLLM(d time.Duration) {
+	t.llmMs.Add(d.Milliseconds())
+	t.llmCalls.Add(1)
+}
+
+func (t *CallTracker) addEmbed(d time.Duration) {
+	t.embedMs.Add(d.Milliseconds())
+	t.embedCalls.Add(1)
 }
 
 func (t *CallTracker) Stats() models.DurationStats {
 	return models.DurationStats{
-		DBMs:    t.dbMs.Load(),
-		DBCalls: int(t.dbCalls.Load()),
-		AIMs:    t.aiMs.Load(),
-		AICalls: int(t.aiCalls.Load()),
+		DBMs:       t.dbMs.Load(),
+		DBCalls:    int(t.dbCalls.Load()),
+		LLMMs:      t.llmMs.Load(),
+		LLMCalls:   int(t.llmCalls.Load()),
+		EmbedMs:    t.embedMs.Load(),
+		EmbedCalls: int(t.embedCalls.Load()),
 	}
 }
 

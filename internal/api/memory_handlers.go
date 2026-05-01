@@ -58,7 +58,7 @@ func contextualHandler(memEngine *engine.MemoryEngine, agentSvc *agent.Service) 
 			return
 		}
 		d := output.Duration
-		log.Printf("contextual duration db=%dms db_calls=%d ai=%dms ai_calls=%d", d.DBMs, d.DBCalls, d.AIMs, d.AICalls)
+		log.Printf("contextual duration db=%dms db_calls=%d llm=%dms llm_calls=%d embed=%dms embed_calls=%d", d.DBMs, d.DBCalls, d.LLMMs, d.LLMCalls, d.EmbedMs, d.EmbedCalls)
 		writeJSON(w, http.StatusOK, output)
 	}
 }
@@ -99,7 +99,7 @@ func factualHandler(memEngine *engine.MemoryEngine, agentSvc *agent.Service) htt
 			return
 		}
 		d := output.Duration
-		log.Printf("factual duration db=%dms db_calls=%d ai=%dms ai_calls=%d", d.DBMs, d.DBCalls, d.AIMs, d.AICalls)
+		log.Printf("factual duration db=%dms db_calls=%d llm=%dms llm_calls=%d embed=%dms embed_calls=%d", d.DBMs, d.DBCalls, d.LLMMs, d.LLMCalls, d.EmbedMs, d.EmbedCalls)
 		writeJSON(w, http.StatusOK, output)
 	}
 }
@@ -149,7 +149,7 @@ func recallHandler(memEngine *engine.MemoryEngine, agentSvc *agent.Service) http
 			return
 		}
 		d := output.Duration
-		log.Printf("recall duration db=%dms db_calls=%d ai=%dms ai_calls=%d", d.DBMs, d.DBCalls, d.AIMs, d.AICalls)
+		log.Printf("recall duration db=%dms db_calls=%d llm=%dms llm_calls=%d embed=%dms embed_calls=%d", d.DBMs, d.DBCalls, d.LLMMs, d.LLMCalls, d.EmbedMs, d.EmbedCalls)
 		writeJSON(w, http.StatusOK, output)
 	}
 }
