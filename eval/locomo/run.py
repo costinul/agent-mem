@@ -476,6 +476,18 @@ def _write_output(out_path: str, results: list, elapsed: float, data_path: str) 
         "avg_recall_duration_seconds": round(sum(all_recall) / len(all_recall), 3) if all_recall else 0,
     }
 
+    # Capture models from .env
+    models = {
+        "AI_MODEL_DECOMPOSE": os.environ["AI_MODEL_DECOMPOSE"],
+        "AI_MODEL_EVALUATE": os.environ["AI_MODEL_EVALUATE"],
+        "AI_MODEL_SELECT_FACTS": os.environ["AI_MODEL_SELECT_FACTS"],
+        "AI_MODEL_DECOMPOSE_QUERIES": os.environ["AI_MODEL_DECOMPOSE_QUERIES"],
+        "AI_MODEL_DECOMPOSE_RECALL": os.environ["AI_MODEL_DECOMPOSE_RECALL"],
+        "AI_EMBEDDING_MODEL": os.environ["AI_EMBEDDING_MODEL"],
+    }
+    if os.environ.get("AI_MODEL_JUDGE"):
+        models["AI_MODEL_JUDGE"] = os.environ["AI_MODEL_JUDGE"]
+
     # Strip the raw duration lists from the per-conversation output to keep it clean
     conversations = [
         {k: v for k, v in r.items() if k not in ("ingest_durations", "recall_durations")}
@@ -487,6 +499,7 @@ def _write_output(out_path: str, results: list, elapsed: float, data_path: str) 
     output = {
         "dataset": Path(data_path).stem,
         "elapsed_seconds": round(elapsed, 1),
+        "models": models,
         "summary": summary,
         "timing": timing,
         "error_stats": {
@@ -515,6 +528,19 @@ async def main() -> None:
         api_key = os.environ["MEMORY_API_KEY"]
         agent_id = os.environ["MEMORY_AGENT_ID"]
         mem0_api_key = ""
+
+    # Ensure required AI models are set in the environment
+    required_models = [
+        "AI_MODEL_DECOMPOSE",
+        "AI_MODEL_EVALUATE",
+        "AI_MODEL_SELECT_FACTS",
+        "AI_MODEL_DECOMPOSE_QUERIES",
+        "AI_MODEL_DECOMPOSE_RECALL",
+        "AI_EMBEDDING_MODEL",
+    ]
+    missing_models = [m for m in required_models if not os.environ.get(m)]
+    if missing_models:
+        sys.exit(f"[ERROR] Missing required environment variables for models: {', '.join(missing_models)}")
 
     samples = load_dataset(Path(args.data))
     if args.start:
@@ -549,7 +575,10 @@ async def main() -> None:
         openai_endpoint = os.environ.get(
             "AZURE_OPENAI_ENDPOINT", "https://cchat-ai.cognitiveservices.azure.com/"
         )
-        evaluator = Evaluator(api_key=openai_key, endpoint=openai_endpoint)
+        judge_model = os.environ.get("AI_MODEL_JUDGE")
+        if not judge_model:
+            sys.exit("[ERROR] AI_MODEL_JUDGE environment variable is required when running with the judge.")
+        evaluator = Evaluator(api_key=openai_key, endpoint=openai_endpoint, model=judge_model)
 
     semaphore = asyncio.Semaphore(args.concurrency)
     start = time.time()

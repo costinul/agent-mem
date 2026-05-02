@@ -63,3 +63,30 @@ Add these variables to the `.env` file at the root of the repository:
 See each dataset's own `README.md` for details:
 
 - [LoCoMo](locomo/README.md) — 10 long conversations, QA benchmark
+
+## Running Evaluations
+
+Run these commands from the `eval/` directory.
+
+### Examples
+
+**Run 1 conversation (fast test):**
+```bash
+python locomo/run.py --limit 1 --out results_v18.json
+```
+
+**Run with high concurrency:**
+```bash
+python locomo/run.py --concurrency 5
+```
+
+**Reuse an existing thread (skip ingestion):**
+If you already ingested a conversation and want to iterate on the recall/judge logic without re-ingesting:
+```bash
+python locomo/run.py --limit 1 --reuse-thread <thread_id> --out debug_recall.json
+```
+
+**Skip the LLM judge (save tokens):**
+```bash
+python locomo/run.py --limit 1 --no-judge
+```

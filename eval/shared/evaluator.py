@@ -49,7 +49,7 @@ class JudgeResult:
 
 
 class Evaluator:
-    def __init__(self, api_key: str, endpoint: str, model: str = "gpt-4.1-mini"):
+    def __init__(self, api_key: str, endpoint: str, model: str):
         self._client = AsyncAzureOpenAI(
             api_key=api_key,
             azure_endpoint=endpoint,
