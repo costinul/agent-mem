@@ -45,17 +45,26 @@ type SelectFactsRequest struct {
 	Candidates []models.Fact
 }
 
+// LLMModels holds per-operation model IDs for the LLM adapter.
+type LLMModels struct {
+	Decompose        string
+	Evaluate         string
+	SelectFacts      string
+	DecomposeQueries string
+	DecomposeRecall  string
+}
+
 // LLMAdapter wraps the bwai client and exposes the three LLM operations the engine needs.
 type LLMAdapter struct {
 	client         *bwaiclient.BWAIClient
-	schemaModel    string
+	models         LLMModels
 	embeddingModel string
 }
 
-func NewLLMAdapter(client *bwaiclient.BWAIClient, schemaModel, embeddingModel string) *LLMAdapter {
+func NewLLMAdapter(client *bwaiclient.BWAIClient, models LLMModels, embeddingModel string) *LLMAdapter {
 	return &LLMAdapter{
 		client:         client,
-		schemaModel:    schemaModel,
+		models:         models,
 		embeddingModel: embeddingModel,
 	}
 }
@@ -108,7 +117,7 @@ func (a *LLMAdapter) Decompose(ctx context.Context, req DecomposeRequest) (model
 	}
 
 	out := &factsOnlyOutput{}
-	err := a.client.ExecuteAs(ctx, uuid.New(), promptName, a.schemaModel, &bwai.PromptData{
+	err := a.client.ExecuteAs(ctx, uuid.New(), promptName, a.models.Decompose, &bwai.PromptData{
 		Data: req,
 	}, out)
 	if err != nil {
@@ -129,7 +138,7 @@ func (a *LLMAdapter) Decompose(ctx context.Context, req DecomposeRequest) (model
 func (a *LLMAdapter) DecomposeWithQueries(ctx context.Context, req DecomposeRequest) (models.Decomposition, error) {
 	defer observeLLM(ctx, "decompose_with_queries", time.Now())
 	out := &decompositionOutput{}
-	err := a.client.ExecuteAs(ctx, uuid.New(), "decompose_conversational", a.schemaModel, &bwai.PromptData{
+	err := a.client.ExecuteAs(ctx, uuid.New(), "decompose_conversational", a.models.Decompose, &bwai.PromptData{
 		Data: req,
 	}, out)
 	if err != nil {
@@ -151,7 +160,7 @@ func (a *LLMAdapter) DecomposeWithQueries(ctx context.Context, req DecomposeRequ
 func (a *LLMAdapter) DecomposeQueries(ctx context.Context, req DecomposeRequest) ([]models.ExtractedQuery, error) {
 	defer observeLLM(ctx, "decompose_queries", time.Now())
 	out := &queriesOnlyOutput{}
-	err := a.client.ExecuteAs(ctx, uuid.New(), "decompose_queries", a.schemaModel, &bwai.PromptData{
+	err := a.client.ExecuteAs(ctx, uuid.New(), "decompose_queries", a.models.DecomposeQueries, &bwai.PromptData{
 		Data: req,
 	}, out)
 	if err != nil {
@@ -164,7 +173,7 @@ func (a *LLMAdapter) DecomposeQueries(ctx context.Context, req DecomposeRequest)
 func (a *LLMAdapter) DecomposeRecall(ctx context.Context, req DecomposeRecallRequest) (models.Decomposition, error) {
 	defer observeLLM(ctx, "decompose_recall", time.Now())
 	out := &decompositionOutput{}
-	err := a.client.ExecuteAs(ctx, uuid.New(), "decompose_recall", a.schemaModel, &bwai.PromptData{
+	err := a.client.ExecuteAs(ctx, uuid.New(), "decompose_recall", a.models.DecomposeRecall, &bwai.PromptData{
 		Data: req,
 	}, out)
 	if err != nil {
@@ -188,7 +197,7 @@ func (a *LLMAdapter) Evaluate(ctx context.Context, req EvaluateRequest) (models.
 	}
 	defer observeLLM(ctx, "evaluate", time.Now())
 	out := &evaluateOutput{}
-	err := a.client.ExecuteAs(ctx, uuid.New(), "evaluate", a.schemaModel, &bwai.PromptData{
+	err := a.client.ExecuteAs(ctx, uuid.New(), "evaluate", a.models.Evaluate, &bwai.PromptData{
 		Data: req,
 	}, out)
 	if err != nil {
@@ -278,7 +287,7 @@ func (a *LLMAdapter) SelectFacts(ctx context.Context, req SelectFactsRequest) ([
 	}
 
 	out := &selectFactsOutput{}
-	err := a.client.ExecuteAs(ctx, uuid.New(), "select_facts", a.schemaModel, &bwai.PromptData{
+	err := a.client.ExecuteAs(ctx, uuid.New(), "select_facts", a.models.SelectFacts, &bwai.PromptData{
 		Data: td,
 	}, out)
 	if err != nil {

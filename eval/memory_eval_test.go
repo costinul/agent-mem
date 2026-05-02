@@ -41,7 +41,14 @@ func setupEngine(t *testing.T) (*engine.MemoryEngine, *memoryrepo.InMemoryReposi
 
 	client := bwaiclient.NewBWAIClient(registry, nil, nil)
 	repo := memoryrepo.NewInMemory()
-	eng := engine.NewMemoryEngine(client, repo, os.Getenv("AI_SCHEMA_MODEL"), os.Getenv("AI_EMBEDDING_MODEL"))
+	llmModels := engine.LLMModels{
+		Decompose:        os.Getenv("AI_MODEL_DECOMPOSE"),
+		Evaluate:         os.Getenv("AI_MODEL_EVALUATE"),
+		SelectFacts:      os.Getenv("AI_MODEL_SELECT_FACTS"),
+		DecomposeQueries: os.Getenv("AI_MODEL_DECOMPOSE_QUERIES"),
+		DecomposeRecall:  os.Getenv("AI_MODEL_DECOMPOSE_RECALL"),
+	}
+	eng := engine.NewMemoryEngine(client, repo, llmModels, os.Getenv("AI_EMBEDDING_MODEL"))
 	return eng, repo
 }
 

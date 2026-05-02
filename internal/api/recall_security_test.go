@@ -44,7 +44,7 @@ func recallSecurityServer(t *testing.T) (*Server, string, string) {
 		t.Fatalf("create thread B: %v", err)
 	}
 
-	memEngine := engine.NewMemoryEngine(nil, memoryrepo.NewInMemory(), "", "")
+	memEngine := engine.NewMemoryEngine(nil, memoryrepo.NewInMemory(), engine.LLMModels{}, "")
 	accountSvc := account.NewService(&mockAccountRepo{})
 	server := NewServer(memEngine, accountSvc, svc, nil)
 

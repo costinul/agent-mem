@@ -83,7 +83,14 @@ func main() {
 	bwaiClient := bwaiclient.NewBWAIClient(registry, nil, nil)
 
 	log.Println("Initializing MemoryEngine...")
-	engine := engine.NewMemoryEngine(bwaiClient, memoryRepo, cfg.AI.SchemaModel, cfg.AI.EmbeddingModel)
+	llmModels := engine.LLMModels{
+		Decompose:        cfg.AI.ModelDecompose,
+		Evaluate:         cfg.AI.ModelEvaluate,
+		SelectFacts:      cfg.AI.ModelSelectFacts,
+		DecomposeQueries: cfg.AI.ModelDecomposeQueries,
+		DecomposeRecall:  cfg.AI.ModelDecomposeRecall,
+	}
+	engine := engine.NewMemoryEngine(bwaiClient, memoryRepo, llmModels, cfg.AI.EmbeddingModel)
 
 	var adminDeps *api.AdminDeps
 	if cfg.Admin.Enabled {

@@ -364,7 +364,7 @@ async def evaluate_sample(
 
 # ── summary ────────────────────────────────────────────────────────────────────
 
-def print_summary(results: list[dict]) -> None:
+def _compute_summary(results: list[dict]) -> dict:
     totals: dict[str, int] = defaultdict(int)
     by_category: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     failed_or_partial: list[dict] = []
@@ -382,36 +382,59 @@ def print_summary(results: list[dict]) -> None:
                     "sample_id": sample["sample_id"],
                     "question": qa["question"],
                     "score": score,
-                    "reason": qa["reason"]
+                    "reason": qa["reason"],
                 })
 
     total = sum(totals.values())
+    by_category_out = {}
+    for cat, scores in sorted(by_category.items()):
+        cat_total = sum(scores.values())
+        by_category_out[cat] = {
+            "total": cat_total,
+            **{k: scores[k] for k in ("pass", "partial", "fail", "skipped") if scores[k]},
+        }
+
+    return {
+        "total_questions": total,
+        "soft_errors": soft_errors_total,
+        "hard_errors": hard_errors_total,
+        "scores": {k: totals[k] for k in ("pass", "partial", "fail", "skipped") if totals[k]},
+        "by_category": by_category_out,
+        "failed_or_partial": failed_or_partial,
+    }
+
+
+def print_summary(results: list[dict]) -> None:
+    s = _compute_summary(results)
+    total = s["total_questions"]
+
     if total == 0:
         print("No QA results.")
-        print(f"Soft errors: {soft_errors_total}")
-        print(f"Hard errors: {hard_errors_total}")
+        print(f"Soft errors: {s['soft_errors']}")
+        print(f"Hard errors: {s['hard_errors']}")
         return
 
     print("\n" + "=" * 50)
     print("EVALUATION SUMMARY")
     print("=" * 50)
     print(f"Total questions : {total}")
-    print(f"Soft errors     : {soft_errors_total}")
-    print(f"Hard errors     : {hard_errors_total}")
+    print(f"Soft errors     : {s['soft_errors']}")
+    print(f"Hard errors     : {s['hard_errors']}")
     for score_key in ("pass", "partial", "fail", "skipped"):
-        if totals[score_key]:
-            pct = 100 * totals[score_key] // total
-            print(f"  {score_key:<10}: {totals[score_key]}  ({pct}%)")
+        count = s["scores"].get(score_key, 0)
+        if count:
+            pct = 100 * count // total
+            print(f"  {score_key:<10}: {count}  ({pct}%)")
 
     print("\nBy category:")
-    for cat, scores in sorted(by_category.items()):
-        cat_total = sum(scores.values())
-        pct = 100 * scores["pass"] // cat_total if cat_total else 0
-        print(f"  {cat:<30} pass={scores['pass']}/{cat_total} ({pct}%)")
+    for cat, scores in s["by_category"].items():
+        cat_total = scores["total"]
+        pct = 100 * scores.get("pass", 0) // cat_total if cat_total else 0
+        print(f"  {cat:<30} pass={scores.get('pass', 0)}/{cat_total} ({pct}%)")
 
-    if failed_or_partial:
+    if s["failed_or_partial"]:
         print("\nFailed or Partial Reasons:")
-        for item in failed_or_partial:
+        for item in s["failed_or_partial"]:
             print(f"  [{item['sample_id']}] Q: {item['question']}")
             print(f"    Score: {item['score']}")
             print(f"    Reason: {item['reason']}")
@@ -459,9 +482,12 @@ def _write_output(out_path: str, results: list, elapsed: float, data_path: str) 
         for r in results
     ]
 
+    summary = _compute_summary(results)
+
     output = {
         "dataset": Path(data_path).stem,
         "elapsed_seconds": round(elapsed, 1),
+        "summary": summary,
         "timing": timing,
         "error_stats": {
             "soft_errors": soft_errors_total,

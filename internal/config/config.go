@@ -31,8 +31,12 @@ type DatabaseConfig struct {
 }
 
 type AIConfig struct {
-	SchemaModel    string
-	EmbeddingModel string
+	ModelDecompose        string
+	ModelEvaluate         string
+	ModelSelectFacts      string
+	ModelDecomposeQueries string
+	ModelDecomposeRecall  string
+	EmbeddingModel        string
 }
 
 func Load() (*Config, error) {
@@ -48,8 +52,12 @@ func Load() (*Config, error) {
 			PostgresDSN: strings.TrimSpace(os.Getenv("POSTGRES_DSN")),
 		},
 		AI: AIConfig{
-			SchemaModel:    os.Getenv("AI_SCHEMA_MODEL"),
-			EmbeddingModel: os.Getenv("AI_EMBEDDING_MODEL"),
+			ModelDecompose:        os.Getenv("AI_MODEL_DECOMPOSE"),
+			ModelEvaluate:         os.Getenv("AI_MODEL_EVALUATE"),
+			ModelSelectFacts:      os.Getenv("AI_MODEL_SELECT_FACTS"),
+			ModelDecomposeQueries: os.Getenv("AI_MODEL_DECOMPOSE_QUERIES"),
+			ModelDecomposeRecall:  os.Getenv("AI_MODEL_DECOMPOSE_RECALL"),
+			EmbeddingModel:        os.Getenv("AI_EMBEDDING_MODEL"),
 		},
 		Admin: AdminConfig{
 			GoogleClientID:     googleClientID,
@@ -75,8 +83,24 @@ func (c *Config) validate() error {
 		missing = append(missing, "POSTGRES_DSN")
 	}
 
-	if c.AI.SchemaModel == "" {
-		missing = append(missing, "AI_SCHEMA_MODEL")
+	if c.AI.ModelDecompose == "" {
+		missing = append(missing, "AI_MODEL_DECOMPOSE")
+	}
+
+	if c.AI.ModelEvaluate == "" {
+		missing = append(missing, "AI_MODEL_EVALUATE")
+	}
+
+	if c.AI.ModelSelectFacts == "" {
+		missing = append(missing, "AI_MODEL_SELECT_FACTS")
+	}
+
+	if c.AI.ModelDecomposeQueries == "" {
+		missing = append(missing, "AI_MODEL_DECOMPOSE_QUERIES")
+	}
+
+	if c.AI.ModelDecomposeRecall == "" {
+		missing = append(missing, "AI_MODEL_DECOMPOSE_RECALL")
 	}
 
 	if c.AI.EmbeddingModel == "" {

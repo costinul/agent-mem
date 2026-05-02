@@ -155,7 +155,7 @@ func TestWithRecoveryLogsPanicsAndReturnsInternalServerError(t *testing.T) {
 
 func newTestServer() *Server {
 	repo := memoryrepo.NewInMemory()
-	memEngine := engine.NewMemoryEngine(nil, repo, "", "")
+	memEngine := engine.NewMemoryEngine(nil, repo, engine.LLMModels{}, "")
 	accountSvc := account.NewService(&mockAccountRepo{})
 	agentSvc := agentsvc.NewService(&mockAgentRepo{})
 	return NewServer(memEngine, accountSvc, agentSvc, nil)
