@@ -179,6 +179,23 @@ async def _run_with_retries(
             return None, None, 0, 1, exc
     return None, None, 0, 1, RuntimeError("unreachable retry state")
 
+def _merge_usage(acc: dict, usage: dict | None) -> None:
+    """Accumulate token counts from a single API response usage block into acc."""
+    if not usage or not isinstance(usage, dict):
+        return
+    acc["input_tokens"] = acc.get("input_tokens", 0) + usage.get("input_tokens", 0)
+    acc["output_tokens"] = acc.get("output_tokens", 0) + usage.get("output_tokens", 0)
+    per_model = usage.get("per_model") or {}
+    if per_model:
+        if "per_model" not in acc:
+            acc["per_model"] = {}
+        for model, stats in per_model.items():
+            m = acc["per_model"].setdefault(model, {"calls": 0, "input_tokens": 0, "output_tokens": 0})
+            m["calls"] += stats.get("calls", 0)
+            m["input_tokens"] += stats.get("input_tokens", 0)
+            m["output_tokens"] += stats.get("output_tokens", 0)
+
+
 async def evaluate_sample(
     sample: dict,
     client: MemoryAPIClient | Mem0APIClient,
@@ -203,6 +220,7 @@ async def evaluate_sample(
     recall_durations: list[float] = []
     soft_errors = 0
     hard_errors = 0
+    usage: dict = {}
 
     async with semaphore:
         if not reuse_thread_id:
@@ -231,7 +249,7 @@ async def evaluate_sample(
                         f" {role}: \"{_preview(text)}\"{suffix}",
                         flush=True,
                     )
-                    _, ingest_elapsed, soft_inc, hard_inc, _ = await _run_with_retries(
+                    ingest_resp, ingest_elapsed, soft_inc, hard_inc, _ = await _run_with_retries(
                         label=f"ingest ({session_key} turn {ingested}/{total_turns})",
                         sample_id=sample_id,
                         action=lambda: client.ingest(
@@ -247,6 +265,8 @@ async def evaluate_sample(
                     hard_errors += hard_inc
                     if hard_inc == 0 and ingest_elapsed is not None:
                         ingest_durations.append(ingest_elapsed)
+                        if isinstance(ingest_resp, dict):
+                            _merge_usage(usage, ingest_resp.get("usage"))
 
             ingest_elapsed = time.time() - ingest_start
             print(
@@ -293,6 +313,7 @@ async def evaluate_sample(
                     recall_durations.append(recall_elapsed)
                 facts = [f["text"] for f in memory_output.get("facts", [])]
                 recall_debug = memory_output.get("debug")
+                _merge_usage(usage, memory_output.get("usage"))
             else:
                 facts = []
                 recall_debug = {"error": str(recall_exc) if recall_exc else "unknown recall error"}
@@ -359,6 +380,7 @@ async def evaluate_sample(
         "recall_durations": recall_durations,
         "soft_errors": soft_errors,
         "hard_errors": hard_errors,
+        "usage": usage,
     }
 
 
@@ -463,6 +485,14 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
+def _aggregate_usage(results: list) -> dict:
+    """Merge per-sample usage dicts into a single run-level usage summary."""
+    agg: dict = {}
+    for r in results:
+        _merge_usage(agg, r.get("usage"))
+    return agg
+
+
 def _write_output(out_path: str, results: list, elapsed: float, data_path: str) -> None:
     all_ingest = [d for r in results for d in r.get("ingest_durations", [])]
     all_recall = [d for r in results for d in r.get("recall_durations", [])]
@@ -495,11 +525,13 @@ def _write_output(out_path: str, results: list, elapsed: float, data_path: str) 
     ]
 
     summary = _compute_summary(results)
+    usage = _aggregate_usage(results)
 
     output = {
         "dataset": Path(data_path).stem,
         "elapsed_seconds": round(elapsed, 1),
         "models": models,
+        "usage": usage,
         "summary": summary,
         "timing": timing,
         "error_stats": {

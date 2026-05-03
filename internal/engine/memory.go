@@ -15,10 +15,10 @@ type MemoryEngine struct {
 	ai   *LLMAdapter
 }
 
-func NewMemoryEngine(client *bwaiclient.BWAIClient, repo memoryrepo.Repository, models LLMModels, embeddingModel string) *MemoryEngine {
+func NewMemoryEngine(client *bwaiclient.BWAIClient, repo memoryrepo.Repository, models LLMModels, embeddingModel string, reg *trackerRegistry) *MemoryEngine {
 	return &MemoryEngine{
 		repo: &repoWrapper{inner: repo},
-		ai:   NewLLMAdapter(client, models, embeddingModel),
+		ai:   NewLLMAdapter(client, models, embeddingModel, reg),
 	}
 }
 

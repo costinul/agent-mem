@@ -48,6 +48,7 @@ func contextualHandler(memEngine *engine.MemoryEngine, agentSvc *agent.Service) 
 			return
 		}
 		input.AccountID = accountID
+		input.Debug = debugFromContext(r.Context())
 		if err := populateAgentFromThread(r, agentSvc, &input.AgentID, input.ThreadID); err != nil {
 			writeEngineError(w, r, err)
 			return
@@ -89,6 +90,7 @@ func factualHandler(memEngine *engine.MemoryEngine, agentSvc *agent.Service) htt
 			return
 		}
 		input.AccountID = accountID
+		input.Debug = debugFromContext(r.Context())
 		if err := populateAgentFromThread(r, agentSvc, &input.AgentID, input.ThreadID); err != nil {
 			writeEngineError(w, r, err)
 			return

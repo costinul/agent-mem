@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -11,7 +12,8 @@ import (
 
 type trackerKey struct{}
 
-// CallTracker accumulates DB, LLM, and embedding call durations and counts for a single operation.
+// CallTracker accumulates DB, LLM, and embedding call durations, counts, and token usage
+// for a single API request.
 type CallTracker struct {
 	dbMs       atomic.Int64
 	dbCalls    atomic.Int64
@@ -19,6 +21,72 @@ type CallTracker struct {
 	llmCalls   atomic.Int64
 	embedMs    atomic.Int64
 	embedCalls atomic.Int64
+
+	inputTokens  atomic.Int64
+	outputTokens atomic.Int64
+
+	// perModel is populated only when debugMode is true.
+	debugMode bool
+	mu        sync.Mutex
+	perModel  map[string]*modelUsage
+}
+
+type modelUsage struct {
+	calls        int64
+	inputTokens  int64
+	outputTokens int64
+}
+
+// NewCallTracker creates a tracker. When debug is true the per-model breakdown
+// is collected; otherwise only aggregate token totals are tracked.
+func NewCallTracker(debug bool) *CallTracker {
+	t := &CallTracker{debugMode: debug}
+	if debug {
+		t.perModel = map[string]*modelUsage{}
+	}
+	return t
+}
+
+func (t *CallTracker) addTokens(model string, in, out int) {
+	t.inputTokens.Add(int64(in))
+	t.outputTokens.Add(int64(out))
+	if !t.debugMode {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	m := t.perModel[model]
+	if m == nil {
+		m = &modelUsage{}
+		t.perModel[model] = m
+	}
+	m.calls++
+	m.inputTokens += int64(in)
+	m.outputTokens += int64(out)
+}
+
+// Usage returns the token stats for the request. PerModel is non-nil only
+// when the tracker was created with debug=true.
+func (t *CallTracker) Usage() models.TokenStats {
+	s := models.TokenStats{
+		InputTokens:  t.inputTokens.Load(),
+		OutputTokens: t.outputTokens.Load(),
+	}
+	if t.debugMode {
+		t.mu.Lock()
+		defer t.mu.Unlock()
+		if len(t.perModel) > 0 {
+			s.PerModel = make(map[string]models.ModelUsage, len(t.perModel))
+			for model, u := range t.perModel {
+				s.PerModel[model] = models.ModelUsage{
+					Calls:        u.calls,
+					InputTokens:  u.inputTokens,
+					OutputTokens: u.outputTokens,
+				}
+			}
+		}
+	}
+	return s
 }
 
 func (t *CallTracker) addDB(d time.Duration) {

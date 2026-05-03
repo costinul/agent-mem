@@ -15,7 +15,7 @@ func (e *MemoryEngine) AddFactual(ctx context.Context, input models.FactualInput
 		return models.WriteOutput{}, err
 	}
 
-	tracker := &CallTracker{}
+	tracker := NewCallTracker(input.Debug)
 	ctx = withTracker(ctx, tracker)
 
 	log.Printf("factual pipeline start account=%s agent=%s thread=%s inputs=%d", input.AccountID, input.AgentID, input.ThreadID, len(input.Inputs))
@@ -64,7 +64,7 @@ func (e *MemoryEngine) AddFactual(ctx context.Context, input models.FactualInput
 	}
 
 	log.Printf("factual pipeline completed event=%s stored_facts=%d", event.ID, len(storedFacts))
-	return models.WriteOutput{Duration: tracker.Stats()}, nil
+	return models.WriteOutput{Duration: tracker.Stats(), Usage: tracker.Usage()}, nil
 }
 
 // validateFactualInput ensures all required fields for a factual memory write are present.

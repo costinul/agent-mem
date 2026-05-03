@@ -12,6 +12,7 @@ type MemoryInput struct {
 	AgentID   string      `json:"-" swaggerignore:"true"`
 	ThreadID  string      `json:"thread_id"`
 	Inputs    []InputItem `json:"inputs"`
+	Debug     bool        `json:"-" swaggerignore:"true"`
 }
 
 // InputItem is a single piece of content within one API call.
@@ -38,18 +39,35 @@ type DurationStats struct {
 	EmbedCalls int   `json:"embed_calls"`
 }
 
+// ModelUsage holds token counts for a single model within a request.
+type ModelUsage struct {
+	Calls        int64 `json:"calls"`
+	InputTokens  int64 `json:"input_tokens"`
+	OutputTokens int64 `json:"output_tokens"`
+}
+
+// TokenStats is per-request LLM token usage. Totals are always populated.
+// PerModel is non-nil only when the API key has debug=true.
+type TokenStats struct {
+	InputTokens  int64                 `json:"input_tokens"`
+	OutputTokens int64                 `json:"output_tokens"`
+	PerModel     map[string]ModelUsage `json:"per_model,omitempty"`
+}
+
 // WriteOutput is the acknowledgement returned by contextual/factual write pipelines.
 // Writes are fire-and-forget: the caller delegates fact extraction/storage to the
 // memory manager and does not receive the resulting facts. Use the recall or
 // fact-listing endpoints to inspect what is stored.
 type WriteOutput struct {
 	Duration DurationStats `json:"duration"`
+	Usage    TokenStats    `json:"usage"`
 }
 
 // RecallOutput is the response from the recall (read-only retrieval) endpoint.
 type RecallOutput struct {
 	Facts    []ReturnedFact `json:"facts"`
 	Duration DurationStats  `json:"duration"`
+	Usage    TokenStats     `json:"usage"`
 	Debug    *RecallDebug   `json:"debug,omitempty"`
 }
 
@@ -126,6 +144,7 @@ type FactualInput struct {
 	AgentID   string      `json:"-" swaggerignore:"true"`
 	ThreadID  string      `json:"thread_id"`
 	Inputs    []InputItem `json:"inputs"`
+	Debug     bool        `json:"-" swaggerignore:"true"`
 }
 
 type FactUpdateBody struct {

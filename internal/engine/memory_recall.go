@@ -28,7 +28,7 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 		return models.RecallOutput{}, errs.NewValidation("query is required")
 	}
 
-	tracker := &CallTracker{}
+	tracker := NewCallTracker(input.Debug)
 	ctx = withTracker(ctx, tracker)
 
 	eventDate := time.Now().UTC()
@@ -161,6 +161,7 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 		return models.RecallOutput{}, err
 	}
 	out.Duration = tracker.Stats()
+	out.Usage = tracker.Usage()
 	return out, nil
 }
 

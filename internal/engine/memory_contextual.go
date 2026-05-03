@@ -27,7 +27,7 @@ func (e *MemoryEngine) ProcessContextual(ctx context.Context, input models.Memor
 		return models.WriteOutput{}, err
 	}
 
-	tracker := &CallTracker{}
+	tracker := NewCallTracker(input.Debug)
 	ctx = withTracker(ctx, tracker)
 
 	log.Printf("contextual pipeline start account=%s agent=%s thread=%s inputs=%d", input.AccountID, input.AgentID, input.ThreadID, len(input.Inputs))
@@ -71,7 +71,7 @@ func (e *MemoryEngine) ProcessContextual(ctx context.Context, input models.Memor
 	}
 
 	log.Printf("contextual pipeline completed event=%s stored_facts=%d", event.ID, len(storedFacts))
-	return models.WriteOutput{Duration: tracker.Stats()}, nil
+	return models.WriteOutput{Duration: tracker.Stats(), Usage: tracker.Usage()}, nil
 }
 
 // validateContextualInput ensures all required fields for a contextual memory write are present.

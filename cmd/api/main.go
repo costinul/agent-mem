@@ -80,7 +80,12 @@ func main() {
 		log.Printf("failed to initialize model registry: %v", err)
 		os.Exit(1)
 	}
-	bwaiClient := bwaiclient.NewBWAIClient(registry, nil, nil)
+	trackerReg := engine.NewTrackerRegistry()
+	usageLogger := engine.NewCompositeUsageLogger(
+		engine.NewTrackerUsageRecorder(trackerReg),
+		// future: engine.NewBillingUsageRecorder(usageRepo) for per-account persistence
+	)
+	bwaiClient := bwaiclient.NewBWAIClient(registry, nil, usageLogger)
 
 	log.Println("Initializing MemoryEngine...")
 	llmModels := engine.LLMModels{
@@ -90,7 +95,7 @@ func main() {
 		DecomposeQueries: cfg.AI.ModelDecomposeQueries,
 		DecomposeRecall:  cfg.AI.ModelDecomposeRecall,
 	}
-	engine := engine.NewMemoryEngine(bwaiClient, memoryRepo, llmModels, cfg.AI.EmbeddingModel)
+	engine := engine.NewMemoryEngine(bwaiClient, memoryRepo, llmModels, cfg.AI.EmbeddingModel, trackerReg)
 
 	var adminDeps *api.AdminDeps
 	if cfg.Admin.Enabled {

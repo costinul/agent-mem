@@ -59,13 +59,30 @@ type LLMAdapter struct {
 	client         *bwaiclient.BWAIClient
 	models         LLMModels
 	embeddingModel string
+	trackerReg     *trackerRegistry
 }
 
-func NewLLMAdapter(client *bwaiclient.BWAIClient, models LLMModels, embeddingModel string) *LLMAdapter {
+func NewLLMAdapter(client *bwaiclient.BWAIClient, models LLMModels, embeddingModel string, reg *trackerRegistry) *LLMAdapter {
 	return &LLMAdapter{
 		client:         client,
 		models:         models,
 		embeddingModel: embeddingModel,
+		trackerReg:     reg,
+	}
+}
+
+// bind generates a refID and registers it against the in-flight CallTracker so
+// that the bwai usage logger can route token counts back to the right tracker.
+// The returned cleanup function must be deferred immediately after call.
+func (a *LLMAdapter) bind(ctx context.Context) (uuid.UUID, func()) {
+	refID := uuid.New()
+	if t := getTracker(ctx); t != nil && a.trackerReg != nil {
+		a.trackerReg.bind(refID, t)
+	}
+	return refID, func() {
+		if a.trackerReg != nil {
+			a.trackerReg.unbind(refID)
+		}
 	}
 }
 
@@ -91,7 +108,9 @@ func (a *LLMAdapter) Embed(ctx context.Context, texts []string) ([][]float64, er
 		return nil, nil
 	}
 	defer observeEmbed(ctx, time.Now())
-	raw, err := a.client.GetEmbeddings(ctx, uuid.New(), a.embeddingModel, texts)
+	refID, done := a.bind(ctx)
+	defer done()
+	raw, err := a.client.GetEmbeddings(ctx, refID, a.embeddingModel, texts)
 	if err != nil {
 		return nil, fmt.Errorf("get embeddings: %w", err)
 	}
@@ -116,8 +135,10 @@ func (a *LLMAdapter) Decompose(ctx context.Context, req DecomposeRequest) (model
 		promptName = "decompose_conversational"
 	}
 
+	refID, done := a.bind(ctx)
+	defer done()
 	out := &factsOnlyOutput{}
-	err := a.client.ExecuteAs(ctx, uuid.New(), promptName, a.models.Decompose, &bwai.PromptData{
+	err := a.client.ExecuteAs(ctx, refID, promptName, a.models.Decompose, &bwai.PromptData{
 		Data: req,
 	}, out)
 	if err != nil {
@@ -137,8 +158,10 @@ func (a *LLMAdapter) Decompose(ctx context.Context, req DecomposeRequest) (model
 // schema includes both facts and queries.
 func (a *LLMAdapter) DecomposeWithQueries(ctx context.Context, req DecomposeRequest) (models.Decomposition, error) {
 	defer observeLLM(ctx, "decompose_with_queries", time.Now())
+	refID, done := a.bind(ctx)
+	defer done()
 	out := &decompositionOutput{}
-	err := a.client.ExecuteAs(ctx, uuid.New(), "decompose_conversational", a.models.Decompose, &bwai.PromptData{
+	err := a.client.ExecuteAs(ctx, refID, "decompose_conversational", a.models.Decompose, &bwai.PromptData{
 		Data: req,
 	}, out)
 	if err != nil {
@@ -159,8 +182,10 @@ func (a *LLMAdapter) DecomposeWithQueries(ctx context.Context, req DecomposeRequ
 // memory. Single-purpose call so the model can focus on query phrasing.
 func (a *LLMAdapter) DecomposeQueries(ctx context.Context, req DecomposeRequest) ([]models.ExtractedQuery, error) {
 	defer observeLLM(ctx, "decompose_queries", time.Now())
+	refID, done := a.bind(ctx)
+	defer done()
 	out := &queriesOnlyOutput{}
-	err := a.client.ExecuteAs(ctx, uuid.New(), "decompose_queries", a.models.DecomposeQueries, &bwai.PromptData{
+	err := a.client.ExecuteAs(ctx, refID, "decompose_queries", a.models.DecomposeQueries, &bwai.PromptData{
 		Data: req,
 	}, out)
 	if err != nil {
@@ -172,8 +197,10 @@ func (a *LLMAdapter) DecomposeQueries(ctx context.Context, req DecomposeRequest)
 // DecomposeRecall breaks a recall query into atomic search phrases via the LLM.
 func (a *LLMAdapter) DecomposeRecall(ctx context.Context, req DecomposeRecallRequest) (models.Decomposition, error) {
 	defer observeLLM(ctx, "decompose_recall", time.Now())
+	refID, done := a.bind(ctx)
+	defer done()
 	out := &decompositionOutput{}
-	err := a.client.ExecuteAs(ctx, uuid.New(), "decompose_recall", a.models.DecomposeRecall, &bwai.PromptData{
+	err := a.client.ExecuteAs(ctx, refID, "decompose_recall", a.models.DecomposeRecall, &bwai.PromptData{
 		Data: req,
 	}, out)
 	if err != nil {
@@ -196,8 +223,10 @@ func (a *LLMAdapter) Evaluate(ctx context.Context, req EvaluateRequest) (models.
 		return models.EvaluateResult{}, nil
 	}
 	defer observeLLM(ctx, "evaluate", time.Now())
+	refID, done := a.bind(ctx)
+	defer done()
 	out := &evaluateOutput{}
-	err := a.client.ExecuteAs(ctx, uuid.New(), "evaluate", a.models.Evaluate, &bwai.PromptData{
+	err := a.client.ExecuteAs(ctx, refID, "evaluate", a.models.Evaluate, &bwai.PromptData{
 		Data: req,
 	}, out)
 	if err != nil {
@@ -256,6 +285,8 @@ func (a *LLMAdapter) SelectFacts(ctx context.Context, req SelectFactsRequest) ([
 		return nil, nil
 	}
 	defer observeLLM(ctx, "select_facts", time.Now())
+	refID, done := a.bind(ctx)
+	defer done()
 
 	// Build a template-friendly representation so the prompt can access pre-formatted dates.
 	type candidateView struct {
@@ -287,7 +318,7 @@ func (a *LLMAdapter) SelectFacts(ctx context.Context, req SelectFactsRequest) ([
 	}
 
 	out := &selectFactsOutput{}
-	err := a.client.ExecuteAs(ctx, uuid.New(), "select_facts", a.models.SelectFacts, &bwai.PromptData{
+	err := a.client.ExecuteAs(ctx, refID, "select_facts", a.models.SelectFacts, &bwai.PromptData{
 		Data: td,
 	}, out)
 	if err != nil {
