@@ -48,7 +48,7 @@ func setupEngine(t *testing.T) (*engine.MemoryEngine, *memoryrepo.InMemoryReposi
 		DecomposeQueries: os.Getenv("AI_MODEL_DECOMPOSE_QUERIES"),
 		DecomposeRecall:  os.Getenv("AI_MODEL_DECOMPOSE_RECALL"),
 	}
-	eng := engine.NewMemoryEngine(client, repo, llmModels, os.Getenv("AI_EMBEDDING_MODEL"))
+	eng := engine.NewMemoryEngine(client, repo, llmModels, os.Getenv("AI_EMBEDDING_MODEL"), engine.NewTrackerRegistry())
 	return eng, repo
 }
 
