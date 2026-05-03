@@ -92,7 +92,7 @@ func TestCreateGetAndDeleteThread(t *testing.T) {
 }
 
 func newAgentTestServer() *Server {
-	memEngine := engine.NewMemoryEngine(nil, memoryrepo.NewInMemory(), engine.LLMModels{}, "")
+	memEngine := engine.NewMemoryEngine(nil, memoryrepo.NewInMemory(), engine.LLMModels{}, "", engine.NewTrackerRegistry())
 	accountSvc := account.NewService(&mockAccountRepo{})
 	agentSvc := agentsvc.NewService(newStatefulAgentRepo())
 	return NewServer(memEngine, accountSvc, agentSvc, nil)
