@@ -202,6 +202,7 @@ async def evaluate_sample(
     evaluator: Evaluator | None,
     semaphore: asyncio.Semaphore,
     reuse_thread_id: str | None = None,
+    recall_mode: str = "standard",
 ) -> dict:
     sample_id = str(sample["sample_id"])
     if reuse_thread_id:
@@ -304,7 +305,7 @@ async def evaluate_sample(
             memory_output, recall_elapsed, soft_inc, hard_inc, recall_exc = await _run_with_retries(
                 label=f"recall (qa {qi}/{total_qa})",
                 sample_id=sample_id,
-                action=lambda: client.recall(thread_id, question, when=last_session_iso),
+                action=lambda: client.recall(thread_id, question, when=last_session_iso, light=(recall_mode == "light")),
             )
             soft_errors += soft_inc
             hard_errors += hard_inc
@@ -482,6 +483,12 @@ def parse_args() -> argparse.Namespace:
         default="our_api",
         help="Target API to test against: 'our_api' (default) or 'mem0'",
     )
+    p.add_argument(
+        "--mode",
+        choices=["standard", "light"],
+        default="standard",
+        help="Recall mode: 'standard' (default, with query decomposition) or 'light' (cheaper, embedding-only retrieval)",
+    )
     return p.parse_args()
 
 
@@ -493,7 +500,7 @@ def _aggregate_usage(results: list) -> dict:
     return agg
 
 
-def _write_output(out_path: str, results: list, elapsed: float, data_path: str) -> None:
+def _write_output(out_path: str, results: list, elapsed: float, data_path: str, recall_mode: str = "standard") -> None:
     all_ingest = [d for r in results for d in r.get("ingest_durations", [])]
     all_recall = [d for r in results for d in r.get("recall_durations", [])]
     soft_errors_total = sum(int(sample.get("soft_errors", 0)) for sample in results)
@@ -530,6 +537,7 @@ def _write_output(out_path: str, results: list, elapsed: float, data_path: str) 
     output = {
         "dataset": Path(data_path).stem,
         "elapsed_seconds": round(elapsed, 1),
+        "recall_mode": recall_mode,
         "models": models,
         "usage": usage,
         "summary": summary,
@@ -594,6 +602,7 @@ async def main() -> None:
     print(f"  total turns : {total_turns}")
     print(f"  total QAs   : {total_qa}")
     print(f"  concurrency : {args.concurrency}")
+    print(f"  recall mode : {args.mode}")
     print(f"  judge       : {'disabled (--no-judge)' if args.no_judge else 'enabled'}")
     if args.target == "mem0":
         print(f"  API         : mem0 (https://api.mem0.ai/v3)")
@@ -625,7 +634,7 @@ async def main() -> None:
     try:
         async with client_ctx as client:
             tasks = [
-                evaluate_sample(sample, client, evaluator, semaphore, reuse_thread_id=args.reuse_thread)
+                evaluate_sample(sample, client, evaluator, semaphore, reuse_thread_id=args.reuse_thread, recall_mode=args.mode)
                 for sample in samples
             ]
             raw = await asyncio.gather(*tasks, return_exceptions=True)
@@ -640,7 +649,7 @@ async def main() -> None:
         print(f"\n[ERROR] run aborted: {exc!r}. Writing partial results…", flush=True)
     finally:
         elapsed = time.time() - start
-        _write_output(args.out, results, elapsed, args.data)
+        _write_output(args.out, results, elapsed, args.data, recall_mode=args.mode)
         print_summary(results)
 
     if args.cleanup:

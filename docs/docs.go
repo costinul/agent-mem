@@ -469,14 +469,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/memory/contextual": {
+        "/memory": {
             "post": {
                 "security": [
                     {
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Process input through the contextual smart pipeline to store, update, and evolve facts.",
+                "description": "Process input through the memory pipeline to store, update, and evolve facts.",
                 "consumes": [
                     "application/json"
                 ],
@@ -486,7 +486,7 @@ const docTemplate = `{
                 "tags": [
                     "memory"
                 ],
-                "summary": "Process Contextual Memory",
+                "summary": "Add Memory",
                 "parameters": [
                     {
                         "description": "Memory Input",
@@ -495,63 +495,6 @@ const docTemplate = `{
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/memory.MemoryInput"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/memory.WriteOutput"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiError"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiError"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/api.apiError"
-                        }
-                    }
-                }
-            }
-        },
-        "/memory/factual": {
-            "post": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Process input through the factual pipeline to store, update, and evolve facts (no conversation context).",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "memory"
-                ],
-                "summary": "Add Factual Memory",
-                "parameters": [
-                    {
-                        "description": "Factual Input",
-                        "name": "input",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/memory.FactualInput"
                         }
                     }
                 ],
@@ -601,6 +544,63 @@ const docTemplate = `{
                     "memory"
                 ],
                 "summary": "Recall Memory",
+                "parameters": [
+                    {
+                        "description": "Recall Input",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/memory.RecallInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/memory.RecallOutput"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.apiError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.apiError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.apiError"
+                        }
+                    }
+                }
+            }
+        },
+        "/memory/recall/light": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve facts using a single embedding + Flash Lite selection pass. Cheaper than /memory/recall.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "memory"
+                ],
+                "summary": "Recall Memory (Light)",
                 "parameters": [
                     {
                         "description": "Recall Input",
@@ -986,6 +986,29 @@ const docTemplate = `{
                 }
             }
         },
+        "memory.DurationStats": {
+            "type": "object",
+            "properties": {
+                "db_calls": {
+                    "type": "integer"
+                },
+                "db_ms": {
+                    "type": "integer"
+                },
+                "embed_calls": {
+                    "type": "integer"
+                },
+                "embed_ms": {
+                    "type": "integer"
+                },
+                "llm_calls": {
+                    "type": "integer"
+                },
+                "llm_ms": {
+                    "type": "integer"
+                }
+            }
+        },
         "memory.Fact": {
             "type": "object",
             "properties": {
@@ -1096,20 +1119,6 @@ const docTemplate = `{
                 }
             }
         },
-        "memory.FactualInput": {
-            "type": "object",
-            "properties": {
-                "inputs": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/memory.InputItem"
-                    }
-                },
-                "thread_id": {
-                    "type": "string"
-                }
-            }
-        },
         "memory.InputItem": {
             "type": "object",
             "properties": {
@@ -1145,6 +1154,20 @@ const docTemplate = `{
                 },
                 "thread_id": {
                     "type": "string"
+                }
+            }
+        },
+        "memory.ModelUsage": {
+            "type": "object",
+            "properties": {
+                "calls": {
+                    "type": "integer"
+                },
+                "input_tokens": {
+                    "type": "integer"
+                },
+                "output_tokens": {
+                    "type": "integer"
                 }
             }
         },
@@ -1228,11 +1251,17 @@ const docTemplate = `{
                 "debug": {
                     "$ref": "#/definitions/memory.RecallDebug"
                 },
+                "duration": {
+                    "$ref": "#/definitions/memory.DurationStats"
+                },
                 "facts": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/memory.ReturnedFact"
                     }
+                },
+                "usage": {
+                    "$ref": "#/definitions/memory.TokenStats"
                 }
             }
         },
@@ -1328,8 +1357,33 @@ const docTemplate = `{
                 }
             }
         },
+        "memory.TokenStats": {
+            "type": "object",
+            "properties": {
+                "input_tokens": {
+                    "type": "integer"
+                },
+                "output_tokens": {
+                    "type": "integer"
+                },
+                "per_model": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/memory.ModelUsage"
+                    }
+                }
+            }
+        },
         "memory.WriteOutput": {
-            "type": "object"
+            "type": "object",
+            "properties": {
+                "duration": {
+                    "$ref": "#/definitions/memory.DurationStats"
+                },
+                "usage": {
+                    "$ref": "#/definitions/memory.TokenStats"
+                }
+            }
         }
     },
     "securityDefinitions": {

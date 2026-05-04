@@ -9,12 +9,13 @@ import (
 )
 
 type Config struct {
-	Port     string
-	GinMode  string
-	LogLevel string
-	Database DatabaseConfig
-	AI       AIConfig
-	Admin    AdminConfig
+	Port      string
+	GinMode   string
+	LogLevel  string
+	Database  DatabaseConfig
+	AI        AIConfig
+	Admin     AdminConfig
+	Ingestion IngestionConfig
 }
 
 type AdminConfig struct {
@@ -34,9 +35,15 @@ type AIConfig struct {
 	ModelDecompose        string
 	ModelEvaluate         string
 	ModelSelectFacts      string
+	ModelSelectFactsLight string
 	ModelDecomposeQueries string
 	ModelDecomposeRecall  string
 	EmbeddingModel        string
+}
+
+type IngestionConfig struct {
+	ChunkMaxTokens     int // INGEST_CHUNK_MAX_TOKENS, default 4000
+	ChunkOverlapTokens int // INGEST_CHUNK_OVERLAP_TOKENS, default 400
 }
 
 func Load() (*Config, error) {
@@ -55,9 +62,14 @@ func Load() (*Config, error) {
 			ModelDecompose:        os.Getenv("AI_MODEL_DECOMPOSE"),
 			ModelEvaluate:         os.Getenv("AI_MODEL_EVALUATE"),
 			ModelSelectFacts:      os.Getenv("AI_MODEL_SELECT_FACTS"),
+			ModelSelectFactsLight: getEnvOrDefault("AI_MODEL_SELECT_FACTS_LIGHT", "gemini-3.0-flash-lite"),
 			ModelDecomposeQueries: os.Getenv("AI_MODEL_DECOMPOSE_QUERIES"),
 			ModelDecomposeRecall:  os.Getenv("AI_MODEL_DECOMPOSE_RECALL"),
-			EmbeddingModel:        os.Getenv("AI_EMBEDDING_MODEL"),
+			EmbeddingModel:        getEnvOrDefault("AI_EMBEDDING_MODEL", "gemini-embedding-001"),
+		},
+		Ingestion: IngestionConfig{
+			ChunkMaxTokens:     getEnvIntOrDefault("INGEST_CHUNK_MAX_TOKENS", 4000),
+			ChunkOverlapTokens: getEnvIntOrDefault("INGEST_CHUNK_OVERLAP_TOKENS", 400),
 		},
 		Admin: AdminConfig{
 			GoogleClientID:     googleClientID,

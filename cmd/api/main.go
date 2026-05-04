@@ -31,6 +31,43 @@ import (
 	"github.com/costinul/bwai/bwaiclient"
 )
 
+// estimatedPromptOverhead is a conservative token budget for system prompt,
+// metadata fields, and JSON scaffolding added by the prompt template.
+const estimatedPromptOverhead = 512
+
+// validateChunkConfig checks that the configured chunk size fits within the
+// context window of the models assigned to ingestion prompts.
+func validateChunkConfig(registry *bwai.ModelRegistry, cfg *config.Config) error {
+	type check struct {
+		prompt string
+		model  string
+	}
+	checks := []check{
+		{"decompose_content", cfg.AI.ModelDecompose},
+		{"decompose_conversational", cfg.AI.ModelDecompose},
+	}
+	for _, c := range checks {
+		pd := registry.GetPromptDefinition(c.prompt)
+		if pd == nil {
+			return fmt.Errorf("prompt %q not found in registry", c.prompt)
+		}
+		mc := registry.GetModelConfig(c.model)
+		if mc == nil {
+			return fmt.Errorf("model %q not found in registry (prompt=%s)", c.model, c.prompt)
+		}
+		required := cfg.Ingestion.ChunkMaxTokens + estimatedPromptOverhead + pd.MaxTokens
+		if required > mc.ContextWindowSize {
+			return fmt.Errorf(
+				"chunk config too large: prompt=%s model=%s chunk_max=%d + overhead=%d + max_tokens=%d = %d > context_window=%d",
+				c.prompt, c.model,
+				cfg.Ingestion.ChunkMaxTokens, estimatedPromptOverhead, pd.MaxTokens,
+				required, mc.ContextWindowSize,
+			)
+		}
+	}
+	return nil
+}
+
 // @title Agent Memory API
 // @version 1.0
 // @description This is the API for the Agent Memory service.
@@ -87,15 +124,21 @@ func main() {
 	)
 	bwaiClient := bwaiclient.NewBWAIClient(registry, nil, usageLogger)
 
+	if err := validateChunkConfig(registry, cfg); err != nil {
+		log.Printf("startup validation failed: %v", err)
+		os.Exit(1)
+	}
+
 	log.Println("Initializing MemoryEngine...")
 	llmModels := engine.LLMModels{
 		Decompose:        cfg.AI.ModelDecompose,
 		Evaluate:         cfg.AI.ModelEvaluate,
 		SelectFacts:      cfg.AI.ModelSelectFacts,
+		SelectFactsLight: cfg.AI.ModelSelectFactsLight,
 		DecomposeQueries: cfg.AI.ModelDecomposeQueries,
 		DecomposeRecall:  cfg.AI.ModelDecomposeRecall,
 	}
-	engine := engine.NewMemoryEngine(bwaiClient, memoryRepo, llmModels, cfg.AI.EmbeddingModel, trackerReg)
+	engine := engine.NewMemoryEngine(bwaiClient, memoryRepo, llmModels, cfg.AI.EmbeddingModel, cfg.Ingestion, trackerReg)
 
 	var adminDeps *api.AdminDeps
 	if cfg.Admin.Enabled {

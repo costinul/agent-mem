@@ -13,11 +13,11 @@ import (
 	"agentmem/internal/repository/memoryrepo"
 )
 
-// ProcessContextual runs the full write pipeline for a conversational (thread-scoped) memory input:
+// Add runs the full write pipeline for a memory input:
 // it inserts an event, decomposes sources into facts, retrieves similar existing facts,
 // evaluates what to store/update/evolve, and persists the result.
-func (e *MemoryEngine) ProcessContextual(ctx context.Context, input models.MemoryInput) (models.WriteOutput, error) {
-	if err := validateContextualInput(input); err != nil {
+func (e *MemoryEngine) Add(ctx context.Context, input models.MemoryInput) (models.WriteOutput, error) {
+	if err := validateMemoryInput(input); err != nil {
 		return models.WriteOutput{}, err
 	}
 
@@ -30,7 +30,7 @@ func (e *MemoryEngine) ProcessContextual(ctx context.Context, input models.Memor
 	tracker := NewCallTracker(input.Debug)
 	ctx = withTracker(ctx, tracker)
 
-	log.Printf("contextual pipeline start account=%s agent=%s thread=%s inputs=%d", input.AccountID, input.AgentID, input.ThreadID, len(input.Inputs))
+	log.Printf("add pipeline start account=%s agent=%s thread=%s inputs=%d", input.AccountID, input.AgentID, input.ThreadID, len(input.Inputs))
 	threadID := input.ThreadID
 	event, err := e.repo.InsertEvent(ctx, models.Event{
 		AccountID: input.AccountID,
@@ -70,12 +70,12 @@ func (e *MemoryEngine) ProcessContextual(ctx context.Context, input models.Memor
 		return models.WriteOutput{}, err
 	}
 
-	log.Printf("contextual pipeline completed event=%s stored_facts=%d", event.ID, len(storedFacts))
+	log.Printf("add pipeline completed event=%s stored_facts=%d", event.ID, len(storedFacts))
 	return models.WriteOutput{Duration: tracker.Stats(), Usage: tracker.Usage()}, nil
 }
 
-// validateContextualInput ensures all required fields for a contextual memory write are present.
-func validateContextualInput(input models.MemoryInput) error {
+// validateMemoryInput ensures all required fields for a memory write are present.
+func validateMemoryInput(input models.MemoryInput) error {
 	if strings.TrimSpace(input.AccountID) == "" {
 		return errs.NewValidation("account_id is required")
 	}

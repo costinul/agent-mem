@@ -34,9 +34,9 @@ type AdminDeps struct {
 func NewServer(engine *engine.MemoryEngine, accountSvc *account.Service, agentSvc *agent.Service, adminDeps *AdminDeps) *Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler)
-	mux.HandleFunc("POST /memory/contextual", requireAPIKey(accountSvc, contextualHandler(engine, agentSvc)))
-	mux.HandleFunc("POST /memory/factual", requireAPIKey(accountSvc, factualHandler(engine, agentSvc)))
+	mux.HandleFunc("POST /memory", requireAPIKey(accountSvc, addHandler(engine, agentSvc)))
 	mux.HandleFunc("POST /memory/recall", requireAPIKey(accountSvc, recallHandler(engine, agentSvc)))
+	mux.HandleFunc("POST /memory/recall/light", requireAPIKey(accountSvc, recallLightHandler(engine, agentSvc)))
 	mux.HandleFunc("GET /facts", requireAPIKey(accountSvc, listFactsHandler(engine)))
 	mux.HandleFunc("GET /facts/{id}", requireAPIKey(accountSvc, getFactHandler(engine)))
 	mux.HandleFunc("PUT /facts/{id}", requireAPIKey(accountSvc, updateFactHandler(engine)))

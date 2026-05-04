@@ -54,7 +54,7 @@ type TokenStats struct {
 	PerModel     map[string]ModelUsage `json:"per_model,omitempty"`
 }
 
-// WriteOutput is the acknowledgement returned by contextual/factual write pipelines.
+// WriteOutput is the acknowledgement returned by the memory write pipeline.
 // Writes are fire-and-forget: the caller delegates fact extraction/storage to the
 // memory manager and does not receive the resulting facts. Use the recall or
 // fact-listing endpoints to inspect what is stored.
@@ -136,15 +136,6 @@ type FactUpdateRequest struct {
 	FactID string     `json:"fact_id"`
 	Text   string     `json:"text"`   // New fact text. Embedding will be regenerated.
 	Source SourceKind `json:"source"` // Must be equal or higher trust than the target fact's source.
-}
-
-// FactualInput is the request body for the factual interface.
-type FactualInput struct {
-	AccountID string      `json:"-" swaggerignore:"true"`
-	AgentID   string      `json:"-" swaggerignore:"true"`
-	ThreadID  string      `json:"thread_id"`
-	Inputs    []InputItem `json:"inputs"`
-	Debug     bool        `json:"-" swaggerignore:"true"`
 }
 
 type FactUpdateBody struct {

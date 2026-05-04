@@ -48,7 +48,7 @@ func setupEngine(t *testing.T) (*engine.MemoryEngine, *memoryrepo.InMemoryReposi
 		DecomposeQueries: os.Getenv("AI_MODEL_DECOMPOSE_QUERIES"),
 		DecomposeRecall:  os.Getenv("AI_MODEL_DECOMPOSE_RECALL"),
 	}
-	eng := engine.NewMemoryEngine(client, repo, llmModels, os.Getenv("AI_EMBEDDING_MODEL"), engine.NewTrackerRegistry())
+	eng := engine.NewMemoryEngine(client, repo, llmModels, os.Getenv("AI_EMBEDDING_MODEL"), engine.DefaultIngestion(), engine.NewTrackerRegistry())
 	return eng, repo
 }
 
@@ -59,7 +59,7 @@ func sendMessage(t *testing.T, eng *engine.MemoryEngine, content string) {
 
 func sendMessageAs(t *testing.T, eng *engine.MemoryEngine, content string, author *string) {
 	t.Helper()
-	if _, err := eng.ProcessContextual(context.Background(), models.MemoryInput{
+	if _, err := eng.Add(context.Background(), models.MemoryInput{
 		AccountID: "eval-account",
 		AgentID:   "eval-agent",
 		ThreadID:  "eval-thread",
@@ -67,7 +67,7 @@ func sendMessageAs(t *testing.T, eng *engine.MemoryEngine, content string, autho
 			{Kind: models.SOURCE_USER, Author: author, Content: content},
 		},
 	}); err != nil {
-		t.Fatalf("ProcessContextual(%q) error = %v", content, err)
+		t.Fatalf("Add(%q) error = %v", content, err)
 	}
 }
 

@@ -65,7 +65,7 @@ class MemoryAPIClient:
         when: str | None = None,
         image_caption: str | None = None,
     ) -> dict:
-        """Send a single conversation turn to /memory/contextual for ingestion.
+        """Send a single conversation turn to /memory for ingestion.
 
         Args:
             when: ISO 8601 timestamp string for when the message was produced.
@@ -92,16 +92,17 @@ class MemoryAPIClient:
             item["event_date"] = when
 
         payload = {"thread_id": thread_id, "inputs": [item]}
-        resp = await self._client_or_raise().post(f"{self.base_url}/memory/contextual", json=payload)
+        resp = await self._client_or_raise().post(f"{self.base_url}/memory", json=payload)
         self._raise_with_body(resp)
         return resp.json()
 
-    async def recall(self, thread_id: str, question: str, when: str | None = None) -> dict:
+    async def recall(self, thread_id: str, question: str, when: str | None = None, light: bool = False) -> dict:
         """Read-only retrieval of facts relevant to the question.
 
         Args:
             when: ISO 8601 timestamp string for when the question is being asked.
                   Sent as event_date; used to resolve relative-time phrases in the query.
+            light: If True, use /memory/recall/light (cheaper, no query decomposition).
         """
         payload = {
             "thread_id": thread_id,
@@ -110,7 +111,8 @@ class MemoryAPIClient:
         }
         if when:
             payload["event_date"] = when
-        resp = await self._client_or_raise().post(f"{self.base_url}/memory/recall", json=payload)
+        endpoint = "/memory/recall/light" if light else "/memory/recall"
+        resp = await self._client_or_raise().post(f"{self.base_url}{endpoint}", json=payload)
         self._raise_with_body(resp)
         return resp.json()
 

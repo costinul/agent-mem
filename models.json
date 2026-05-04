@@ -30,5 +30,68 @@
   "extra_headers": {},
   "enable_caching": false,
   "max_output_tokens": 4096
+},
+{
+  "id": "gemini-embedding-001",
+  "name": "Gemini Embedding 001",
+  "provider": "google",
+  "model": "gemini-embedding-001",
+  "api_key": "GEMINI_API_KEY",
+  "context_window_size": 8192,
+  "embedding_size": 768,
+  "function_calls": false,
+  "streaming_support": false,
+  "specializations": ["embedding"],
+  "extra_headers": {},
+  "enable_caching": false,
+  "max_output_tokens": 0,
+  "metadata": {
+    "task_type": "RETRIEVAL_DOCUMENT"
+  }
+},
+{
+  "id": "cerebras-gpt-oss-120b",
+  "name": "Cerebras GPT OSS 120B",
+  "provider": "cerebras",
+  "model": "gpt-oss-120b",
+  "api_key": "CEREBRAS_API_KEY",
+  "context_window_size": 128000,
+  "embedding_size": 0,
+  "function_calls": true,
+  "streaming_support": true,
+  "specializations": ["text", "coding","reasoning"],
+  "extra_headers": {},
+  "enable_caching": false,
+  "max_output_tokens": 128000
+},
+{
+  "id": "gemini-3.0-flash",
+  "name": "Gemini 3.0 Flash",
+  "provider": "google",
+  "model": "gemini-flash-latest",
+  "api_key": "GEMINI_API_KEY",
+  "context_window_size": 1000000,
+  "embedding_size": 0,
+  "function_calls": true,
+  "streaming_support": true,
+  "specializations": ["text", "coding"],
+  "extra_headers": {},
+  "enable_caching": true,
+  "max_output_tokens": 32768
+},
+{
+  "id": "gemini-3.0-flash-lite",
+  "name": "Gemini 3.0 Flash Lite",
+  "provider": "google",
+  "model": "gemini-flash-lite-latest",
+  "api_key": "GEMINI_API_KEY",
+  "context_window_size": 1000000,
+  "embedding_size": 0,
+  "function_calls": true,
+  "streaming_support": true,
+  "specializations": ["text", "coding"],
+  "extra_headers": {},
+  "enable_caching": true,
+  "max_output_tokens": 32768
 }
 ]

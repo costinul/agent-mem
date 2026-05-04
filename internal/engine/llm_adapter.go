@@ -50,6 +50,7 @@ type LLMModels struct {
 	Decompose        string
 	Evaluate         string
 	SelectFacts      string
+	SelectFactsLight string // cheaper model for RecallLight; reuses select_facts prompt
 	DecomposeQueries string
 	DecomposeRecall  string
 }
@@ -323,6 +324,70 @@ func (a *LLMAdapter) SelectFacts(ctx context.Context, req SelectFactsRequest) ([
 	}, out)
 	if err != nil {
 		return nil, fmt.Errorf("select facts: %w", err)
+	}
+
+	byID := make(map[string]models.Fact, len(req.Candidates))
+	for _, f := range req.Candidates {
+		byID[f.ID] = f
+	}
+
+	selected := make([]models.Fact, 0, len(out.FactIDs))
+	seen := make(map[string]struct{}, len(out.FactIDs))
+	for _, id := range out.FactIDs {
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		if f, ok := byID[id]; ok {
+			selected = append(selected, f)
+			seen[id] = struct{}{}
+		}
+	}
+	return selected, nil
+}
+
+// SelectFactsLight runs the same select_facts prompt on the cheaper light model.
+func (a *LLMAdapter) SelectFactsLight(ctx context.Context, req SelectFactsRequest) ([]models.Fact, error) {
+	if len(req.Candidates) == 0 {
+		return nil, nil
+	}
+	defer observeLLM(ctx, "select_facts_light", time.Now())
+	refID, done := a.bind(ctx)
+	defer done()
+
+	type candidateView struct {
+		ID           string
+		Kind         models.FactKind
+		Text         string
+		EventDate    string
+		ReferencedAt string
+		SupersededBy string
+	}
+	type templateData struct {
+		Query      string
+		EventDate  string
+		Candidates []candidateView
+	}
+	td := templateData{Query: req.Query, EventDate: req.EventDate}
+	for _, f := range req.Candidates {
+		cv := candidateView{ID: f.ID, Kind: f.Kind, Text: f.Text}
+		if f.EventDate != nil {
+			cv.EventDate = f.EventDate.Format("2006-01-02")
+		}
+		if f.ReferencedAt != nil {
+			cv.ReferencedAt = f.ReferencedAt.Format("2006-01-02")
+		}
+		if f.SupersededBy != nil {
+			cv.SupersededBy = *f.SupersededBy
+		}
+		td.Candidates = append(td.Candidates, cv)
+	}
+
+	out := &selectFactsOutput{}
+	err := a.client.ExecuteAs(ctx, refID, "select_facts", a.models.SelectFactsLight, &bwai.PromptData{
+		Data: td,
+	}, out)
+	if err != nil {
+		return nil, fmt.Errorf("select facts light: %w", err)
 	}
 
 	byID := make(map[string]models.Fact, len(req.Candidates))

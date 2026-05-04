@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"agentmem/internal/config"
 	models "agentmem/internal/models"
 	"agentmem/internal/repository/memoryrepo"
 
@@ -11,16 +12,24 @@ import (
 )
 
 type MemoryEngine struct {
-	repo memoryrepo.Repository
-	ai   *LLMAdapter
+	repo      memoryrepo.Repository
+	ai        *LLMAdapter
+	ingestion config.IngestionConfig
 }
 
-func NewMemoryEngine(client *bwaiclient.BWAIClient, repo memoryrepo.Repository, models LLMModels, embeddingModel string, reg *trackerRegistry) *MemoryEngine {
+// DefaultIngestion returns the default ingestion configuration (used in tests).
+func DefaultIngestion() config.IngestionConfig {
+	return config.IngestionConfig{ChunkMaxTokens: 4000, ChunkOverlapTokens: 400}
+}
+
+func NewMemoryEngine(client *bwaiclient.BWAIClient, repo memoryrepo.Repository, llmModels LLMModels, embeddingModel string, ingestion config.IngestionConfig, reg *trackerRegistry) *MemoryEngine {
 	return &MemoryEngine{
-		repo: &repoWrapper{inner: repo},
-		ai:   NewLLMAdapter(client, models, embeddingModel, reg),
+		repo:      &repoWrapper{inner: repo},
+		ai:        NewLLMAdapter(client, llmModels, embeddingModel, reg),
+		ingestion: ingestion,
 	}
 }
+
 
 func (e *MemoryEngine) Decompose(ctx context.Context, req DecomposeRequest) (models.Decomposition, error) {
 	return e.ai.Decompose(ctx, req)

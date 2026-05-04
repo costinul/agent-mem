@@ -7,9 +7,10 @@ import (
 	"regexp"
 	"strings"
 	"time"
-	"unicode"
 
 	models "agentmem/internal/models"
+
+	"github.com/tiktoken-go/tokenizer"
 )
 
 // provenanceSuffixRe matches any trailing parenthetical that carries provenance
@@ -40,10 +41,17 @@ func normalizeFactText(s string) string {
 	return s
 }
 
-// maxDecomposeChunkChars is the upper bound (in runes) on the content size sent to
-// a single decompose call. Long messages are split into chunks below this size so
-// the LLM keeps full attention on each piece and drops fewer details.
-const maxDecomposeChunkChars = 500
+// cl100kEncoder is a shared cl100k_base tokenizer used to count tokens for chunking.
+// It is safe for concurrent use.
+var cl100kEncoder tokenizer.Codec
+
+func init() {
+	enc, err := tokenizer.Get(tokenizer.Cl100kBase)
+	if err != nil {
+		panic(fmt.Sprintf("failed to initialize cl100k_base tokenizer: %v", err))
+	}
+	cl100kEncoder = enc
+}
 
 // persistAndDecomposeSources saves each input as a Source record, then calls the LLM
 // to decompose it into extracted facts and search queries. Optionally loads recent
@@ -99,7 +107,7 @@ func (e *MemoryEngine) persistAndDecomposeSources(ctx context.Context, eventID, 
 		isConversational := item.Kind == models.SOURCE_USER || item.Kind == models.SOURCE_AGENT
 		formattedEventDate := eventDate.Format("Monday, 2 January 2006, 15:04 UTC")
 
-		chunks := chunkContent(item.Content, maxDecomposeChunkChars)
+		chunks := chunkContent(item.Content, e.ingestion.ChunkMaxTokens, e.ingestion.ChunkOverlapTokens)
 		if len(chunks) > 1 {
 			log.Printf("decompose chunked source=%s kind=%s chunks=%d", inserted.ID, item.Kind, len(chunks))
 		}
@@ -169,37 +177,159 @@ func (e *MemoryEngine) persistAndDecomposeSources(ctx context.Context, eventID, 
 	return storedSources, decompositions, nil
 }
 
-// chunkContent splits content into pieces no larger than maxChars runes, preferring
-// structural delimiters that exist in any language: paragraph break ("\n\n"), then
-// line break ("\n"), then any Unicode whitespace, finally a hard rune-boundary cut.
-// No regex, no language-specific punctuation, no proper-noun detection.
-func chunkContent(content string, maxChars int) []string {
+// chunkContent splits content into token-aware chunks no larger than maxTokens,
+// prepending overlapTokens of the previous chunk to each subsequent chunk.
+// Paragraph boundaries are preferred; line breaks are used when paragraphs are
+// too large; hard token cuts are used as a last resort.
+func chunkContent(content string, maxTokens, overlapTokens int) []string {
 	trimmed := strings.TrimSpace(content)
 	if trimmed == "" {
 		return []string{trimmed}
 	}
-	if maxChars <= 0 {
+	if maxTokens <= 0 {
 		return []string{trimmed}
 	}
-	if runeLen(trimmed) <= maxChars {
+	if countTokens(trimmed) <= maxTokens {
 		return []string{trimmed}
 	}
 
-	if parts := splitNonEmpty(trimmed, "\n\n"); len(parts) > 1 {
-		return chunkPieces(parts, maxChars)
+	paragraphs := splitNonEmpty(trimmed, "\n\n")
+	if len(paragraphs) <= 1 {
+		paragraphs = splitNonEmpty(trimmed, "\n")
 	}
-	if parts := splitNonEmpty(trimmed, "\n"); len(parts) > 1 {
-		return chunkPieces(parts, maxChars)
+
+	var rawChunks []string
+	if len(paragraphs) > 1 {
+		rawChunks = packParagraphs(paragraphs, maxTokens)
+	} else {
+		rawChunks = hardCutByTokens(trimmed, maxTokens)
 	}
-	return hardCutByRunes(trimmed, maxChars)
+
+	if overlapTokens <= 0 || len(rawChunks) <= 1 {
+		return rawChunks
+	}
+	return applyOverlap(rawChunks, overlapTokens)
 }
 
-func chunkPieces(parts []string, maxChars int) []string {
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		out = append(out, chunkContent(p, maxChars)...)
+// packParagraphs greedily packs paragraphs into chunks of at most maxTokens tokens.
+func packParagraphs(paragraphs []string, maxTokens int) []string {
+	var chunks []string
+	var current strings.Builder
+	currentTokens := 0
+
+	flush := func() {
+		if t := strings.TrimSpace(current.String()); t != "" {
+			chunks = append(chunks, t)
+		}
+		current.Reset()
+		currentTokens = 0
 	}
-	return out
+
+	for _, para := range paragraphs {
+		paraTokens := countTokens(para)
+		if paraTokens > maxTokens {
+			// paragraph is too large on its own — flush current and hard-cut
+			flush()
+			chunks = append(chunks, hardCutByTokens(para, maxTokens)...)
+			continue
+		}
+		sep := ""
+		if current.Len() > 0 {
+			sep = "\n\n"
+		}
+		if currentTokens+paraTokens+countTokens(sep) > maxTokens {
+			flush()
+		}
+		if current.Len() > 0 {
+			current.WriteString("\n\n")
+			currentTokens += countTokens("\n\n")
+		}
+		current.WriteString(para)
+		currentTokens += paraTokens
+	}
+	flush()
+	return chunks
+}
+
+// hardCutByTokens cuts a string at token boundaries, preferring a preceding
+// space within the second half of the window.
+func hardCutByTokens(s string, maxTokens int) []string {
+	var chunks []string
+	for {
+		if countTokens(s) <= maxTokens {
+			if t := strings.TrimSpace(s); t != "" {
+				chunks = append(chunks, t)
+			}
+			break
+		}
+		// Binary-search for the largest prefix that fits in maxTokens.
+		runes := []rune(s)
+		lo, hi := 1, len(runes)
+		for lo < hi {
+			mid := (lo + hi + 1) / 2
+			if countTokens(string(runes[:mid])) <= maxTokens {
+				lo = mid
+			} else {
+				hi = mid - 1
+			}
+		}
+		cut := lo
+		// Prefer breaking at whitespace within the second half of the window.
+		for i := lo; i > lo/2; i-- {
+			if strings.ContainsRune(" \t\n\r", runes[i-1]) {
+				cut = i
+				break
+			}
+		}
+		piece := strings.TrimSpace(string(runes[:cut]))
+		if piece != "" {
+			chunks = append(chunks, piece)
+		}
+		s = strings.TrimSpace(string(runes[cut:]))
+	}
+	return chunks
+}
+
+// applyOverlap prepends the last overlapTokens tokens from the previous chunk
+// to the start of each subsequent chunk.
+func applyOverlap(chunks []string, overlapTokens int) []string {
+	result := make([]string, len(chunks))
+	result[0] = chunks[0]
+	for i := 1; i < len(chunks); i++ {
+		suffix := lastNTokensAsText(chunks[i-1], overlapTokens)
+		if suffix != "" {
+			result[i] = suffix + "\n\n" + chunks[i]
+		} else {
+			result[i] = chunks[i]
+		}
+	}
+	return result
+}
+
+// lastNTokensAsText returns the last n tokens of s decoded back to a string.
+func lastNTokensAsText(s string, n int) string {
+	ids, _, err := cl100kEncoder.Encode(s)
+	if err != nil || len(ids) == 0 {
+		return ""
+	}
+	if n >= len(ids) {
+		return s
+	}
+	tail := ids[len(ids)-n:]
+	text, err := cl100kEncoder.Decode(tail)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(text)
+}
+
+// countTokens returns the cl100k_base token count for s.
+func countTokens(s string) int {
+	ids, _, err := cl100kEncoder.Encode(s)
+	if err != nil {
+		return len([]rune(s)) / 4
+	}
+	return len(ids)
 }
 
 // splitNonEmpty splits s by sep and returns the trimmed, non-empty pieces.
@@ -212,42 +342,6 @@ func splitNonEmpty(s, sep string) []string {
 		}
 	}
 	return out
-}
-
-// hardCutByRunes cuts a single piece at maxChars rune boundaries, preferring
-// the nearest preceding whitespace within the second half of the window.
-func hardCutByRunes(s string, maxChars int) []string {
-	runes := []rune(s)
-	out := make([]string, 0, (len(runes)/maxChars)+1)
-	for len(runes) > 0 {
-		if len(runes) <= maxChars {
-			if t := strings.TrimSpace(string(runes)); t != "" {
-				out = append(out, t)
-			}
-			break
-		}
-		cut := maxChars
-		for i := maxChars; i > maxChars/2; i-- {
-			if unicode.IsSpace(runes[i]) {
-				cut = i
-				break
-			}
-		}
-		piece := strings.TrimSpace(string(runes[:cut]))
-		if piece != "" {
-			out = append(out, piece)
-		}
-		runes = runes[cut:]
-	}
-	return out
-}
-
-func runeLen(s string) int {
-	n := 0
-	for range s {
-		n++
-	}
-	return n
 }
 
 // buildEventContextHeader concatenates the content of USER and AGENT inputs

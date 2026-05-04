@@ -74,7 +74,7 @@ CREATE TABLE facts (
     source_id UUID NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
     kind TEXT NOT NULL CHECK (kind IN ('KNOWLEDGE','RULE','PREFERENCE')),
     text TEXT NOT NULL,
-    embedding vector(1536),
+    embedding vector(768),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

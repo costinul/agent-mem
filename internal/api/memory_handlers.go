@@ -22,9 +22,9 @@ type apiError struct {
 	Error string `json:"error"`
 }
 
-// contextualHandler handles the contextual smart pipeline.
-// @Summary Process Contextual Memory
-// @Description Process input through the contextual smart pipeline to store, update, and evolve facts.
+// addHandler handles the memory write pipeline.
+// @Summary Add Memory
+// @Description Process input through the memory pipeline to store, update, and evolve facts.
 // @Tags memory
 // @Accept json
 // @Produce json
@@ -34,8 +34,8 @@ type apiError struct {
 // @Failure 401 {object} apiError
 // @Failure 500 {object} apiError
 // @Security ApiKeyAuth
-// @Router /memory/contextual [post]
-func contextualHandler(memEngine *engine.MemoryEngine, agentSvc *agent.Service) http.HandlerFunc {
+// @Router /memory [post]
+func addHandler(memEngine *engine.MemoryEngine, agentSvc *agent.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		accountID := accountIDFromContext(r.Context())
 		if accountID == "" {
@@ -53,55 +53,63 @@ func contextualHandler(memEngine *engine.MemoryEngine, agentSvc *agent.Service) 
 			writeEngineError(w, r, err)
 			return
 		}
-		output, err := memEngine.ProcessContextual(r.Context(), input)
+		output, err := memEngine.Add(r.Context(), input)
 		if err != nil {
 			writeEngineError(w, r, err)
 			return
 		}
 		d := output.Duration
-		log.Printf("contextual duration db=%dms db_calls=%d llm=%dms llm_calls=%d embed=%dms embed_calls=%d", d.DBMs, d.DBCalls, d.LLMMs, d.LLMCalls, d.EmbedMs, d.EmbedCalls)
+		log.Printf("add duration db=%dms db_calls=%d llm=%dms llm_calls=%d embed=%dms embed_calls=%d", d.DBMs, d.DBCalls, d.LLMMs, d.LLMCalls, d.EmbedMs, d.EmbedCalls)
 		writeJSON(w, http.StatusOK, output)
 	}
 }
 
-// factualHandler handles the factual interface.
-// @Summary Add Factual Memory
-// @Description Process input through the factual pipeline to store, update, and evolve facts (no conversation context).
+// recallLightHandler handles cheap read-only memory retrieval (no query decomposition).
+// @Summary Recall Memory (Light)
+// @Description Retrieve facts using a single embedding + Flash Lite selection pass. Cheaper than /memory/recall.
 // @Tags memory
 // @Accept json
 // @Produce json
-// @Param input body memory.FactualInput true "Factual Input"
-// @Success 200 {object} memory.WriteOutput
+// @Param input body memory.RecallInput true "Recall Input"
+// @Success 200 {object} memory.RecallOutput
 // @Failure 400 {object} apiError
 // @Failure 401 {object} apiError
 // @Failure 500 {object} apiError
 // @Security ApiKeyAuth
-// @Router /memory/factual [post]
-func factualHandler(memEngine *engine.MemoryEngine, agentSvc *agent.Service) http.HandlerFunc {
+// @Router /memory/recall/light [post]
+func recallLightHandler(memEngine *engine.MemoryEngine, agentSvc *agent.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		accountID := accountIDFromContext(r.Context())
 		if accountID == "" {
 			writeJSON(w, http.StatusUnauthorized, apiError{Error: "missing account context"})
 			return
 		}
-		var input models.FactualInput
+		var input models.RecallInput
 		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 			writeJSON(w, http.StatusBadRequest, apiError{Error: "invalid JSON payload"})
 			return
 		}
 		input.AccountID = accountID
 		input.Debug = debugFromContext(r.Context())
-		if err := populateAgentFromThread(r, agentSvc, &input.AgentID, input.ThreadID); err != nil {
-			writeEngineError(w, r, err)
-			return
+		if input.AgentID != "" {
+			if err := validateAgentOwnership(r.Context(), agentSvc, accountID, input.AgentID); err != nil {
+				writeEngineError(w, r, err)
+				return
+			}
 		}
-		output, err := memEngine.AddFactual(r.Context(), input)
+		if input.ThreadID != "" {
+			if _, err := agentSvc.GetThread(r.Context(), accountID, input.ThreadID); err != nil {
+				writeEngineError(w, r, err)
+				return
+			}
+		}
+		output, err := memEngine.RecallLight(r.Context(), input)
 		if err != nil {
 			writeEngineError(w, r, err)
 			return
 		}
 		d := output.Duration
-		log.Printf("factual duration db=%dms db_calls=%d llm=%dms llm_calls=%d embed=%dms embed_calls=%d", d.DBMs, d.DBCalls, d.LLMMs, d.LLMCalls, d.EmbedMs, d.EmbedCalls)
+		log.Printf("recall-light duration db=%dms db_calls=%d llm=%dms llm_calls=%d embed=%dms embed_calls=%d", d.DBMs, d.DBCalls, d.LLMMs, d.LLMCalls, d.EmbedMs, d.EmbedCalls)
 		writeJSON(w, http.StatusOK, output)
 	}
 }

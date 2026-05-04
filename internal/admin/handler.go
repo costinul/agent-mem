@@ -87,9 +87,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, adminMw func(http.Handler) 
 	protected.HandleFunc("GET /admin/playground", h.playgroundPage)
 	protected.HandleFunc("GET /admin/playground/agents", h.playgroundAgents)
 	protected.HandleFunc("GET /admin/playground/threads", h.playgroundThreads)
-	protected.HandleFunc("POST /admin/playground/contextual", h.playgroundContextual)
-	protected.HandleFunc("POST /admin/playground/factual", h.playgroundFactual)
+	protected.HandleFunc("POST /admin/playground/add", h.playgroundContextual)
 	protected.HandleFunc("POST /admin/playground/recall", h.playgroundRecall)
+	protected.HandleFunc("POST /admin/playground/recall-light", h.playgroundRecallLight)
 	protected.HandleFunc("POST /admin/playground/decompose", h.playgroundDecompose)
 
 	mux.Handle("/admin/", adminMw(protected))
@@ -1054,13 +1054,13 @@ func (h *Handler) playgroundContextual(w http.ResponseWriter, r *http.Request) {
 	threadID, newThreadID, err := h.resolveThreadID(r.Context(), strings.TrimSpace(r.FormValue("thread_id")), accountID, agentID)
 	if err != nil {
 		slog.Error("playground create thread", "error", err)
-		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Contextual", Error: fmt.Sprintf("failed to create thread: %v", err)})
+		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Add", Error: fmt.Sprintf("failed to create thread: %v", err)})
 		return
 	}
 	inputs := parseInputItems(r)
 
 	if accountID == "" || agentID == "" || len(inputs) == 0 {
-		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Contextual", Error: "account, agent, and at least one input are required"})
+		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Add", Error: "account, agent, and at least one input are required"})
 		return
 	}
 
@@ -1070,48 +1070,55 @@ func (h *Handler) playgroundContextual(w http.ResponseWriter, r *http.Request) {
 		ThreadID:  threadID,
 		Inputs:    inputs,
 	}
-	out, err := h.engine.ProcessContextual(r.Context(), input)
+	out, err := h.engine.Add(r.Context(), input)
 	if err != nil {
-		slog.Error("playground contextual", "error", err)
-		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Contextual", Error: fmt.Sprintf("engine error: %v", err)})
+		slog.Error("playground add", "error", err)
+		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Add", Error: fmt.Sprintf("engine error: %v", err)})
 		return
 	}
 	d := out.Duration
-	slog.Info("playground contextual duration", "db_ms", d.DBMs, "db_calls", d.DBCalls, "llm_ms", d.LLMMs, "llm_calls", d.LLMCalls, "embed_ms", d.EmbedMs, "embed_calls", d.EmbedCalls)
-	h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Contextual", NewThreadID: newThreadID})
+	slog.Info("playground add duration", "db_ms", d.DBMs, "db_calls", d.DBCalls, "llm_ms", d.LLMMs, "llm_calls", d.LLMCalls, "embed_ms", d.EmbedMs, "embed_calls", d.EmbedCalls)
+	h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Add", NewThreadID: newThreadID})
 }
 
-func (h *Handler) playgroundFactual(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) playgroundRecallLight(w http.ResponseWriter, r *http.Request) {
 	accountID := strings.TrimSpace(r.FormValue("account_id"))
 	agentID := strings.TrimSpace(r.FormValue("agent_id"))
-	threadID, newThreadID, err := h.resolveThreadID(r.Context(), strings.TrimSpace(r.FormValue("thread_id")), accountID, agentID)
-	if err != nil {
-		slog.Error("playground create thread", "error", err)
-		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Factual", Error: fmt.Sprintf("failed to create thread: %v", err)})
-		return
-	}
-	inputs := parseInputItems(r)
+	threadID := strings.TrimSpace(r.FormValue("thread_id"))
+	query := strings.TrimSpace(r.FormValue("query"))
+	limitStr := strings.TrimSpace(r.FormValue("limit"))
+	includeSources := r.FormValue("include_sources") == "on"
 
-	if accountID == "" || agentID == "" || len(inputs) == 0 {
-		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Factual", Error: "account, agent, and at least one input are required"})
+	if accountID == "" || agentID == "" || query == "" {
+		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "RecallLight", Error: "account, agent, and query are required"})
 		return
 	}
 
-	input := models.FactualInput{
-		AccountID: accountID,
-		AgentID:   agentID,
-		ThreadID:  threadID,
-		Inputs:    inputs,
+	limit := 10
+	if limitStr != "" {
+		if v, err := strconv.Atoi(limitStr); err == nil && v > 0 {
+			limit = v
+		}
 	}
-	out, err := h.engine.AddFactual(r.Context(), input)
+
+	input := models.RecallInput{
+		AccountID:      accountID,
+		AgentID:        agentID,
+		ThreadID:       threadID,
+		Query:          query,
+		Limit:          limit,
+		IncludeSources: includeSources,
+		Debug:          true,
+	}
+	out, err := h.engine.RecallLight(r.Context(), input)
 	if err != nil {
-		slog.Error("playground factual", "error", err)
-		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Factual", Error: fmt.Sprintf("engine error: %v", err)})
+		slog.Error("playground recall-light", "error", err)
+		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "RecallLight", Error: fmt.Sprintf("engine error: %v", err)})
 		return
 	}
 	d := out.Duration
-	slog.Info("playground factual duration", "db_ms", d.DBMs, "db_calls", d.DBCalls, "llm_ms", d.LLMMs, "llm_calls", d.LLMCalls, "embed_ms", d.EmbedMs, "embed_calls", d.EmbedCalls)
-	h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Factual", NewThreadID: newThreadID})
+	slog.Info("playground recall-light duration", "db_ms", d.DBMs, "db_calls", d.DBCalls, "llm_ms", d.LLMMs, "llm_calls", d.LLMCalls, "embed_ms", d.EmbedMs, "embed_calls", d.EmbedCalls)
+	h.renderPlaygroundResult(w, &PlaygroundResult{Op: "RecallLight", Facts: out.Facts, Debug: out.Debug})
 }
 
 func (h *Handler) playgroundRecall(w http.ResponseWriter, r *http.Request) {

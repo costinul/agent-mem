@@ -24,9 +24,9 @@ import (
 	"agentmem/internal/repository/memoryrepo"
 )
 
-func TestContextualHandlerValidation(t *testing.T) {
+func TestAddHandlerValidation(t *testing.T) {
 	server := newTestServer()
-	req := httptest.NewRequest(http.MethodPost, "/memory/contextual", bytes.NewBufferString(`{}`))
+	req := httptest.NewRequest(http.MethodPost, "/memory", bytes.NewBufferString(`{}`))
 	req.Header.Set("Authorization", "Bearer "+testAPIKey)
 	rec := httptest.NewRecorder()
 
@@ -36,26 +36,19 @@ func TestContextualHandlerValidation(t *testing.T) {
 	}
 }
 
-func TestFactualHandlerSuccess(t *testing.T) {
+func TestFactualRouteRemoved(t *testing.T) {
 	server := newTestServer()
-	body := models.FactualInput{
-		Inputs: []models.InputItem{
-			{Kind: models.SOURCE_USER, Content: "Always include tests", ContentType: "text/plain"},
-		},
-	}
-	payload, _ := json.Marshal(body)
-
-	req := httptest.NewRequest(http.MethodPost, "/memory/factual", bytes.NewReader(payload))
+	req := httptest.NewRequest(http.MethodPost, "/memory/factual", bytes.NewBufferString(`{}`))
 	req.Header.Set("Authorization", "Bearer "+testAPIKey)
 	rec := httptest.NewRecorder()
 
 	server.httpServer.Handler.ServeHTTP(rec, req)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404 (route removed)", rec.Code)
 	}
 }
 
-func TestContextualHandlerWithAuthor(t *testing.T) {
+func TestAddHandlerWithAuthor(t *testing.T) {
 	server := newTestServer()
 	// The in-memory engine has no AI client, so the pipeline will error inside the engine.
 	// This test only verifies that the author field is accepted by the JSON decoder
@@ -68,13 +61,12 @@ func TestContextualHandlerWithAuthor(t *testing.T) {
 	}
 	payload, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPost, "/memory/contextual", bytes.NewReader(payload))
+	req := httptest.NewRequest(http.MethodPost, "/memory", bytes.NewReader(payload))
 	req.Header.Set("Authorization", "Bearer "+testAPIKey)
 	rec := httptest.NewRecorder()
 
 	server.httpServer.Handler.ServeHTTP(rec, req)
-	// 400 = validation error (thread not found via agent lookup) — not a JSON decode failure.
-	// The important thing is that it is NOT 400 due to author being rejected.
+	// The important thing is that it is NOT 401 due to author being rejected.
 	if rec.Code == http.StatusUnauthorized {
 		t.Fatalf("request was rejected as unauthorised")
 	}
@@ -96,7 +88,7 @@ func TestGetFactNotFound(t *testing.T) {
 
 func TestProtectedRouteRequiresAPIKey(t *testing.T) {
 	server := newTestServer()
-	req := httptest.NewRequest(http.MethodPost, "/memory/contextual", bytes.NewBufferString(`{}`))
+	req := httptest.NewRequest(http.MethodPost, "/memory", bytes.NewBufferString(`{}`))
 	rec := httptest.NewRecorder()
 
 	server.httpServer.Handler.ServeHTTP(rec, req)
@@ -155,7 +147,7 @@ func TestWithRecoveryLogsPanicsAndReturnsInternalServerError(t *testing.T) {
 
 func newTestServer() *Server {
 	repo := memoryrepo.NewInMemory()
-	memEngine := engine.NewMemoryEngine(nil, repo, engine.LLMModels{}, "", engine.NewTrackerRegistry())
+	memEngine := engine.NewMemoryEngine(nil, repo, engine.LLMModels{}, "", engine.DefaultIngestion(), engine.NewTrackerRegistry())
 	accountSvc := account.NewService(&mockAccountRepo{})
 	agentSvc := agentsvc.NewService(&mockAgentRepo{})
 	return NewServer(memEngine, accountSvc, agentSvc, nil)
