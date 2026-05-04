@@ -2,7 +2,7 @@
 
 Notation: **[LLM]** = LLM call, **[EMB]** = embedding call, **[VEC]** = vector search call, **[DB]** = plain DB write/read.
 
-## Contextual — Ingestion (`ProcessContextual`)
+## Ingestion (`Add`)
 
 1. Validate input.
 2. Enforce monotonic `event_date` per thread (reject backdated events). **[DB]**
@@ -19,9 +19,9 @@ Notation: **[LLM]** = LLM call, **[EMB]** = embedding call, **[VEC]** = vector s
    - update existing → embed new texts **[EMB]**, update rows **[DB]**
    - evolve → embed successors **[EMB]**, supersede + insert **[DB]**
 
-## Contextual — Recall (`Recall`)
+Chunking is token-aware (cl100k_base) with configurable `ChunkMaxTokens` (default 4000) and `ChunkOverlapTokens` (default 400). Paragraphs are preferred as split boundaries; a hard token cut is used only for single oversized paragraphs.
 
-Recall is shared between contextual and factual. Same code path.
+## Recall — Standard (`Recall`)
 
 1. `DecomposeRecall`: split free-text query into search phrases. **[LLM]**
 2. Embed phrases. **[EMB]**
@@ -33,24 +33,36 @@ Recall is shared between contextual and factual. Same code path.
 8. `SelectFacts`: LLM picks the relevant subset from the reranked candidates. **[LLM]**
 9. Build response (loads sources/threads as needed). **[DB]**
 
-## Factual — Ingestion (`AddFactual`)
+## Recall — Light (`RecallLight`)
 
-1. Validate input.
-2. Insert `Event` row. **[DB]**
-3. For each input: insert `Source` **[DB]**, then `Decompose` per chunk (no message history, no queries when non-conversational). **[LLM × N]**
-4. Embed extracted fact texts. **[EMB]**
-5. Per-phrase vector search, thread/agent/account, top-10. **[VEC × 3 × phrases]**
-6. `Evaluate` LLM → store/update/evolve. **[LLM]**
-7. Apply result (same store/update/evolve path as contextual, each with **[EMB]** + **[DB]**).
+Cheaper, language-agnostic recall: no query decomposition, no per-phrase multi-scope fan-out, and the final selection runs on a small LLM (Gemini Flash Lite by default).
 
-## Factual — Recall
+1. Embed the raw query as a single vector. **[EMB]**
+2. Vector search across thread/agent/account, top-K=200. **[VEC × 3]**
+3. Sibling expansion: round-robin facts sharing a `source_id` with seeds, budget 35. **[DB]**
+4. Cosine rerank against the query embedding (in-memory).
+5. Text-normalized dedup (in-memory).
+6. Date rerank: demote facts whose `referenced_at > event_date` (in-memory).
+7. `SelectFactsLight`: small-LLM pick over the full reranked candidate set, reusing the `select_facts` prompt. **[LLM]**
+8. Build response. **[DB]**
 
-Same `Recall` path as contextual (see above).
+## Recall — Zero (`RecallZero`)
 
-## Differences: Contextual vs Factual ingestion
+LLM-free recall: same retrieval/post-processing chain as `RecallLight`, but the final LLM-based selection is dropped — the deterministic candidate list is truncated to the top N (`recallZeroDefaultLimit` = 30, overridable via `Limit`) and returned as-is.
 
-- **Event-date ordering**: contextual enforces monotonic `event_date` per thread; factual does not.
-- **Message history**: contextual loads the last 10 thread messages and feeds them to the decomposer as prior context; factual does not.
-- **Decomposer outputs**: for conversational unchunked inputs, contextual uses the combined `DecomposeWithQueries` (facts + queries in one call) and otherwise plans queries explicitly via `DecomposeQueries`. Factual relies on plain `Decompose` (facts only) — no separate query-planning call, so search embeddings come only from the extracted fact texts.
-- **Everything else is identical**: `Source`/`Event` insertion, embedding, three-scope vector retrieval, `Evaluate`, and the store/update/evolve apply step are the exact same code.
-- **Recall**: shared, no difference.
+1. Embed the raw query as a single vector. **[EMB]**
+2. Vector search across thread/agent/account, top-K=200. **[VEC × 3]**
+3. Sibling expansion: round-robin facts sharing a `source_id` with seeds, budget 35. **[DB]**
+4. Cosine rerank against the query embedding (in-memory).
+5. Text-normalized dedup (in-memory).
+6. Date rerank: demote facts whose `referenced_at > event_date` (in-memory).
+7. Truncate to top N (default 30, or `input.Limit` when set).
+8. Build response. **[DB]**
+
+## Differences: Standard vs Light vs Zero recall
+
+- **Query decomposition**: standard calls `DecomposeRecall` (**[LLM]**) to produce multiple search phrases; light/zero skip it and use the raw query as a single embedding.
+- **Embeddings**: standard embeds every phrase; light/zero embed once.
+- **Vector search**: standard fans out `3 × phrases` searches and merges; light/zero do a single 3-scope search at K=200.
+- **Final selection**: standard uses the primary `SelectFacts` model; light uses `SelectFactsLight` (Gemini Flash Lite) over the same prompt; zero performs no LLM call and returns the top N candidates directly.
+- **Post-retrieval processing** (`expandBySource`, `cosineRerank`, `dedupByText`, `dateRerank`) is identical across all three.

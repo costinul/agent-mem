@@ -65,6 +65,21 @@ definitions:
       text:
         type: string
     type: object
+  memory.DurationStats:
+    properties:
+      db_calls:
+        type: integer
+      db_ms:
+        type: integer
+      embed_calls:
+        type: integer
+      embed_ms:
+        type: integer
+      llm_calls:
+        type: integer
+      llm_ms:
+        type: integer
+    type: object
   memory.Fact:
     properties:
       account_id:
@@ -145,15 +160,6 @@ definitions:
       text:
         type: string
     type: object
-  memory.FactualInput:
-    properties:
-      inputs:
-        items:
-          $ref: '#/definitions/memory.InputItem'
-        type: array
-      thread_id:
-        type: string
-    type: object
   memory.InputItem:
     properties:
       author:
@@ -181,6 +187,15 @@ definitions:
         type: array
       thread_id:
         type: string
+    type: object
+  memory.ModelUsage:
+    properties:
+      calls:
+        type: integer
+      input_tokens:
+        type: integer
+      output_tokens:
+        type: integer
     type: object
   memory.RecallDebug:
     properties:
@@ -236,10 +251,14 @@ definitions:
     properties:
       debug:
         $ref: '#/definitions/memory.RecallDebug'
+      duration:
+        $ref: '#/definitions/memory.DurationStats'
       facts:
         items:
           $ref: '#/definitions/memory.ReturnedFact'
         type: array
+      usage:
+        $ref: '#/definitions/memory.TokenStats'
     type: object
   memory.ReturnedFact:
     properties:
@@ -308,7 +327,23 @@ definitions:
           $ref: '#/definitions/memory.ConversationMessage'
         type: array
     type: object
+  memory.TokenStats:
+    properties:
+      input_tokens:
+        type: integer
+      output_tokens:
+        type: integer
+      per_model:
+        additionalProperties:
+          $ref: '#/definitions/memory.ModelUsage'
+        type: object
+    type: object
   memory.WriteOutput:
+    properties:
+      duration:
+        $ref: '#/definitions/memory.DurationStats'
+      usage:
+        $ref: '#/definitions/memory.TokenStats'
     type: object
 host: localhost:8080
 info:
@@ -611,12 +646,12 @@ paths:
       summary: Health Check
       tags:
       - health
-  /memory/contextual:
+  /memory:
     post:
       consumes:
       - application/json
-      description: Process input through the contextual smart pipeline to store, update,
-        and evolve facts.
+      description: Process input through the memory pipeline to store, update, and
+        evolve facts.
       parameters:
       - description: Memory Input
         in: body
@@ -645,44 +680,7 @@ paths:
             $ref: '#/definitions/api.apiError'
       security:
       - ApiKeyAuth: []
-      summary: Process Contextual Memory
-      tags:
-      - memory
-  /memory/factual:
-    post:
-      consumes:
-      - application/json
-      description: Process input through the factual pipeline to store, update, and
-        evolve facts (no conversation context).
-      parameters:
-      - description: Factual Input
-        in: body
-        name: input
-        required: true
-        schema:
-          $ref: '#/definitions/memory.FactualInput'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/memory.WriteOutput'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/api.apiError'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/api.apiError'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/api.apiError'
-      security:
-      - ApiKeyAuth: []
-      summary: Add Factual Memory
+      summary: Add Memory
       tags:
       - memory
   /memory/recall:
@@ -720,6 +718,80 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Recall Memory
+      tags:
+      - memory
+  /memory/recall/light:
+    post:
+      consumes:
+      - application/json
+      description: Retrieve facts using a single embedding + Flash Lite selection
+        pass. Cheaper than /memory/recall.
+      parameters:
+      - description: Recall Input
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/memory.RecallInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/memory.RecallOutput'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiError'
+      security:
+      - ApiKeyAuth: []
+      summary: Recall Memory (Light)
+      tags:
+      - memory
+  /memory/recall/zero:
+    post:
+      consumes:
+      - application/json
+      description: Retrieve facts using a single embedding pass with deterministic
+        post-processing only — no LLM is invoked. Cheaper than /memory/recall/light.
+      parameters:
+      - description: Recall Input
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/memory.RecallInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/memory.RecallOutput'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.apiError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.apiError'
+      security:
+      - ApiKeyAuth: []
+      summary: Recall Memory (Zero)
       tags:
       - memory
   /threads:

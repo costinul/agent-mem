@@ -71,7 +71,7 @@ load_dotenv(dotenv_path=env_path)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from shared.api_client import MemoryAPIClient, Mem0APIClient
-from shared.evaluator import Evaluator
+from shared.evaluator import Evaluator, JudgeResult, SCORE_TO_NUMERIC
 
 LOCOMO_DATA_URL = (
     "https://raw.githubusercontent.com/snap-research/locomo/main/data/locomo10.json"
@@ -319,10 +319,8 @@ async def evaluate_sample(
                 facts = []
                 recall_debug = {"error": str(recall_exc) if recall_exc else "unknown recall error"}
 
-            if evaluator is None:
-                score = "skipped"
-                reason = "--no-judge"
-            else:
+            judge_result: JudgeResult | None = None
+            if evaluator is not None:
                 result, _, soft_inc, hard_inc, judge_exc = await _run_with_retries(
                     label=f"judge (qa {qi}/{total_qa})",
                     sample_id=sample_id,
@@ -331,39 +329,54 @@ async def evaluate_sample(
                 soft_errors += soft_inc
                 hard_errors += hard_inc
                 if hard_inc == 0 and result is not None:
-                    score = result.score
-                    reason = result.reason
+                    judge_result = result
                 else:
-                    score = "fail"
-                    reason = str(judge_exc) if judge_exc else "unknown judge error"
-
-            if score == "fail" and evaluator is not None:
-                revised = qa.get("answer_revised")
-                if revised:
-                    retry, _, soft_inc, hard_inc, _ = await _run_with_retries(
-                        label=f"judge-revised (qa {qi}/{total_qa})",
-                        sample_id=sample_id,
-                        action=lambda: evaluator.judge(question, str(revised), facts),
+                    judge_result = JudgeResult(
+                        recall_score="fail",
+                        answer_score="fail",
+                        fact_relevance=[False] * len(facts),
+                        reason=str(judge_exc) if judge_exc else "unknown judge error",
                     )
-                    soft_errors += soft_inc
-                    hard_errors += hard_inc
-                    if hard_inc == 0 and retry is not None:
-                        score = retry.score
-                        reason = retry.reason
+
+                # Retry against the dataset's revised answer when our judge
+                # marks recall_score=fail. The revised answer is sometimes
+                # phrased more loosely and accepts a wider set of supporting
+                # facts than the strict ground truth.
+                if judge_result.recall_score == "fail":
+                    revised = qa.get("answer_revised")
+                    if revised:
+                        retry, _, soft_inc, hard_inc, _ = await _run_with_retries(
+                            label=f"judge-revised (qa {qi}/{total_qa})",
+                            sample_id=sample_id,
+                            action=lambda: evaluator.judge(question, str(revised), facts),
+                        )
+                        soft_errors += soft_inc
+                        hard_errors += hard_inc
+                        if hard_inc == 0 and retry is not None:
+                            judge_result = retry
 
             elapsed_qa = time.time() - qa_t0
-            print(
-                f"  [{sample_id} qa {qi}/{total_qa}] score={score} facts={len(facts)} ({elapsed_qa:.1f}s)",
-                flush=True,
-            )
+            if judge_result is None:
+                print(
+                    f"  [{sample_id} qa {qi}/{total_qa}] judge=skipped facts={len(facts)} ({elapsed_qa:.1f}s)",
+                    flush=True,
+                )
+            else:
+                p = judge_result.precision
+                p_str = f"{p:.2f}" if p is not None else "n/a"
+                print(
+                    f"  [{sample_id} qa {qi}/{total_qa}] r={judge_result.recall_score} "
+                    f"a={judge_result.answer_score} p={p_str} facts={len(facts)} "
+                    f"({elapsed_qa:.1f}s)",
+                    flush=True,
+                )
 
             qa_results.append({
                 "question": question,
                 "ground_truth": ground_truth,
                 "category": category,
                 "facts_returned": facts,
-                "score": score,
-                "reason": reason,
+                "judge": judge_result.to_dict() if judge_result is not None else None,
                 "recall_debug": recall_debug,
             })
 
@@ -387,44 +400,163 @@ async def evaluate_sample(
 
 # ── summary ────────────────────────────────────────────────────────────────────
 
+def _empty_bucket() -> dict:
+    return {
+        "count": 0,
+        "skipped": 0,
+        "recall": {"pass": 0, "partial": 0, "fail": 0},
+        "answer": {"pass": 0, "partial": 0, "fail": 0},
+        "precision_sum": 0.0,
+        "precision_count": 0,
+        "f1_sum": 0.0,
+        "f1_count": 0,
+        "rank_sum": 0,
+        "rank_count": 0,
+        "rrank_sum": 0.0,
+        "facts_count_sum": 0,
+        "facts_count_min": None,
+        "facts_count_max": 0,
+    }
+
+
+def _accumulate(b: dict, judge: dict | None, facts_count: int) -> None:
+    b["count"] += 1
+    b["facts_count_sum"] += facts_count
+    if b["facts_count_min"] is None or facts_count < b["facts_count_min"]:
+        b["facts_count_min"] = facts_count
+    if facts_count > b["facts_count_max"]:
+        b["facts_count_max"] = facts_count
+
+    if judge is None:
+        b["skipped"] += 1
+        return
+
+    rec = judge.get("recall_score", "fail")
+    ans = judge.get("answer_score", "fail")
+    if rec in b["recall"]:
+        b["recall"][rec] += 1
+    if ans in b["answer"]:
+        b["answer"][ans] += 1
+
+    p = judge.get("precision")
+    if p is not None:
+        b["precision_sum"] += p
+        b["precision_count"] += 1
+    f = judge.get("f1")
+    if f is not None:
+        b["f1_sum"] += f
+        b["f1_count"] += 1
+    rank = judge.get("first_relevant_rank")
+    if rank is not None and rank > 0:
+        b["rank_sum"] += rank
+        b["rank_count"] += 1
+        b["rrank_sum"] += 1.0 / rank
+
+
+def _finalize_bucket(b: dict) -> dict:
+    n_judged = b["count"] - b["skipped"]
+
+    def _aggregate_score(counts: dict) -> float | None:
+        if n_judged == 0:
+            return None
+        return round(sum(SCORE_TO_NUMERIC[k] * v for k, v in counts.items()) / n_judged, 4)
+
+    return {
+        "count": b["count"],
+        "skipped": b["skipped"],
+        "recall": {**b["recall"], "score": _aggregate_score(b["recall"])},
+        "answer": {**b["answer"], "score": _aggregate_score(b["answer"])},
+        "precision": {
+            "mean": round(b["precision_sum"] / b["precision_count"], 4) if b["precision_count"] else None,
+            "questions_with_facts": b["precision_count"],
+        },
+        "f1": {
+            "mean": round(b["f1_sum"] / b["f1_count"], 4) if b["f1_count"] else None,
+            "questions_scored": b["f1_count"],
+        },
+        "first_relevant_rank": {
+            "mean": round(b["rank_sum"] / b["rank_count"], 2) if b["rank_count"] else None,
+            "mrr": round(b["rrank_sum"] / b["rank_count"], 4) if b["rank_count"] else None,
+            "questions_with_relevant": b["rank_count"],
+        },
+        "facts_returned": {
+            "mean": round(b["facts_count_sum"] / b["count"], 2) if b["count"] else 0,
+            "min": b["facts_count_min"] if b["facts_count_min"] is not None else 0,
+            "max": b["facts_count_max"],
+        },
+    }
+
+
 def _compute_summary(results: list[dict]) -> dict:
-    totals: dict[str, int] = defaultdict(int)
-    by_category: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    overall = _empty_bucket()
+    by_category: dict[str, dict] = defaultdict(_empty_bucket)
     failed_or_partial: list[dict] = []
     soft_errors_total = sum(int(sample.get("soft_errors", 0)) for sample in results)
     hard_errors_total = sum(int(sample.get("hard_errors", 0)) for sample in results)
 
     for sample in results:
         for qa in sample["qa"]:
-            score = qa["score"]
             cat = qa["category"]
-            totals[score] += 1
-            by_category[cat][score] += 1
-            if score in ("partial", "fail"):
+            judge = qa.get("judge")
+            facts_count = len(qa.get("facts_returned", []))
+
+            _accumulate(overall, judge, facts_count)
+            _accumulate(by_category[cat], judge, facts_count)
+
+            if judge is not None and (
+                judge.get("recall_score") in ("partial", "fail")
+                or judge.get("answer_score") in ("partial", "fail")
+            ):
                 failed_or_partial.append({
                     "sample_id": sample["sample_id"],
                     "question": qa["question"],
-                    "score": score,
-                    "reason": qa["reason"],
+                    "recall_score": judge.get("recall_score"),
+                    "answer_score": judge.get("answer_score"),
+                    "precision": judge.get("precision"),
+                    "facts_count": facts_count,
+                    "reason": judge.get("reason", ""),
                 })
 
-    total = sum(totals.values())
-    by_category_out = {}
-    for cat, scores in sorted(by_category.items()):
-        cat_total = sum(scores.values())
-        by_category_out[cat] = {
-            "total": cat_total,
-            **{k: scores[k] for k in ("pass", "partial", "fail", "skipped") if scores[k]},
-        }
-
     return {
-        "total_questions": total,
+        "total_questions": overall["count"],
         "soft_errors": soft_errors_total,
         "hard_errors": hard_errors_total,
-        "scores": {k: totals[k] for k in ("pass", "partial", "fail", "skipped") if totals[k]},
-        "by_category": by_category_out,
+        "metrics": _finalize_bucket(overall),
+        "by_category": {cat: _finalize_bucket(b) for cat, b in sorted(by_category.items())},
         "failed_or_partial": failed_or_partial,
     }
+
+
+def _fmt(value) -> str:
+    if value is None:
+        return "n/a"
+    if isinstance(value, float):
+        return f"{value:.3f}"
+    return str(value)
+
+
+def _print_bucket(b: dict, indent: str = "") -> None:
+    rec = b["recall"]
+    ans = b["answer"]
+    p = b["precision"]
+    f1 = b["f1"]
+    rk = b["first_relevant_rank"]
+    fr = b["facts_returned"]
+    print(
+        f"{indent}Recall   : score={_fmt(rec['score'])}  "
+        f"pass={rec['pass']}  partial={rec['partial']}  fail={rec['fail']}"
+    )
+    print(
+        f"{indent}Answer   : score={_fmt(ans['score'])}  "
+        f"pass={ans['pass']}  partial={ans['partial']}  fail={ans['fail']}"
+    )
+    print(f"{indent}Precision: mean={_fmt(p['mean'])}  (over {p['questions_with_facts']} qs with facts)")
+    print(f"{indent}F1       : mean={_fmt(f1['mean'])}  (over {f1['questions_scored']} qs)")
+    print(
+        f"{indent}Rank     : mean={_fmt(rk['mean'])}  MRR={_fmt(rk['mrr'])}  "
+        f"(over {rk['questions_with_relevant']} qs with ≥1 relevant)"
+    )
+    print(f"{indent}Facts ret: mean={_fmt(fr['mean'])}  min={fr['min']}  max={fr['max']}")
 
 
 def print_summary(results: list[dict]) -> None:
@@ -437,32 +569,34 @@ def print_summary(results: list[dict]) -> None:
         print(f"Hard errors: {s['hard_errors']}")
         return
 
-    print("\n" + "=" * 50)
+    m = s["metrics"]
+    print("\n" + "=" * 70)
     print("EVALUATION SUMMARY")
-    print("=" * 50)
-    print(f"Total questions : {total}")
-    print(f"Soft errors     : {s['soft_errors']}")
-    print(f"Hard errors     : {s['hard_errors']}")
-    for score_key in ("pass", "partial", "fail", "skipped"):
-        count = s["scores"].get(score_key, 0)
-        if count:
-            pct = 100 * count // total
-            print(f"  {score_key:<10}: {count}  ({pct}%)")
+    print("=" * 70)
+    print(f"Total questions   : {total}")
+    print(f"Skipped (no judge): {m['skipped']}")
+    print(f"Soft errors       : {s['soft_errors']}")
+    print(f"Hard errors       : {s['hard_errors']}")
+    print()
+    _print_bucket(m, indent="")
 
     print("\nBy category:")
-    for cat, scores in s["by_category"].items():
-        cat_total = scores["total"]
-        pct = 100 * scores.get("pass", 0) // cat_total if cat_total else 0
-        print(f"  {cat:<30} pass={scores.get('pass', 0)}/{cat_total} ({pct}%)")
+    for cat, b in s["by_category"].items():
+        print(f"  [category {cat}]  count={b['count']}")
+        _print_bucket(b, indent="    ")
 
     if s["failed_or_partial"]:
-        print("\nFailed or Partial Reasons:")
+        print(f"\nFailed/partial questions ({len(s['failed_or_partial'])}):")
         for item in s["failed_or_partial"]:
-            print(f"  [{item['sample_id']}] Q: {item['question']}")
-            print(f"    Score: {item['score']}")
-            print(f"    Reason: {item['reason']}")
+            p = item.get("precision")
+            p_str = f"{p:.2f}" if isinstance(p, (int, float)) else "n/a"
+            print(
+                f"  [{item['sample_id']}] r={item['recall_score']:<7} a={item['answer_score']:<7} "
+                f"p={p_str} facts={item['facts_count']} :: {item['question']}"
+            )
+            print(f"      → {item['reason']}")
 
-    print("=" * 50 + "\n")
+    print("=" * 70 + "\n")
 
 
 # ── entrypoint ─────────────────────────────────────────────────────────────────
