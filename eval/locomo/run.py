@@ -305,7 +305,7 @@ async def evaluate_sample(
             memory_output, recall_elapsed, soft_inc, hard_inc, recall_exc = await _run_with_retries(
                 label=f"recall (qa {qi}/{total_qa})",
                 sample_id=sample_id,
-                action=lambda: client.recall(thread_id, question, when=last_session_iso, light=(recall_mode == "light")),
+                action=lambda: client.recall(thread_id, question, when=last_session_iso, mode=recall_mode),
             )
             soft_errors += soft_inc
             hard_errors += hard_inc
@@ -484,12 +484,26 @@ def parse_args() -> argparse.Namespace:
         help="Target API to test against: 'our_api' (default) or 'mem0'",
     )
     p.add_argument(
-        "--mode",
-        choices=["standard", "light"],
-        default="standard",
-        help="Recall mode: 'standard' (default, with query decomposition) or 'light' (cheaper, embedding-only retrieval)",
+        "--light",
+        action="store_true",
+        help="Use RecallLight (cheaper, single-embedding + Flash Lite selection) instead of standard recall",
+    )
+    p.add_argument(
+        "--zero",
+        action="store_true",
+        help="Use RecallZero (no LLM at all; single embedding + deterministic post-processing) instead of standard recall",
     )
     return p.parse_args()
+
+
+def _recall_mode_from_args(args: argparse.Namespace) -> str:
+    if args.light and args.zero:
+        sys.exit("[ERROR] --light and --zero are mutually exclusive")
+    if args.zero:
+        return "zero"
+    if args.light:
+        return "light"
+    return "standard"
 
 
 def _aggregate_usage(results: list) -> dict:
@@ -582,6 +596,8 @@ async def main() -> None:
     if missing_models:
         sys.exit(f"[ERROR] Missing required environment variables for models: {', '.join(missing_models)}")
 
+    recall_mode = _recall_mode_from_args(args)
+
     samples = load_dataset(Path(args.data))
     if args.start:
         samples = samples[args.start:]
@@ -602,7 +618,7 @@ async def main() -> None:
     print(f"  total turns : {total_turns}")
     print(f"  total QAs   : {total_qa}")
     print(f"  concurrency : {args.concurrency}")
-    print(f"  recall mode : {args.mode}")
+    print(f"  recall mode : {recall_mode}")
     print(f"  judge       : {'disabled (--no-judge)' if args.no_judge else 'enabled'}")
     if args.target == "mem0":
         print(f"  API         : mem0 (https://api.mem0.ai/v3)")
@@ -634,7 +650,7 @@ async def main() -> None:
     try:
         async with client_ctx as client:
             tasks = [
-                evaluate_sample(sample, client, evaluator, semaphore, reuse_thread_id=args.reuse_thread, recall_mode=args.mode)
+                evaluate_sample(sample, client, evaluator, semaphore, reuse_thread_id=args.reuse_thread, recall_mode=recall_mode)
                 for sample in samples
             ]
             raw = await asyncio.gather(*tasks, return_exceptions=True)
@@ -649,7 +665,7 @@ async def main() -> None:
         print(f"\n[ERROR] run aborted: {exc!r}. Writing partial results…", flush=True)
     finally:
         elapsed = time.time() - start
-        _write_output(args.out, results, elapsed, args.data, recall_mode=args.mode)
+        _write_output(args.out, results, elapsed, args.data, recall_mode=recall_mode)
         print_summary(results)
 
     if args.cleanup:

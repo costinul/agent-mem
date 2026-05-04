@@ -2,6 +2,7 @@ package eval_test
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"testing"
@@ -13,6 +14,8 @@ import (
 	"github.com/costinul/bwai"
 	"github.com/costinul/bwai/bwaiclient"
 )
+
+var lightMode = flag.Bool("light", false, "use RecallLight instead of Recall")
 
 type envSecretStorage struct{}
 
@@ -45,6 +48,7 @@ func setupEngine(t *testing.T) (*engine.MemoryEngine, *memoryrepo.InMemoryReposi
 		Decompose:        os.Getenv("AI_MODEL_DECOMPOSE"),
 		Evaluate:         os.Getenv("AI_MODEL_EVALUATE"),
 		SelectFacts:      os.Getenv("AI_MODEL_SELECT_FACTS"),
+		SelectFactsLight: os.Getenv("AI_MODEL_SELECT_FACTS_LIGHT"),
 		DecomposeQueries: os.Getenv("AI_MODEL_DECOMPOSE_QUERIES"),
 		DecomposeRecall:  os.Getenv("AI_MODEL_DECOMPOSE_RECALL"),
 	}
@@ -69,6 +73,28 @@ func sendMessageAs(t *testing.T, eng *engine.MemoryEngine, content string, autho
 	}); err != nil {
 		t.Fatalf("Add(%q) error = %v", content, err)
 	}
+}
+
+func recall(t *testing.T, eng *engine.MemoryEngine, query string) models.RecallOutput {
+	t.Helper()
+	input := models.RecallInput{
+		AccountID: "eval-account",
+		AgentID:   "eval-agent",
+		ThreadID:  "eval-thread",
+		Query:     query,
+	}
+	if *lightMode {
+		out, err := eng.RecallLight(context.Background(), input)
+		if err != nil {
+			t.Fatalf("RecallLight(%q) error = %v", query, err)
+		}
+		return out
+	}
+	out, err := eng.Recall(context.Background(), input)
+	if err != nil {
+		t.Fatalf("Recall(%q) error = %v", query, err)
+	}
+	return out
 }
 
 func logFacts(t *testing.T, label string, facts []models.Fact) {

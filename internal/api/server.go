@@ -37,6 +37,7 @@ func NewServer(engine *engine.MemoryEngine, accountSvc *account.Service, agentSv
 	mux.HandleFunc("POST /memory", requireAPIKey(accountSvc, addHandler(engine, agentSvc)))
 	mux.HandleFunc("POST /memory/recall", requireAPIKey(accountSvc, recallHandler(engine, agentSvc)))
 	mux.HandleFunc("POST /memory/recall/light", requireAPIKey(accountSvc, recallLightHandler(engine, agentSvc)))
+	mux.HandleFunc("POST /memory/recall/zero", requireAPIKey(accountSvc, recallZeroHandler(engine, agentSvc)))
 	mux.HandleFunc("GET /facts", requireAPIKey(accountSvc, listFactsHandler(engine)))
 	mux.HandleFunc("GET /facts/{id}", requireAPIKey(accountSvc, getFactHandler(engine)))
 	mux.HandleFunc("PUT /facts/{id}", requireAPIKey(accountSvc, updateFactHandler(engine)))

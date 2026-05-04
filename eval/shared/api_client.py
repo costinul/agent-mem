@@ -96,13 +96,15 @@ class MemoryAPIClient:
         self._raise_with_body(resp)
         return resp.json()
 
-    async def recall(self, thread_id: str, question: str, when: str | None = None, light: bool = False) -> dict:
+    async def recall(self, thread_id: str, question: str, when: str | None = None, mode: str = "standard") -> dict:
         """Read-only retrieval of facts relevant to the question.
 
         Args:
             when: ISO 8601 timestamp string for when the question is being asked.
                   Sent as event_date; used to resolve relative-time phrases in the query.
-            light: If True, use /memory/recall/light (cheaper, no query decomposition).
+            mode: "standard" → /memory/recall (full LLM pipeline),
+                  "light"    → /memory/recall/light (single embedding + Flash Lite selection),
+                  "zero"     → /memory/recall/zero (no LLM at all).
         """
         payload = {
             "thread_id": thread_id,
@@ -111,7 +113,10 @@ class MemoryAPIClient:
         }
         if when:
             payload["event_date"] = when
-        endpoint = "/memory/recall/light" if light else "/memory/recall"
+        endpoint = {
+            "light": "/memory/recall/light",
+            "zero": "/memory/recall/zero",
+        }.get(mode, "/memory/recall")
         resp = await self._client_or_raise().post(f"{self.base_url}{endpoint}", json=payload)
         self._raise_with_body(resp)
         return resp.json()
