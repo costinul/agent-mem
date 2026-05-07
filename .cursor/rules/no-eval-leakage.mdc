@@ -1,0 +1,22 @@
+---
+description: Prompts and code must never contain examples or entities from any evaluation dataset
+alwaysApply: true
+---
+
+# No evaluation-set leakage
+
+Prompts, system instructions, few-shot examples, heuristics, and any other model-facing text MUST be corpus-agnostic. They must NEVER reference entities, topics, or fact patterns that appear in any dataset used to evaluate the system (e.g. locomo, longmemeval, or any future benchmark).
+
+This is a hard scientific rule, not a stylistic preference. Putting test-set entities or facts into a prompt is data leakage: any score lift it produces is partial memorization of the evaluation, not a property of the system being measured.
+
+## Rules
+
+- Do NOT use names, places, hobbies, professions, relationships, or fact wordings drawn from an eval dataset in any prompt example.
+  - locomo characters include (non-exhaustive): Caroline, Melanie, Nate, Joanna, Diane.
+  - locomo fact patterns include (non-exhaustive): adoption agencies, returning to home country, LGBTQ identity, camping plans, painting hobbies, wedding dates.
+- Use neutral placeholder names (`Alice`, `Bob`, `Carol`) or abstract slots (`<X>`, `<entity>`, `<activity>`) in examples.
+- Topics in examples must be generic and not match any entity in the eval (e.g. "preferred programming language", "home city", "studies linguistics") — chosen so they cannot accidentally describe a real eval entity.
+- The same rule applies to code: heuristics, regexes, hardcoded keyword lists, or stop-word sets must not be tuned to strings that appear only in eval data.
+- When adding a new prompt example, ask: "would this example still make sense if the eval set were swapped for a different one?" If no, rewrite it.
+
+If you find existing prompts that violate this rule, flag them and replace the offending examples with neutral ones.
