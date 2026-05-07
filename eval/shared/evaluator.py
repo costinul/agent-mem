@@ -38,14 +38,46 @@ Derived metrics computed downstream from these primitives:
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import time
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from openai import AsyncAzureOpenAI
+from openai import AsyncAzureOpenAI, AsyncOpenAI
 
 logger = logging.getLogger(__name__)
+
+GEMINI_OPENAI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+CEREBRAS_OPENAI_BASE_URL = "https://api.cerebras.ai/v1/"
+
+
+class _SlidingWindowRpmLimiter:
+    """Async-safe sliding-window limiter: at most `rpm` calls per any 60s window.
+
+    Before each call we look at the timestamp of the oldest call still inside
+    the window; if the window is full, we sleep just long enough for that call
+    to fall out, then proceed. Tight to the cap, no fixed-interval slack.
+    """
+
+    def __init__(self, rpm: int):
+        self._rpm = rpm
+        self._calls: deque[float] = deque()
+        self._lock = asyncio.Lock()
+
+    async def acquire(self) -> None:
+        while True:
+            async with self._lock:
+                now = time.monotonic()
+                while self._calls and now - self._calls[0] >= 60.0:
+                    self._calls.popleft()
+                if len(self._calls) < self._rpm:
+                    self._calls.append(now)
+                    return
+                wait_for = 60.0 - (now - self._calls[0]) + 0.05
+            await asyncio.sleep(wait_for)
 
 Score = Literal["pass", "partial", "fail"]
 
@@ -157,13 +189,44 @@ class JudgeResult:
 
 
 class Evaluator:
-    def __init__(self, api_key: str, endpoint: str, model: str):
-        self._client = AsyncAzureOpenAI(
-            api_key=api_key,
-            azure_endpoint=endpoint,
-            api_version="2024-02-15-preview",
-        )
+    def __init__(
+        self,
+        model: str,
+        *,
+        provider: str = "azure",
+        azure_api_key: str | None = None,
+        azure_endpoint: str | None = None,
+        gemini_api_key: str | None = None,
+        cerebras_api_key: str | None = None,
+        rpm_limit: int | None = None,
+    ):
         self.model = model
+        self.provider = provider.lower()
+        if self.provider == "google":
+            if not gemini_api_key:
+                raise ValueError("gemini_api_key is required for Google judge models")
+            self._client = AsyncOpenAI(
+                api_key=gemini_api_key,
+                base_url=GEMINI_OPENAI_BASE_URL,
+            )
+        elif self.provider == "cerebras":
+            if not cerebras_api_key:
+                raise ValueError("cerebras_api_key is required for Cerebras judge models")
+            self._client = AsyncOpenAI(
+                api_key=cerebras_api_key,
+                base_url=CEREBRAS_OPENAI_BASE_URL,
+            )
+        elif self.provider == "azure":
+            if not (azure_api_key and azure_endpoint):
+                raise ValueError("azure_api_key and azure_endpoint are required for Azure judge models")
+            self._client = AsyncAzureOpenAI(
+                api_key=azure_api_key,
+                azure_endpoint=azure_endpoint,
+                api_version="2024-02-15-preview",
+            )
+        else:
+            raise ValueError(f"unsupported judge provider: {provider}")
+        self._limiter = _SlidingWindowRpmLimiter(rpm_limit) if rpm_limit and rpm_limit > 0 else None
 
     async def judge(self, question: str, ground_truth: str, facts: list[str]) -> JudgeResult:
         n = len(facts)
@@ -177,6 +240,8 @@ class Evaluator:
             n=n,
             facts=facts_text,
         )
+        if self._limiter is not None:
+            await self._limiter.acquire()
         response = await self._client.chat.completions.create(
             model=self.model,
             temperature=0.0,

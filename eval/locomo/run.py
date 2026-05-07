@@ -77,6 +77,23 @@ LOCOMO_DATA_URL = (
     "https://raw.githubusercontent.com/snap-research/locomo/main/data/locomo10.json"
 )
 DATA_DEFAULT = Path(__file__).parent / "data" / "locomo10.json"
+MODELS_JSON_PATH = Path(__file__).resolve().parent.parent.parent / "models.json"
+
+
+def _resolve_model(model_id: str) -> tuple[str, str]:
+    """Resolve a logical model id (as used in .env) to (real_model_name, provider)
+    using models.json. Falls back to (model_id, 'azure') if not found, preserving
+    backward compatibility with raw OpenAI model strings.
+    """
+    try:
+        with open(MODELS_JSON_PATH, encoding="utf-8") as f:
+            entries = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return model_id, "azure"
+    for entry in entries:
+        if entry.get("id") == model_id:
+            return entry.get("model", model_id), entry.get("provider", "azure")
+    return model_id, "azure"
 
 _PREVIEW_LEN = 80
 _MAX_RETRIES = 3
@@ -601,6 +618,166 @@ def print_summary(results: list[dict]) -> None:
 
 # ── entrypoint ─────────────────────────────────────────────────────────────────
 
+def _build_evaluator() -> Evaluator:
+    """Construct the Evaluator from env vars based on AI_MODEL_JUDGE provider."""
+    judge_id = os.environ.get("AI_MODEL_JUDGE")
+    if not judge_id:
+        sys.exit("[ERROR] AI_MODEL_JUDGE environment variable is required when running with the judge.")
+    judge_model, judge_provider = _resolve_model(judge_id)
+    if judge_provider == "google":
+        gemini_key = os.environ.get("GEMINI_API_KEY")
+        if not gemini_key:
+            sys.exit("[ERROR] GEMINI_API_KEY is required when AI_MODEL_JUDGE is a Google model.")
+        rpm = int(os.environ.get("GEMINI_JUDGE_RPM", "5"))
+        return Evaluator(
+            model=judge_model,
+            provider="google",
+            gemini_api_key=gemini_key,
+            rpm_limit=rpm,
+        )
+    if judge_provider == "cerebras":
+        cerebras_key = os.environ.get("CEREBRAS_API_KEY")
+        if not cerebras_key:
+            sys.exit("[ERROR] CEREBRAS_API_KEY is required when AI_MODEL_JUDGE is a Cerebras model.")
+        rpm_env = os.environ.get("CEREBRAS_JUDGE_RPM")
+        rpm = int(rpm_env) if rpm_env else None
+        return Evaluator(
+            model=judge_model,
+            provider="cerebras",
+            cerebras_api_key=cerebras_key,
+            rpm_limit=rpm,
+        )
+    azure_key = os.environ.get("AZURE_OPENAI_API_KEY")
+    if not azure_key:
+        sys.exit("[ERROR] AZURE_OPENAI_API_KEY is required for Azure judge models.")
+    azure_endpoint = os.environ.get(
+        "AZURE_OPENAI_ENDPOINT", "https://cchat-ai.cognitiveservices.azure.com/"
+    )
+    return Evaluator(
+        model=judge_model,
+        provider="azure",
+        azure_api_key=azure_key,
+        azure_endpoint=azure_endpoint,
+    )
+
+
+async def rejudge_file(
+    input_path: str,
+    out_path: str,
+    max_facts: int | None,
+    evaluator: Evaluator,
+    concurrency: int,
+) -> None:
+    """Reload an existing results JSON, optionally truncate facts to top-K, and
+    rerun the judge on every QA. No backend recall is performed.
+    """
+    with open(input_path, encoding="utf-8") as f:
+        data = json.load(f)
+
+    conversations = data.get("conversations") or data.get("samples") or []
+    if not conversations:
+        sys.exit(f"[ERROR] No 'conversations' (or 'samples') found in {input_path}")
+
+    jobs: list[tuple[str, dict]] = []
+    for conv in conversations:
+        sid = conv.get("sample_id", "?")
+        for qa in conv.get("qa", []):
+            jobs.append((sid, qa))
+
+    total = len(jobs)
+    print("=" * 60)
+    print("LoCoMo Rejudge")
+    print("=" * 60)
+    print(f"  source file : {input_path}")
+    print(f"  total QAs   : {total}")
+    print(f"  max facts   : {max_facts if max_facts else 'unlimited (rejudge as-is)'}")
+    print(f"  concurrency : {concurrency}")
+    print(f"  judge model : {evaluator.model}  (provider={evaluator.provider})")
+    print("=" * 60 + "\n")
+
+    sem = asyncio.Semaphore(concurrency)
+    soft_per_sample: dict[str, int] = defaultdict(int)
+    hard_per_sample: dict[str, int] = defaultdict(int)
+    progress = {"done": 0}
+    start = time.time()
+
+    async def _run_one(sid: str, qa: dict) -> None:
+        async with sem:
+            facts = list(qa.get("facts_returned") or [])
+            if max_facts is not None and max_facts > 0:
+                facts = facts[:max_facts]
+            qa["facts_returned"] = facts
+
+            qa_t0 = time.time()
+            question = qa.get("question", "")
+            ground_truth = qa.get("ground_truth", "")
+            result, _, soft_inc, hard_inc, exc = await _run_with_retries(
+                label="rejudge",
+                sample_id=sid,
+                action=lambda: evaluator.judge(question, ground_truth, facts),
+            )
+            soft_per_sample[sid] += soft_inc
+            hard_per_sample[sid] += hard_inc
+
+            if hard_inc == 0 and result is not None:
+                qa["judge"] = result.to_dict()
+            else:
+                qa["judge"] = JudgeResult(
+                    recall_score="fail",
+                    answer_score="fail",
+                    fact_relevance=[False] * len(facts),
+                    reason=str(exc) if exc else "unknown judge error",
+                ).to_dict()
+
+            elapsed_qa = time.time() - qa_t0
+            progress["done"] += 1
+            j = qa["judge"]
+            p = j.get("precision")
+            p_str = f"{p:.2f}" if p is not None else "n/a"
+            print(
+                f"  [{sid} {progress['done']}/{total}] r={j.get('recall_score')} "
+                f"a={j.get('answer_score')} p={p_str} facts={len(facts)} ({elapsed_qa:.1f}s)",
+                flush=True,
+            )
+
+    try:
+        await asyncio.gather(*[_run_one(sid, qa) for sid, qa in jobs])
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        print("\n[interrupted] Writing partial results…", flush=True)
+
+    for conv in conversations:
+        sid = conv.get("sample_id", "?")
+        conv["soft_errors"] = soft_per_sample.get(sid, 0)
+        conv["hard_errors"] = hard_per_sample.get(sid, 0)
+
+    elapsed = time.time() - start
+
+    output = dict(data)
+    output["conversations"] = conversations
+    output["summary"] = _compute_summary(conversations)
+    output["error_stats"] = {
+        "soft_errors": sum(soft_per_sample.values()),
+        "hard_errors": sum(hard_per_sample.values()),
+        "max_retries": _MAX_RETRIES,
+        "retry_wait_seconds": _RETRY_WAIT_SECONDS,
+    }
+    output["rejudge"] = {
+        "source_file": input_path,
+        "max_facts": max_facts,
+        "judge_model": evaluator.model,
+        "judge_provider": evaluator.provider,
+        "elapsed_seconds": round(elapsed, 1),
+    }
+    models = dict(output.get("models") or {})
+    models["AI_MODEL_JUDGE"] = evaluator.model
+    output["models"] = models
+
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(output, f, indent=2, ensure_ascii=False)
+    print(f"\nResults written to: {out_path}  (elapsed: {elapsed:.1f}s)")
+    print_summary(conversations)
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="LoCoMo memory evaluation")
     p.add_argument("--concurrency", type=int, default=1, help="Max parallel conversations (default: 1)")
@@ -626,6 +803,17 @@ def parse_args() -> argparse.Namespace:
         "--zero",
         action="store_true",
         help="Use RecallZero (no LLM at all; single embedding + deterministic post-processing) instead of standard recall",
+    )
+    p.add_argument(
+        "--rejudge",
+        default=None,
+        help="Path to an existing results JSON. Skip backend recall; rerun the judge on the stored facts and write a new file.",
+    )
+    p.add_argument(
+        "--max-facts",
+        type=int,
+        default=None,
+        help="When rejudging, truncate facts_returned to this top-K before scoring. Useful for apples-to-apples cap comparisons.",
     )
     return p.parse_args()
 
@@ -706,6 +894,19 @@ def _write_output(out_path: str, results: list, elapsed: float, data_path: str, 
 async def main() -> None:
     args = parse_args()
 
+    if args.rejudge:
+        if args.no_judge:
+            sys.exit("[ERROR] --rejudge requires the judge; remove --no-judge.")
+        evaluator = _build_evaluator()
+        await rejudge_file(
+            input_path=args.rejudge,
+            out_path=args.out,
+            max_facts=args.max_facts,
+            evaluator=evaluator,
+            concurrency=args.concurrency,
+        )
+        return
+
     if args.target == "mem0":
         mem0_api_key = os.environ["MEM0_API_KEY"]
         api_url = ""
@@ -762,14 +963,7 @@ async def main() -> None:
 
     evaluator: Evaluator | None = None
     if not args.no_judge:
-        openai_key = os.environ["AZURE_OPENAI_API_KEY"]
-        openai_endpoint = os.environ.get(
-            "AZURE_OPENAI_ENDPOINT", "https://cchat-ai.cognitiveservices.azure.com/"
-        )
-        judge_model = os.environ.get("AI_MODEL_JUDGE")
-        if not judge_model:
-            sys.exit("[ERROR] AI_MODEL_JUDGE environment variable is required when running with the judge.")
-        evaluator = Evaluator(api_key=openai_key, endpoint=openai_endpoint, model=judge_model)
+        evaluator = _build_evaluator()
 
     semaphore = asyncio.Semaphore(args.concurrency)
     start = time.time()
