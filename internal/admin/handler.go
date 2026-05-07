@@ -1229,6 +1229,10 @@ func (h *Handler) renderPlaygroundResult(w http.ResponseWriter, result *Playgrou
                     class="py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600 transition-colors">
                 Facts
             </button>
+            <button type="button" onclick="switchResultTab('candidates')" id="res-tab-btn-candidates"
+                    class="py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors">
+                Candidates <span class="ml-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-gray-100 text-gray-500">{{len .Debug.Candidates}}</span>
+            </button>
             <button type="button" onclick="switchResultTab('debug')" id="res-tab-btn-debug"
                     class="py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors">
                 Debug
@@ -1237,16 +1241,13 @@ func (h *Handler) renderPlaygroundResult(w http.ResponseWriter, result *Playgrou
     </div>
     <script>
     function switchResultTab(tab) {
-        document.getElementById('res-tab-btn-facts').className = tab === 'facts' 
-            ? 'py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600 transition-colors'
-            : 'py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors';
-        
-        document.getElementById('res-tab-btn-debug').className = tab === 'debug'
-            ? 'py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600 transition-colors'
-            : 'py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors';
-        
-        document.getElementById('res-tab-panel-facts').style.display = tab === 'facts' ? 'block' : 'none';
-        document.getElementById('res-tab-panel-debug').style.display = tab === 'debug' ? 'block' : 'none';
+        ['facts','candidates','debug'].forEach(function(t) {
+            var active = t === tab;
+            document.getElementById('res-tab-btn-' + t).className = active
+                ? 'py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600 transition-colors'
+                : 'py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors';
+            document.getElementById('res-tab-panel-' + t).style.display = active ? 'block' : 'none';
+        });
     }
     </script>
     {{end}}
@@ -1280,6 +1281,44 @@ func (h *Handler) renderPlaygroundResult(w http.ResponseWriter, result *Playgrou
     </div>
 
     {{if .Debug}}
+    <div id="res-tab-panel-candidates" style="display: none;">
+      {{if .Debug.Candidates}}
+      <div class="flex items-center gap-3 px-4 py-2.5 bg-gray-50 border-b border-gray-100 text-xs">
+        <span class="font-medium text-gray-600">{{len .Debug.Candidates}} total</span>
+        <span class="text-gray-300">|</span>
+        <span class="inline-flex items-center gap-1 text-green-700"><span class="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span>{{len .Debug.SelectedIDs}} selected</span>
+        <span class="text-gray-300">|</span>
+        <span class="inline-flex items-center gap-1 text-gray-500"><span class="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block"></span>in window: {{.Debug.InWindowCount}}</span>
+      </div>
+      <ul class="divide-y divide-gray-100">
+        {{range .Debug.Candidates}}
+        <li class="px-4 py-3 {{if .Selected}}bg-green-50{{end}}">
+          <div class="flex items-start gap-2">
+            <span class="inline-flex shrink-0 px-2 py-0.5 text-[10px] font-medium rounded-full mt-0.5
+              {{if eq (printf "%s" .Kind) "KNOWLEDGE"}}bg-blue-100 text-blue-700
+              {{else if eq (printf "%s" .Kind) "RULE"}}bg-purple-100 text-purple-700
+              {{else}}bg-amber-100 text-amber-700{{end}}">{{.Kind}}</span>
+            {{if not .InWindow}}
+            <span class="inline-flex shrink-0 px-2 py-0.5 text-[10px] font-medium rounded-full mt-0.5 bg-yellow-100 text-yellow-700">out of window</span>
+            {{end}}
+            <p class="text-sm text-gray-900 flex-1">{{.Text}}</p>
+            {{if .Selected}}
+            <span class="inline-flex shrink-0 px-2 py-0.5 text-[10px] font-medium rounded-full mt-0.5 bg-green-100 text-green-700">selected</span>
+            {{else}}
+            <span class="inline-flex shrink-0 px-2 py-0.5 text-[10px] font-medium rounded-full mt-0.5 bg-gray-100 text-gray-500">filtered</span>
+            {{end}}
+          </div>
+          <div class="mt-1 flex items-center gap-3 text-[10px] font-mono text-gray-400">
+            <span>{{.ID}}</span>
+            {{if .EventDate}}<span class="text-gray-300">·</span><span>{{.EventDate}}</span>{{end}}
+          </div>
+        </li>
+        {{end}}
+      </ul>
+      {{else}}
+      <p class="px-4 py-3 text-sm text-gray-400">No candidates.</p>
+      {{end}}
+    </div>
     <div id="res-tab-panel-debug" style="display: none;" class="p-4 text-sm text-gray-700 space-y-4">
       <div>
         <h4 class="font-semibold text-gray-900 mb-1">Search Phrases</h4>
@@ -1303,24 +1342,16 @@ func (h *Handler) renderPlaygroundResult(w http.ResponseWriter, result *Playgrou
           <span class="font-medium">Out of Window:</span> {{.Debug.OutOfWindowCount}}
         </div>
       </div>
+      {{if .Debug.Errors}}
       <div>
-        <h4 class="font-semibold text-gray-900 mb-2">Candidates</h4>
-        <ul class="divide-y divide-gray-100 border border-gray-200 rounded-md">
-          {{range .Debug.Candidates}}
-          <li class="px-3 py-2 {{if .Selected}}bg-green-50{{else}}bg-gray-50{{end}}">
-            <div class="flex items-start gap-2">
-              <span class="inline-flex shrink-0 px-2 py-0.5 text-[10px] font-medium rounded-full mt-0.5 bg-gray-200 text-gray-700">{{.Kind}}</span>
-              <p class="text-xs text-gray-800 flex-1">{{.Text}}</p>
-              {{if .Selected}}
-              <span class="inline-flex shrink-0 px-2 py-0.5 text-[10px] font-medium rounded-full mt-0.5 bg-green-100 text-green-700">Selected</span>
-              {{else}}
-              <span class="inline-flex shrink-0 px-2 py-0.5 text-[10px] font-medium rounded-full mt-0.5 bg-gray-200 text-gray-500">Filtered</span>
-              {{end}}
-            </div>
-          </li>
+        <h4 class="font-semibold text-gray-900 mb-1">Errors</h4>
+        <ul class="list-disc pl-5 text-red-600">
+          {{range .Debug.Errors}}
+          <li>{{.}}</li>
           {{end}}
         </ul>
       </div>
+      {{end}}
     </div>
     {{end}}
   </div>
