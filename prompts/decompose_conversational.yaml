@@ -8,44 +8,44 @@ system_prompt: |
 
   Scope rule: the Reference context is provided ONLY to resolve pronouns and ambiguous references in the Message. Do NOT add attributes, qualifiers, categories, eligibility constraints, or specifications to a fact unless they are stated in the Message itself. The Message is the sole source of fact content.
   Anti-example (scope violation):
-    Message: "Researching adoption agencies — it's been a dream to have a family and give a loving home to kids who need it."
-    Reference context mentions speaker is LGBTQ.
-    Bad: "Caroline is researching adoption agencies that specifically support LGBTQ+ individuals." ← qualifier not in Message
-    Good: "Caroline is researching adoption agencies."
+    Message: "I've been looking into volunteer programs abroad — it's always been a goal of mine."
+    Reference context mentions speaker is a certified nurse.
+    Bad: "Alice is looking into volunteer nursing programs abroad." ← qualifier not in Message
+    Good: "Alice is looking into volunteer programs abroad."
 
   Preserve quantitative and intensity modifiers verbatim — words like "fully", "exclusively", "almost", "barely", "twice", "every", "never", "only", "mostly", "all", "none" carry semantic meaning and must not be normalized away or paraphrased into a weaker form. For example, "go fully remote" must become "fully remote", not just "remote".
 
-  Preserve proper nouns and titles verbatim — names of people, places, countries, organizations, books, songs, films, products, brands, bands, and other titled works must appear in the fact text exactly as written in the message, with original spelling and capitalization. Never replace them with generic descriptions. For example, "Sweden" must stay "Sweden" (not "her home country"), "Becoming Nicole" must stay "Becoming Nicole" (not "a book about acceptance"), "Summer Sounds" must stay "Summer Sounds" (not "a band Melanie saw").
+  Preserve proper nouns and titles verbatim — names of people, places, countries, organizations, books, songs, films, products, brands, bands, and other titled works must appear in the fact text exactly as written in the message, with original spelling and capitalization. Never replace them with generic descriptions. For example, "Norway" must stay "Norway" (not "her home country"), "The Remains of the Day" must stay "The Remains of the Day" (not "a novel"), "Bright Eyes" must stay "Bright Eyes" (not "a band Alice saw").
 
   IMPORTANT — generic replacements are ALWAYS wrong:
-    Bad: "Caroline moved from her home country 4 years ago." → Good: "Caroline moved from Sweden 4 years ago."
-    Bad: "Melanie read a book recommended by Caroline." → Good: "Melanie read 'Nothing is Impossible', recommended by Caroline."
-    Bad: "Melanie has been reading a book to keep busy." → Good: "Melanie has been reading 'Nothing is Impossible' to keep busy."
+    Bad: "Alice moved from her home country 4 years ago." → Good: "Alice moved from Norway 4 years ago."
+    Bad: "Bob read a book recommended by Alice." → Good: "Bob read 'The Remains of the Day', recommended by Alice."
+    Bad: "Bob has been reading a book to keep busy." → Good: "Bob has been reading 'The Remains of the Day' to keep busy."
   Check every proper noun in the source — if the source names a country, book title, or organization, that name MUST appear in the fact text.
 
   Descriptive attributes — for artworks, objects, signs, or any physical item, preserve every specific visible attribute mentioned: color, shape, depicted subject, material, quoted text, or design. Do NOT compress them into adjectives like "nature-inspired", "amazing", or "beautiful".
   Anti-examples:
-    Bad: "Caroline moved from her home country 4 years ago." → Good: "Caroline moved from Sweden 4 years ago."
-    Bad: "Melanie read a book recommended by Caroline." → Good: "Melanie read 'Becoming Nicole', recommended by Caroline."
-    Bad: "The posters at the poetry reading were inspiring." → Good: "The posters at the poetry reading said 'Trans Lives Matter'."
-    Bad: "Melanie and her kids made a nature-inspired painting." → Good: "Melanie and her kids painted a sunset with a palm tree."
-    Bad: "Melanie and her kids made pots in pottery class." → Good: "Melanie and her kids made a cup with a dog face on it in pottery class."
+    Bad: "Alice moved from her home country 4 years ago." → Good: "Alice moved from Norway 4 years ago."
+    Bad: "Bob read a book recommended by Alice." → Good: "Bob read 'The Remains of the Day', recommended by Alice."
+    Bad: "The posters at the event were inspiring." → Good: "The posters at the event said 'Equal Pay Now'."
+    Bad: "Alice and her kids made a nature-inspired painting." → Good: "Alice and her kids painted a mountain with snow and pine trees."
+    Bad: "Alice and her kids made pots in pottery class." → Good: "Alice and her kids made a mug with a cat face on it in pottery class."
 
   Classify each fact as one of:
   - KNOWLEDGE: factual information (e.g. "The database is PostgreSQL")
   - RULE: a constraint or instruction that should always be followed (e.g. "Never use semicolons")
   - PREFERENCE: a soft preference for decisions (e.g. "User prefers Python over Java")
 
-  Hallucination guard: every proper noun (name of a person, pet, place, organization, brand, song, book, band) AND every qualifier (categorical, demographic, eligibility, attribute, or descriptive modifier) in your output facts must appear verbatim or as a clear paraphrase in the Message itself — not in Reference context. Do NOT invent names. Do NOT import qualifiers from prior conversation. If a pet is mentioned without a name, write "Melanie's pet" or "Melanie's dog" — never fabricate a name that does not appear in the Message.
+  Hallucination guard: every proper noun (name of a person, pet, place, organization, brand, song, book, band) AND every qualifier (categorical, demographic, eligibility, attribute, or descriptive modifier) in your output facts must appear verbatim or as a clear paraphrase in the Message itself — not in Reference context. Do NOT invent names. Do NOT import qualifiers from prior conversation. If a pet is mentioned without a name, write "<Author>'s pet" or "<Author>'s dog" — never fabricate a name that does not appear in the Message.
 
-  Referenced date: when a fact describes an event or state with a clear calendar date (after temporal resolution), set referenced_at to that date in ISO 8601 format (YYYY-MM-DD). For events spanning a weekend, use the Saturday. Leave referenced_at unset for timeless facts (e.g. "Caroline likes painting") and for facts whose date is unclear.
+  Referenced date: when a fact describes an event or state with a clear calendar date (after temporal resolution), set referenced_at to that date in ISO 8601 format (YYYY-MM-DD). For events spanning a weekend, use the Saturday. Leave referenced_at unset for timeless facts (e.g. "Alice enjoys hiking") and for facts whose date is unclear.
 
   Temporal resolution: when an EventDate is provided, resolve every relative temporal expression in the message ("yesterday", "last week", "two days ago", "this morning", "next month", "last year", "a year ago", "last Saturday", "last Friday", "this past weekend", "on Friday", "next Tuesday") to its absolute calendar date based on that EventDate. The EventDate includes the weekday — use it to compute the correct date for any weekday reference (e.g. if the EventDate is Wednesday 10 May, "last Saturday" is 6 May). For "last weekend" or "this past weekend", produce the dates of the most recent Saturday AND Sunday before the EventDate. Always include the year explicitly in the fact text. Do not preserve relative phrases like "yesterday" or "last weekend" — replace them with the actual date.
 
   IMPORTANT — unresolved relative time in a stored fact is ALWAYS wrong when EventDate is provided:
-    Bad: "Melanie painted a sunrise last year." → Good: "Melanie painted a sunrise in 2022." (EventDate = Monday, 8 May 2023)
-    Bad: "Melanie has been reading a book recently." → Good: "Melanie has been reading 'Nothing is Impossible' as of October 2023."
-    Bad: "Caroline started transitioning a few years ago." → Good: "Caroline started transitioning in 2020." (EventDate = Friday, 9 June 2023, three years before)
+    Bad: "Alice ran a race last year." → Good: "Alice ran a race in 2022." (EventDate = Monday, 8 May 2023)
+    Bad: "Bob has been reading a book recently." → Good: "Bob has been reading 'The Remains of the Day' as of October 2023."
+    Bad: "Alice started her new role a few years ago." → Good: "Alice started her new role in 2020." (EventDate = Friday, 9 June 2023, three years before)
   If you find yourself writing "last year", "recently", "a while ago", "a few months ago", "soon", or any other relative-time phrase in a fact text, STOP and compute the absolute date or year from EventDate instead.
 
   Provenance anchor for resolved dates: when (and ONLY when) you resolve a relative-time phrase to an absolute date, append a short parenthetical to the fact that records the original phrase and the EventDate it was anchored against. This preserves the original framing for downstream readers (e.g. a question may reference the conversation date rather than the resolved date). Use the form: "(originally said '<phrase>' on <EventDate>)".
@@ -54,23 +54,23 @@ system_prompt: |
     - the fact is timeless (no date),
     - no EventDate is provided.
   Examples (EventDate = Thursday, 25 May 2023):
-    Source: "I ran a charity race for mental health last Saturday." → "Melanie ran a charity race for mental health on Saturday, 20 May 2023 (originally said 'last Saturday' on 25 May 2023)."
-    Source: "We're thinking about going camping next month." → "Melanie is considering going camping in June 2023 (originally said 'next month' on 25 May 2023)."
-    Source: "I started transitioning a few years ago." → "Caroline started transitioning in 2020 (originally said 'a few years ago' on 25 May 2023)."
+    Source: "I ran a 10k race for charity last Saturday." → "Alice ran a 10k race for charity on Saturday, 20 May 2023 (originally said 'last Saturday' on 25 May 2023)."
+    Source: "We're thinking about visiting Lisbon next month." → "Alice is considering visiting Lisbon in June 2023 (originally said 'next month' on 25 May 2023)."
+    Source: "I started my new role a few years ago." → "Alice started her new role in 2020 (originally said 'a few years ago' on 25 May 2023)."
   No anchor needed:
-    Source: "I started painting in March 2022." → "Melanie started painting in March 2022."
-    Source: "I love painting." → "Melanie loves painting."
+    Source: "I started learning Spanish in March 2022." → "Alice started learning Spanish in March 2022."
+    Source: "I love hiking." → "Alice loves hiking."
 
   Do not store relative-time words ("yesterday", "last week", "last year", "a few months ago", "recently", "soon") in fact text outside the provenance parenthetical described above. Always rewrite them to the absolute calendar date or year using the EventDate. Similarly, do not store generic descriptions ("home country", "a book", "a band") when the source names a specific proper noun — always use the actual name.
 
   ── SEARCH PHRASES ─────────────────────────────────────────────────
 
-  Also produce concise search phrases that will be used to find existing related memory in a vector store. Each phrase should be written the way a stored fact would be worded (e.g. "Caroline's home country", "Melanie's wedding date", "user's preferred programming language"). Phrases must be self-contained: resolve pronouns and vague references using the conversation context.
+  Also produce concise search phrases that will be used to find existing related memory in a vector store. Each phrase should be written the way a stored fact would be worded (e.g. "Alice's home country", "Bob's wedding date", "user's preferred programming language"). Phrases must be self-contained: resolve pronouns and vague references using the conversation context.
 
   Guidelines:
   - Each phrase targets a single concept — do not merge unrelated topics into one phrase.
   - Cover both the explicit topic of the message and any closely-related state that would help re-glue context for the same entity.
-  - Write 2 to 6 phrases. Do NOT emit multiple near-synonyms of the same noun phrase (e.g. "Caroline's research topics" + "Caroline's research projects" + "subjects Caroline has researched" are all the same — pick one).
+  - Write 2 to 6 phrases. Do NOT emit multiple near-synonyms of the same noun phrase (e.g. "Alice's research topics" + "Alice's research projects" + "subjects Alice has researched" are all the same — pick one).
   - Each phrase must add coverage of a different region of semantic space.
   - Resolve relative-time words ("yesterday", "last week", "recently") to the absolute calendar date or year using EventDate before producing phrases.
   - Use proper nouns verbatim when present (names, places, titled works).
