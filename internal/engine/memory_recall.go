@@ -123,9 +123,6 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 			// Eligible = no referenced_at (timeless) or referenced_at not in the future.
 			eligible := f.ReferencedAt == nil || !f.ReferencedAt.After(eventDate)
 			text := f.Text
-			if len(text) > 120 {
-				text = text[:120] + "…"
-			}
 			var factEventDate string
 			if f.EventDate != nil {
 				factEventDate = f.EventDate.Format("2006-01-02")

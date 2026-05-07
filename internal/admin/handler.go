@@ -1037,6 +1037,19 @@ func parseInputItems(r *http.Request) []models.InputItem {
 	return items
 }
 
+func parsePlaygroundRecallMethod(raw string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "", "standard":
+		return "standard", nil
+	case "zero":
+		return "zero", nil
+	case "light":
+		return "light", nil
+	default:
+		return "", fmt.Errorf("invalid recall method: %q", raw)
+	}
+}
+
 func (h *Handler) resolveThreadID(ctx context.Context, threadID, accountID, agentID string) (string, string, error) {
 	if threadID != "__new__" {
 		return threadID, "", nil
@@ -1126,12 +1139,19 @@ func (h *Handler) playgroundRecall(w http.ResponseWriter, r *http.Request) {
 	agentID := strings.TrimSpace(r.FormValue("agent_id"))
 	threadID := strings.TrimSpace(r.FormValue("thread_id"))
 	query := strings.TrimSpace(r.FormValue("query"))
+	methodRaw := strings.TrimSpace(r.FormValue("method"))
 	eventDateRaw := strings.TrimSpace(r.FormValue("event_date"))
 	limitStr := strings.TrimSpace(r.FormValue("limit"))
 	includeSources := r.FormValue("include_sources") == "on"
 
 	if accountID == "" || agentID == "" || query == "" {
 		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Recall", Error: "account, agent, and query are required"})
+		return
+	}
+
+	method, err := parsePlaygroundRecallMethod(methodRaw)
+	if err != nil {
+		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Recall", Error: err.Error()})
 		return
 	}
 
@@ -1163,14 +1183,23 @@ func (h *Handler) playgroundRecall(w http.ResponseWriter, r *http.Request) {
 		IncludeSources: includeSources,
 		Debug:          true,
 	}
-	out, err := h.engine.Recall(r.Context(), input)
+
+	var out models.RecallOutput
+	switch method {
+	case "zero":
+		out, err = h.engine.RecallZero(r.Context(), input)
+	case "light":
+		out, err = h.engine.RecallLight(r.Context(), input)
+	default:
+		out, err = h.engine.Recall(r.Context(), input)
+	}
 	if err != nil {
 		slog.Error("playground recall", "error", err)
 		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Recall", Error: fmt.Sprintf("engine error: %v", err)})
 		return
 	}
 	d := out.Duration
-	slog.Info("playground recall duration", "db_ms", d.DBMs, "db_calls", d.DBCalls, "llm_ms", d.LLMMs, "llm_calls", d.LLMCalls, "embed_ms", d.EmbedMs, "embed_calls", d.EmbedCalls)
+	slog.Info("playground recall duration", "method", method, "db_ms", d.DBMs, "db_calls", d.DBCalls, "llm_ms", d.LLMMs, "llm_calls", d.LLMCalls, "embed_ms", d.EmbedMs, "embed_calls", d.EmbedCalls)
 	h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Recall", Facts: out.Facts, Debug: out.Debug})
 }
 

@@ -93,9 +93,6 @@ func (e *MemoryEngine) RecallLight(ctx context.Context, input models.RecallInput
 		for _, f := range candidates {
 			eligible := f.ReferencedAt == nil || !f.ReferencedAt.After(eventDate)
 			text := f.Text
-			if len(text) > 120 {
-				text = text[:120] + "…"
-			}
 			var factEventDate string
 			if f.EventDate != nil {
 				factEventDate = f.EventDate.Format("2006-01-02")

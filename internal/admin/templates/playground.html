@@ -256,6 +256,15 @@
             </div>
             <div class="flex items-end gap-6 mb-4">
                 <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Method</label>
+                    <select name="method"
+                            class="w-36 border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="standard" selected>Standard</option>
+                        <option value="zero">Zero</option>
+                        <option value="light">Light</option>
+                    </select>
+                </div>
+                <div>
                     <label class="block text-xs font-medium text-gray-600 mb-1">Limit</label>
                     <input name="limit" type="number" value="10" min="1" max="100"
                            class="w-24 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
