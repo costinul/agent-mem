@@ -135,8 +135,8 @@ func (e *MemoryEngine) retrieveFacts(ctx context.Context, accountID, agentID, th
 // = limit / nPhrases). Without this, a single phrase whose embedding produces a tight
 // cluster of high-similarity hits can squeeze every other phrase out of the top-`limit`
 // after global sort. That breaks plan/intent recall, where a verb-form phrase
-// ("Melanie thinking about going camping") may rank lower than a noun-form phrase
-// ("Melanie's camping plans") yet produce the only candidate that actually answers
+// ("Alice thinking about visiting Madrid") may rank lower than a noun-form phrase
+// ("Alice's Madrid trip plans") yet produce the only candidate that actually answers
 // the question.
 func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, agentID, threadID string, embeddings [][]float64, limit int) ([]models.Fact, error) {
 	if limit <= 0 {

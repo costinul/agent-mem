@@ -227,3 +227,8 @@ func (w *repoWrapper) MaxSourceEventDateForThread(ctx context.Context, threadID 
 	defer w.observe(ctx, time.Now())
 	return w.inner.MaxSourceEventDateForThread(ctx, threadID)
 }
+
+func (w *repoWrapper) SearchSourcesByContent(ctx context.Context, accountID, agentID, threadID, text string) ([]models.Source, error) {
+	defer w.observe(ctx, time.Now())
+	return w.inner.SearchSourcesByContent(ctx, accountID, agentID, threadID, text)
+}

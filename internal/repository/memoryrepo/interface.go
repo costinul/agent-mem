@@ -15,6 +15,9 @@ type Repository interface {
 	GetSourceByID(ctx context.Context, sourceID string) (*models.Source, error)
 	ListSourcesByEventID(ctx context.Context, eventID string) ([]models.Source, error)
 	ListConversationSourcesByThreadID(ctx context.Context, threadID string, limit int) ([]models.Source, error)
+	// SearchSourcesByContent finds sources whose content starts with text, scoped by account/agent/thread.
+	// agentID and threadID are optional (empty string = no filter).
+	SearchSourcesByContent(ctx context.Context, accountID, agentID, threadID, text string) ([]models.Source, error)
 
 	InsertFact(ctx context.Context, fact models.Fact) (*models.Fact, error)
 	ListFactsByScope(ctx context.Context, accountID string, agentID, threadID *string) ([]models.Fact, error)

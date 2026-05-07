@@ -262,6 +262,56 @@ func (r *PostgresRepository) ListConversationSourcesByThreadID(ctx context.Conte
 	return sources, nil
 }
 
+func (r *PostgresRepository) SearchSourcesByContent(ctx context.Context, accountID, agentID, threadID, text string) ([]models.Source, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT s.id, s.event_id, s.kind, s.author, s.content, s.content_type,
+		        s.bucket_path, s.size_bytes, s.event_date, s.created_at
+		 FROM sources s
+		 JOIN events e ON e.id = s.event_id
+		 WHERE e.account_id = $1
+		   AND ($2 = '' OR e.agent_id::text = $2)
+		   AND ($3 = '' OR e.thread_id::text = $3)
+		   AND LEFT(s.content, LENGTH($4)) = $4
+		 ORDER BY s.created_at ASC`,
+		accountID, agentID, threadID, text,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sources []models.Source
+	for rows.Next() {
+		var (
+			source     models.Source
+			author     sql.NullString
+			content    sql.NullString
+			bucketPath sql.NullString
+			sizeBytes  sql.NullInt64
+		)
+		if err := rows.Scan(
+			&source.ID,
+			&source.EventID,
+			&source.Kind,
+			&author,
+			&content,
+			&source.ContentType,
+			&bucketPath,
+			&sizeBytes,
+			&source.EventDate,
+			&source.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		source.Author = nullStringPtr(author)
+		source.Content = nullStringPtr(content)
+		source.BucketPath = nullStringPtr(bucketPath)
+		source.SizeBytes = nullInt64Ptr(sizeBytes)
+		sources = append(sources, source)
+	}
+	return sources, rows.Err()
+}
+
 func (r *PostgresRepository) InsertFact(ctx context.Context, fact models.Fact) (*models.Fact, error) {
 	var (
 		stored        models.Fact

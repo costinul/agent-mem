@@ -32,6 +32,7 @@ type Handler struct {
 	memoryRepo  memoryrepo.Repository
 	userRepo    userrepo.Repository
 	engine      *engine.MemoryEngine
+	locomoStore *LocomoStore
 }
 
 func NewHandler(
@@ -49,6 +50,7 @@ func NewHandler(
 		memoryRepo:  memoryRepo,
 		userRepo:    userRepo,
 		engine:      eng,
+		locomoStore: NewLocomoStore("eval/locomo/data/locomo10.json"),
 	}
 }
 
@@ -91,6 +93,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, adminMw func(http.Handler) 
 	protected.HandleFunc("POST /admin/playground/recall", h.playgroundRecall)
 	protected.HandleFunc("POST /admin/playground/recall-light", h.playgroundRecallLight)
 	protected.HandleFunc("POST /admin/playground/decompose", h.playgroundDecompose)
+	protected.HandleFunc("GET /admin/locomo", h.locomoPage)
+	protected.HandleFunc("GET /admin/locomo/search", h.locomoSearch)
+	protected.HandleFunc("POST /admin/locomo/recall", h.locomoRecall)
 
 	mux.Handle("/admin/", adminMw(protected))
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -134,6 +135,30 @@ func (r *InMemoryRepository) ListConversationSourcesByThreadID(_ context.Context
 		sources = sources[len(sources)-limit:]
 	}
 	return sources, nil
+}
+
+func (r *InMemoryRepository) SearchSourcesByContent(_ context.Context, accountID, agentID, threadID, text string) ([]models.Source, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var out []models.Source
+	for _, s := range r.sources {
+		if s.Content == nil || !strings.HasPrefix(*s.Content, text) {
+			continue
+		}
+		e, ok := r.events[s.EventID]
+		if !ok || e.AccountID != accountID {
+			continue
+		}
+		if agentID != "" && e.AgentID != agentID {
+			continue
+		}
+		if threadID != "" && (e.ThreadID == nil || *e.ThreadID != threadID) {
+			continue
+		}
+		out = append(out, s)
+	}
+	return out, nil
 }
 
 // =====================
