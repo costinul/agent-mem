@@ -261,7 +261,10 @@ function recallFacts(idx) {
                 return '<li class="flex items-start gap-2 text-sm">' +
                     '<span class="shrink-0 text-xs text-gray-400 font-mono w-4 mt-0.5">' + (i+1) + '</span>' +
                     '<span class="shrink-0 px-1.5 py-0.5 text-[10px] font-medium rounded ' + kindCls + '">' + escHtml(f.kind) + '</span>' +
-                    '<span class="text-gray-900">' + escHtml(f.text) + '</span>' +
+                    '<div class="flex flex-col">' +
+                        '<span class="text-gray-900">' + escHtml(f.text) + '</span>' +
+                        '<span class="text-[10px] text-gray-400 font-mono mt-0.5 select-all" title="Fact ID">' + escHtml(f.id) + '</span>' +
+                    '</div>' +
                 '</li>';
             }).join('') +
             '</ol>';
