@@ -61,6 +61,13 @@ prompt: |
   {{- if .EventDate}}
   Event date: {{.EventDate}}
   {{- end}}
+  {{- if .Phrases}}
+
+  Search angles considered (these are the rephrasings the retriever used to find the candidates below — they reveal the intent behind the query and the alternative wordings the answer fact may use):
+  {{- range .Phrases}}
+  - {{.}}
+  {{- end}}
+  {{- end}}
 
   Reminder: if the query asks for a list, return every relevant candidate, not just one.
   Reminder: if the query asks "would", "should", "likely", or "considered", return supporting and contradicting evidence — do not return empty results.

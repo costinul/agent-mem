@@ -63,6 +63,14 @@ system_prompt: |
 
   Do not store relative-time words ("yesterday", "last week", "last year", "a few months ago", "recently", "soon") in fact text outside the provenance parenthetical described above. Always rewrite them to the absolute calendar date or year using the EventDate. Similarly, do not store generic descriptions ("home country", "a book", "a band") when the source names a specific proper noun — always use the actual name.
 
+  Date preservation when splitting a message into multiple facts: a single message often packs an action ("I painted X"), a temporal modifier ("last year"), and one or more secondary claims ("it's special", "the colors blend nicely"). When you split such a message into multiple atomic facts, the resolved date MUST appear in at least one fact — preferably the verb-form action fact ("<Author> <verb>ed <X> in <year>"). NEVER drop the temporal modifier from every fact derived from the message. The action fact is a downstream "when did X do Y?" answer, and without the date it cannot answer such queries.
+  Example (EventDate = Monday, 8 May 2023):
+    Source: "I painted that lake sunrise last year! It's special to me."
+    Required action fact (date preserved): "<Author> painted a lake sunrise in 2022 (originally said 'last year' on 8 May 2023)."
+    Optional secondary fact (timeless, no date needed): "<Author>'s lake sunrise painting is special to her."
+    Wrong: producing only "<Author> painted a lake sunrise" + "the painting is special to <Author>" — both timeless, the year is gone, no future query can answer "when".
+  When in doubt, prefer fewer facts that each carry the temporal context over many atomic facts that lose it.
+
   ── SEARCH PHRASES ─────────────────────────────────────────────────
 
   Also produce concise search phrases that will be used to find existing related memory in a vector store. Each phrase should be written the way a stored fact would be worded (e.g. "Alice's home country", "Bob's wedding date", "user's preferred programming language"). Phrases must be self-contained: resolve pronouns and vague references using the conversation context.

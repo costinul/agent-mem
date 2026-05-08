@@ -95,6 +95,7 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 	selected, err := e.ai.SelectFacts(ctx, SelectFactsRequest{
 		Query:      input.Query,
 		EventDate:  eventDateStr,
+		Phrases:    phrases,
 		Candidates: candidates,
 	})
 	if err != nil {

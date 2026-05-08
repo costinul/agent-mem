@@ -42,6 +42,7 @@ type EvaluateRequest struct {
 type SelectFactsRequest struct {
 	Query      string
 	EventDate  string // ISO "YYYY-MM-DD" when the question is asked; used by the LLM to resolve relative-time phrases.
+	Phrases    []string // decomposed search angles produced by the recall planner; empty when decomposition was skipped (e.g. RecallLight).
 	Candidates []models.Fact
 }
 
@@ -299,11 +300,12 @@ func (a *LLMAdapter) SelectFacts(ctx context.Context, req SelectFactsRequest) ([
 		SupersededBy string
 	}
 	type templateData struct {
-		Query     string
-		EventDate string // ISO "YYYY-MM-DD" when the question is asked; "" when unset
+		Query      string
+		EventDate  string // ISO "YYYY-MM-DD" when the question is asked; "" when unset
+		Phrases    []string
 		Candidates []candidateView
 	}
-	td := templateData{Query: req.Query, EventDate: req.EventDate}
+	td := templateData{Query: req.Query, EventDate: req.EventDate, Phrases: req.Phrases}
 	for _, f := range req.Candidates {
 		cv := candidateView{ID: f.ID, Kind: f.Kind, Text: f.Text}
 		if f.EventDate != nil {
@@ -365,9 +367,10 @@ func (a *LLMAdapter) SelectFactsLight(ctx context.Context, req SelectFactsReques
 	type templateData struct {
 		Query      string
 		EventDate  string
+		Phrases    []string
 		Candidates []candidateView
 	}
-	td := templateData{Query: req.Query, EventDate: req.EventDate}
+	td := templateData{Query: req.Query, EventDate: req.EventDate, Phrases: req.Phrases}
 	for _, f := range req.Candidates {
 		cv := candidateView{ID: f.ID, Kind: f.Kind, Text: f.Text}
 		if f.EventDate != nil {

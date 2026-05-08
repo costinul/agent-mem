@@ -12,4 +12,13 @@ alwaysApply: true
 - Do not summarize what you are about to do or what you just did. The diff/output speaks for itself.
 - No closing recap, no "let me know if...", no restating the user's request back at them.
 
+## Plain language
+
+- Use simple words. Short sentences. No jargon unless the user used it first.
+- One idea per sentence. One topic per paragraph.
+- Prefer concrete examples over abstract description.
+- If the explanation is longer than 10 lines, you are over-explaining. Cut it.
+- When the user is confused, switch to an analogy a child would understand. Do NOT add more technical detail.
+- Never use filler phrases ("it's worth noting", "interestingly", "as you can see", "essentially", "fundamentally", "in essence").
+
 If the user wants depth, they will ask. Default to short.
