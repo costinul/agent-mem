@@ -6,6 +6,7 @@ import (
 	"log"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	models "agentmem/internal/models"
@@ -16,6 +17,27 @@ import (
 // (Cormack, Clarke, Buettcher 2009): small enough to keep per-list rank-1 dominant,
 // large enough that rank-K and rank-K+1 don't differ wildly.
 const rrfK = 60
+
+// Per-channel weights applied to each ranked list's RRF contribution. Dense is the
+// most semantically faithful signal for natural-language queries, so it carries full
+// weight. Lexical (tsvector) is a corrective signal — strong when the query and the
+// stored fact share rare tokens, silent otherwise — and gets half weight. Entity
+// overlap is treated as a boost rather than a primary channel: when a query names
+// two co-occurring people, every interaction fact between them scores 1.0 in the
+// entity SQL and would otherwise flood the candidate pool with off-topic mentions
+// at the expense of unilateral facts that may carry the actual answer.
+const (
+	weightDense   = 1.0
+	weightLexical = 0.5
+	weightEntity  = 0.2
+)
+
+// rankedList is a single channel's ranked output plus the weight RRF should apply
+// to its contribution. Weight 0 is treated as 1.0 for backward compatibility.
+type rankedList struct {
+	IDs    []string
+	Weight float64
+}
 
 // channelRanks holds, for one ranked list, the rank (0-based) at which each fact ID
 // appears. -1 means the fact was not in the list.
@@ -65,8 +87,9 @@ func (e *MemoryEngine) retrieveFactsHybrid(
 		perChannelLimit = 50
 	}
 
-	// Collected ranked lists: each entry is a slice of fact IDs in rank order.
-	var ranked [][]string
+	// Collected ranked lists: one entry per channel call (dense per phrase,
+	// lexical per phrase, entity once), each carrying its RRF weight.
+	var ranked []rankedList
 
 	// Per-channel rank registries (best rank seen across all lists in that channel).
 	denseRank := channelRanks{}
@@ -121,11 +144,11 @@ func (e *MemoryEngine) retrieveFactsHybrid(
 			for r, id := range ids {
 				updateChannelRank(denseRank, id, r)
 			}
-			ranked = append(ranked, ids)
+			ranked = append(ranked, rankedList{IDs: ids, Weight: weightDense})
 		}
 
 		if phrase != "" {
-			lexList, err := e.searchLexicalAcrossScopes(ctx, accountID, aid, tid, phrase, perChannelLimit, includeSuperseded, maxSourceEventDate)
+			lexList, err := e.searchLexicalAcrossScopes(ctx, accountID, aid, tid, toLexicalORQuery(phrase), perChannelLimit, includeSuperseded, maxSourceEventDate)
 			if err != nil {
 				return nil, fmt.Errorf("lexical channel for phrase %q: %w", phrase, err)
 			}
@@ -133,7 +156,7 @@ func (e *MemoryEngine) retrieveFactsHybrid(
 			for r, id := range ids {
 				updateChannelRank(lexicalRank, id, r)
 			}
-			ranked = append(ranked, ids)
+			ranked = append(ranked, rankedList{IDs: ids, Weight: weightLexical})
 		}
 	}
 
@@ -147,7 +170,7 @@ func (e *MemoryEngine) retrieveFactsHybrid(
 		for r, id := range ids {
 			updateChannelRank(entityRank, id, r)
 		}
-		ranked = append(ranked, ids)
+		ranked = append(ranked, rankedList{IDs: ids, Weight: weightEntity})
 	}
 
 	if len(ranked) == 0 {
@@ -356,17 +379,42 @@ func rankedSlice(merged map[string]memoryrepo.FactWithScore) []memoryrepo.FactWi
 	return out
 }
 
-// rrfFuse runs Reciprocal Rank Fusion over a set of ranked ID lists.
-// Score for fact f is Σ over lists L of  1 / (k + rank_L(f) + 1).
-// Facts not present in a list contribute 0 from that list.
-func rrfFuse(lists [][]string, k int) map[string]float64 {
+// rrfFuse runs weighted Reciprocal Rank Fusion over a set of ranked ID lists.
+// Score for fact f is Σ over lists L of  weight_L * 1 / (k + rank_L(f) + 1).
+// Facts not present in a list contribute 0 from that list. A weight of 0 is
+// promoted to 1.0 so callers that don't care about per-channel weighting still get
+// classic RRF behavior.
+func rrfFuse(lists []rankedList, k int) map[string]float64 {
 	out := map[string]float64{}
 	for _, list := range lists {
-		for i, id := range list {
-			out[id] += 1.0 / float64(k+i+1)
+		w := list.Weight
+		if w == 0 {
+			w = 1.0
+		}
+		for i, id := range list.IDs {
+			out[id] += w / float64(k+i+1)
 		}
 	}
 	return out
+}
+
+// toLexicalORQuery rewrites a natural-language phrase into a websearch_to_tsquery
+// expression that uses OR between tokens instead of the implicit AND.
+//
+// websearch_to_tsquery defaults to AND-joining every token. For conversational
+// recall queries like "Melanie read a book suggested by Caroline", AND semantics
+// almost guarantee zero matches: the answer fact ("Caroline loved the book
+// 'Becoming Nicole'") doesn't contain "Melanie", "read", or "suggested", so it
+// fails the AND test even though it shares the most informative tokens (Caroline,
+// book). Switching to OR turns the lexical channel into a soft signal — every
+// matched fact contributes, ranked by ts_rank_cd which already weights rare tokens
+// higher. The lower channel weight in RRF compensates for the noisier matches.
+func toLexicalORQuery(phrase string) string {
+	fields := strings.Fields(phrase)
+	if len(fields) <= 1 {
+		return phrase
+	}
+	return strings.Join(fields, " OR ")
 }
 
 // rrfPlaceSiblings returns candidates re-ordered such that:

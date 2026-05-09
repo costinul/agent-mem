@@ -65,6 +65,16 @@ system_prompt: |
     Example: "When is Alice planning to visit Madrid?" → ["Alice's Madrid trip plans", "Alice thinking about visiting Madrid", "Alice wants to visit Madrid", "Alice's Madrid trip date"]
     Example: "Where is Bob going to study?" → ["Bob's study plans", "Bob thinking about studying", "Bob's school enrollment", "Bob's university"]
 
+  ## Two-party / second-perspective queries (recommendations, gifts, influences, suggestions, advice)
+  When the query asks about one party's action that originated with another party — "what did <X> read from <Y>'s suggestion?", "what gift did <X> get from <Y>?", "what did <X> learn from <Y>?", "what restaurant did <X> try on <Y>'s recommendation?" — the answer-bearing fact is often stored from the OTHER party's perspective (the recommender's preference, the gift-giver's choice, the teacher's lesson). The recipient's mention usually only confirms the act of receiving without naming the thing.
+  Emit phrases from BOTH perspectives, not just the asker's:
+    - recipient form: "<X> <verb> a <thing> recommended by <Y>", "<X>'s <thing> from <Y>"
+    - giver form: "<Y>'s favorite <thing>", "<Y>'s <thing> recommendations", "<thing>s <Y> likes", "<Y> recommended a <thing>"
+  Cover both, otherwise the dense channel only matches the recipient-side phrasing and misses the answer-bearing fact stored on the giver side.
+    Example: "What book did Alice read from Bob's suggestion?" → ["Alice read a book recommended by Bob", "Bob's favorite books", "books Bob recommends"] — the title is most likely in a fact like "Bob loved the book <title>".
+    Example: "Which restaurant did Carol try on Dave's recommendation?" → ["Carol tried a restaurant Dave recommended", "Dave's favorite restaurants", "restaurants Dave recommends"]
+    Example: "What did Eve learn from Frank?" → ["Eve learned from Frank", "Frank's lessons", "Frank's advice"]
+
   ## Past-tense factual queries ("when / where / who / how did X do Y?")
   When the query asks about a single past event — "When did Alice bake a cake?", "Where did Bob meet Carol?", "Who came to Alice's housewarming?", "How did Bob learn German?" — the answer is almost certainly stored as a single fact worded as a verb-form statement ("Alice baked a cake on 2023-04-12", "Bob met Carol at the conference"). Do NOT pad. Emit 1–2 phrases at most:
     - the verb-form statement of the event itself, with the asked dimension stripped out ("Alice baked a cake", "Bob met Carol", "Bob learned German") — this is the highest-signal query because it lexically matches the stored fact;
