@@ -93,6 +93,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, adminMw func(http.Handler) 
 	protected.HandleFunc("POST /admin/playground/recall", h.playgroundRecall)
 	protected.HandleFunc("POST /admin/playground/recall-light", h.playgroundRecallLight)
 	protected.HandleFunc("POST /admin/playground/decompose", h.playgroundDecompose)
+	protected.HandleFunc("POST /admin/playground/decompose-facts", h.playgroundDecomposeFacts)
 	protected.HandleFunc("GET /admin/locomo", h.locomoPage)
 	protected.HandleFunc("GET /admin/locomo/search", h.locomoSearch)
 	protected.HandleFunc("POST /admin/locomo/recall", h.locomoRecall)
@@ -1463,7 +1464,29 @@ func (h *Handler) renderDecomposeResult(w http.ResponseWriter, result *Decompose
     {{end}}
     {{if .Queries}}
     <div class="px-4 py-3">
-      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Search Queries</p>
+      <form hx-post="/admin/playground/decompose-facts"
+            hx-target="#decompose-facts-result"
+            hx-swap="innerHTML"
+            hx-indicator="#spinner-get-facts"
+            onsubmit="injectContext(this)">
+        <input type="hidden" name="account_id">
+        <input type="hidden" name="agent_id">
+        <input type="hidden" name="thread_id">
+        {{range .Queries}}<input type="hidden" name="query" value="{{.Text}}">{{end}}
+        <div class="flex items-center justify-between mb-2">
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Search Queries</p>
+          <button type="submit"
+                  class="inline-flex items-center gap-1.5 bg-indigo-600 text-white text-xs font-medium px-3 py-1.5 rounded-md hover:bg-indigo-700 transition-colors">
+            <span id="spinner-get-facts" class="htmx-indicator">
+              <svg class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+              </svg>
+            </span>
+            Get Facts
+          </button>
+        </div>
+      </form>
       <ul class="space-y-1">
         {{range .Queries}}
         <li class="text-sm text-gray-700 flex items-center gap-2 group">
@@ -1480,6 +1503,7 @@ func (h *Handler) renderDecomposeResult(w http.ResponseWriter, result *Decompose
         </li>
         {{end}}
       </ul>
+      <div id="decompose-facts-result"></div>
       <script>
       function copyText(btn, text) {
         navigator.clipboard.writeText(text).then(() => {
@@ -1514,4 +1538,173 @@ func (h *Handler) renderDecomposeResult(w http.ResponseWriter, result *Decompose
 		},
 	}).Parse(tmplStr))
 	_ = t.ExecuteTemplate(w, "decompose", result)
+}
+
+// DecomposeFactEntry is one fact in the flat deduplicated fact list.
+// Score is the best score across all queries that returned this fact.
+// Queries lists every query label that matched it.
+type DecomposeFactEntry struct {
+	memoryrepo.FactWithScore
+	Queries []string
+}
+
+// DecomposeFactsResult is the render model for the decompose-facts endpoint.
+type DecomposeFactsResult struct {
+	Facts []DecomposeFactEntry
+	Error string
+}
+
+func (h *Handler) playgroundDecomposeFacts(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		h.renderDecomposeFactsResult(w, &DecomposeFactsResult{Error: "failed to parse form"})
+		return
+	}
+
+	accountID := strings.TrimSpace(r.FormValue("account_id"))
+	agentID := strings.TrimSpace(r.FormValue("agent_id"))
+	threadID := strings.TrimSpace(r.FormValue("thread_id"))
+	queries := r.Form["query"]
+
+	if accountID == "" || agentID == "" {
+		h.renderDecomposeFactsResult(w, &DecomposeFactsResult{Error: "account and agent must be selected in the Context section"})
+		return
+	}
+	if len(queries) == 0 {
+		h.renderDecomposeFactsResult(w, &DecomposeFactsResult{Error: "no queries to search"})
+		return
+	}
+
+	var threadIDPtr *string
+	if threadID != "" && threadID != "__new__" {
+		threadIDPtr = &threadID
+	}
+
+	// Deduplicate facts across queries; keep best score per fact ID.
+	type entry struct {
+		fact    memoryrepo.FactWithScore
+		queries []string
+	}
+	byID := map[string]*entry{}
+	order := []string{} // insertion order for stable output
+
+	for _, q := range queries {
+		q = strings.TrimSpace(q)
+		if q == "" {
+			continue
+		}
+		scored, err := h.engine.SearchWithScores(r.Context(), q, memoryrepo.SearchByEmbeddingParams{
+			AccountID:     accountID,
+			AgentID:       &agentID,
+			ThreadID:      threadIDPtr,
+			MinSimilarity: 0,
+			Limit:         10000,
+		})
+		if err != nil {
+			slog.Error("playground decompose-facts search", "query", q, "error", err)
+			h.renderDecomposeFactsResult(w, &DecomposeFactsResult{Error: fmt.Sprintf("search error: %v", err)})
+			return
+		}
+		for _, fs := range scored {
+			if e, ok := byID[fs.ID]; ok {
+				if fs.Score > e.fact.Score {
+					e.fact.Score = fs.Score
+				}
+				e.queries = append(e.queries, q)
+			} else {
+				byID[fs.ID] = &entry{fact: fs, queries: []string{q}}
+				order = append(order, fs.ID)
+			}
+		}
+	}
+
+	// Sort by best score descending.
+	for i := 0; i < len(order); i++ {
+		for j := i + 1; j < len(order); j++ {
+			if byID[order[j]].fact.Score > byID[order[i]].fact.Score {
+				order[i], order[j] = order[j], order[i]
+			}
+		}
+	}
+
+	facts := make([]DecomposeFactEntry, 0, len(order))
+	for _, id := range order {
+		e := byID[id]
+		facts = append(facts, DecomposeFactEntry{FactWithScore: e.fact, Queries: e.queries})
+	}
+
+	h.renderDecomposeFactsResult(w, &DecomposeFactsResult{Facts: facts})
+}
+
+func (h *Handler) renderDecomposeFactsResult(w http.ResponseWriter, result *DecomposeFactsResult) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	tmplStr := `{{define "decompose-facts"}}
+{{if .Error}}
+<div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 mt-4">
+  <span class="font-medium">Error:</span> {{.Error}}
+</div>
+{{else if .Facts}}
+<div class="mt-4 rounded-lg border border-gray-200 bg-white overflow-hidden">
+  <div class="flex items-center gap-3 px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+    <input type="text" id="decompose-facts-filter" placeholder="Filter by text or ID…"
+           oninput="filterDecomposeFacts(this)"
+           class="flex-1 border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+    <span class="shrink-0 text-xs text-gray-500">{{len .Facts}} fact(s)</span>
+  </div>
+  <ul id="decompose-facts-list" class="divide-y divide-gray-100 max-h-[32rem] overflow-y-auto">
+    {{range .Facts}}
+    <li class="flex items-start gap-2 px-4 py-2.5" data-fact-id="{{.ID}}" data-fact-text="{{.Text}}">
+      <span class="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-mono font-semibold mt-0.5
+        {{scoreClass .Score}}">{{printf "%.3f" .Score}}</span>
+      <span class="shrink-0 inline-flex px-2 py-0.5 text-xs font-medium rounded-full mt-0.5
+        {{kindClass .Kind}}">{{.Kind}}</span>
+      <span class="flex-1 min-w-0">
+        <span class="block text-sm text-gray-900 leading-snug">{{.Text}}</span>
+        <span class="flex flex-wrap items-center gap-1 mt-1">
+          <span class="text-xs text-gray-400 font-mono">{{.ID}}</span>
+          {{range .Queries}}
+          <span class="inline-flex px-1.5 py-0 rounded text-xs bg-indigo-50 text-indigo-600 border border-indigo-100 truncate max-w-[18rem]" title="{{.}}">{{.}}</span>
+          {{end}}
+        </span>
+      </span>
+    </li>
+    {{end}}
+  </ul>
+</div>
+<script>
+function filterDecomposeFacts(input) {
+  const q = input.value.toLowerCase();
+  document.getElementById('decompose-facts-list').querySelectorAll('li').forEach(li => {
+    const text = (li.dataset.factText || '').toLowerCase();
+    const id   = (li.dataset.factId   || '').toLowerCase();
+    li.style.display = (!q || text.includes(q) || id.includes(q)) ? '' : 'none';
+  });
+}
+</script>
+{{else}}
+<p class="mt-4 text-sm text-gray-400">No facts found.</p>
+{{end}}
+{{end}}`
+	t := template.Must(template.New("decompose-facts").Funcs(template.FuncMap{
+		"scoreClass": func(score float64) string {
+			switch {
+			case score >= 0.7:
+				return "bg-green-100 text-green-700"
+			case score >= 0.5:
+				return "bg-amber-100 text-amber-700"
+			default:
+				return "bg-gray-100 text-gray-500"
+			}
+		},
+		"kindClass": func(kind models.FactKind) string {
+			switch fmt.Sprintf("%s", kind) {
+			case "KNOWLEDGE":
+				return "bg-blue-100 text-blue-700"
+			case "RULE":
+				return "bg-purple-100 text-purple-700"
+			default:
+				return "bg-amber-100 text-amber-700"
+			}
+		},
+	}).Parse(tmplStr))
+	_ = t.ExecuteTemplate(w, "decompose-facts", result)
 }
