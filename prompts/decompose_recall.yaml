@@ -17,6 +17,14 @@ system_prompt: |
   - Cap output at 6 phrases. Fewer is better when the query is narrow.
   - Return only queries — leave the facts array empty.
 
+  ## Hallucination guard (hard rule — applies to every phrase)
+  Every noun, name, topic, subject, or category in your output phrases must either:
+    (a) appear verbatim or as a clear paraphrase in the query itself, OR
+    (b) be a generic possessive of an entity named in the query (e.g. "<X>'s plans", "<X>'s interests").
+  Do NOT invent specific subjects, fields, activities, or objects that are not mentioned in the query. Every invented filler biases retrieval toward the wrong region of embedding space and crowds out the correct answer.
+    Bad: query "What did Alice research?" → emitting "Alice researched biology" or "Alice studied computer science" — these subjects are invented.
+    Good: query "What did Alice research?" → emitting "Alice's research" or "Alice researched something" — no invented subject.
+
   ## Anti-duplication rule (strict)
   Every phrase must add coverage of a different region of semantic space. The following all count as the SAME concept and only ONE may appear:
     - Noun-form and verb-form of the same action: "Alice's baking of a cake" ≡ "Alice baked a cake" ≡ "Alice made a cake".
@@ -28,14 +36,15 @@ system_prompt: |
   Do not pad to a target count. If two phrases already cover the question, stop. Extra near-duplicates push the actual answer fact out of the top-K window.
 
   ## Generic-verb rule
-  If the query uses a generic verb ("research", "look into", "explore", "plan", "work on", "do"), emit at least one phrase that drops the verb entirely and covers the topic area broadly ("<X>'s current interests", "things <X> is involved with"), and at least one phrase using a topic-agnostic synonym.
+  If the query uses a generic verb ("research", "look into", "explore", "plan", "work on", "do") with no stated object, emit one verb-form phrase that keeps the verb and one possessive noun phrase — both without an invented subject. Do NOT add phrases that name specific domains, topics, or activities that do not appear in the query.
+    Bad: query "What did Alice look into?" → emitting "Alice looked into finance" — "finance" is invented.
+    Good: query "What did Alice look into?" → ["Alice looked into something", "Alice's interests"] — 2 phrases is enough.
 
   ## Open-enumeration queries ("what", "which", "list", "all")
-  When the query asks what someone studied, did, likes, plans, or is involved with — and the answer is not predictable — emit 2–4 hypothetical answer sentences alongside noun phrases. Hypothetical sentences worded as stored facts embed much closer to actual stored facts than abstract noun phrases do.
-    Example: query "What does Alice study?" → emit:
-      - noun phrases: "Alice's field of study", "Alice's current courses"
-      - hypothetical sentences: "Alice studies linguistics", "Alice studies computer science", "Alice studies law"
-  Hypothetical sentences should cover plausible answer domains but stay generic enough to match facts you have not seen. Aim for 2–3 hypothetical sentences per open query; they count toward the 6-phrase cap.
+  When the query asks what someone did, studied, likes, or is involved with and the answer domain is not stated in the query, emit at most 2 phrases: one verb-form with the asked dimension stripped and one possessive noun phrase. Do NOT invent hypothetical answer subjects.
+    Bad: query "What does Alice study?" → ["Alice studies linguistics", "Alice studies computer science", "Alice studies law"] — all invented.
+    Good: query "What does Alice study?" → ["Alice studies", "Alice's field of study"] — 2 phrases, no invented subjects.
+  If the query names a specific object or category ("what sport does Alice play?", "what book did Bob read?"), use it: ["Alice plays sport", "Alice's sport"].
 
   ## Yes/no and reasoning queries
   When the query asks "would", "should", "is X likely", "would X want to", or any question requiring inference from indirect evidence, emit 2–4 phrases that together cover:

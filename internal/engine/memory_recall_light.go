@@ -34,6 +34,8 @@ func (e *MemoryEngine) RecallLight(ctx context.Context, input models.RecallInput
 		eventDate = input.EventDate.UTC()
 	}
 	eventDateStr := eventDate.Format("2006-01-02")
+	log.Printf("recall-light input account=%s agent=%s thread=%s query=%q event_date=%s limit=%d include_sources=%t",
+		input.AccountID, input.AgentID, input.ThreadID, input.Query, eventDateStr, input.Limit, input.IncludeSources)
 
 	embeddings, err := e.ai.Embed(ctx, []string{input.Query})
 	if err != nil {

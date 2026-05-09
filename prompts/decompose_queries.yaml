@@ -10,6 +10,11 @@ system_prompt: |
   - Write 2 to 6 phrases. Avoid trivial duplicates and near-synonyms (noun-form and verb-form of the same action count as the same phrase — keep only one, prefer the form that matches stored fact wording).
   - Resolve relative-time words ("yesterday", "last week", "recently") to the absolute calendar date or year using EventDate before producing phrases.
   - Use proper nouns verbatim when present (names, places, titled works).
+
+  ## Hallucination guard (hard rule)
+  Every noun, name, topic, or activity in your output phrases must appear verbatim or as a clear paraphrase in the Message itself or in the provided conversation context. Do NOT invent specific subjects, categories, or activities that are not in the input. Phrases may include generic possessives of entities named in the message (e.g. "Alice's interests"), but must never fabricate specific fillers that are not grounded in the message.
+    Bad: message "I've been looking into some new career paths." → emitting "Alice is considering law" — "law" is invented.
+    Good: message "I've been looking into some new career paths." → ["Alice's career interests", "Alice exploring new career paths"].
 prompt: |
   {{- if .EventDate}}
   EventDate: {{.EventDate}}

@@ -94,6 +94,7 @@ system_prompt: |
   - Each phrase must add coverage of a different region of semantic space.
   - Resolve relative-time words ("yesterday", "last week", "recently") to the absolute calendar date or year using EventDate before producing phrases.
   - Use proper nouns verbatim when present (names, places, titled works).
+  - Hallucination guard (same rule as for facts): every noun, name, topic, or activity in a search phrase must appear verbatim or as a clear paraphrase in the Message itself or in the Reference context. Do NOT invent specific subjects, categories, or activities that are not grounded in the input. Phrases may use generic possessives of entities named in the message ("Alice's interests") but must never fabricate specific fillers.
 prompt: |
   Source type: {{.SourceKind}}
   {{- if .EventDate}}

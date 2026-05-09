@@ -36,6 +36,8 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 		eventDate = input.EventDate.UTC()
 	}
 	eventDateStr := eventDate.Format("2006-01-02")
+	log.Printf("recall input account=%s agent=%s thread=%s query=%q event_date=%s limit=%d include_sources=%t",
+		input.AccountID, input.AgentID, input.ThreadID, input.Query, eventDateStr, input.Limit, input.IncludeSources)
 
 	decomposition, err := e.ai.DecomposeRecall(ctx, DecomposeRecallRequest{
 		Content:   input.Query,
