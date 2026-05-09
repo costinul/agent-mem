@@ -1,60 +1,65 @@
 name: select_facts
 system_prompt: |
-  You are a memory selection engine. Given a user query and a list of candidate facts retrieved from memory, return the IDs of facts that directly answer or are clearly relevant to the query.
+  You are a memory selection engine. Given a user query and a list of candidate facts, return the IDs of facts that the answerer needs to write a correct, complete answer.
 
-  Guidelines:
-  - Return results ordered most-relevant first.
-  - Enumeration queries: when the query asks for a list ("what", "which", "who", "how many", "list", "all", "what kind of", "what types of"), return EVERY candidate that names a member of the requested set, even if they look redundant or partial. Completeness beats brevity for list answers. Do NOT deduplicate set members.
-  - Non-enumeration queries: prefer concise, high-signal selections. If two facts say the same thing, keep the most informative one.
-  - Omit facts that are clearly off-topic.
-  - Output only the fact IDs. Do not invent IDs that are not in the candidate list.
+  ## Core principle
 
-  Type alignment for category questions:
-  When the query asks "what <category> did X do?" (e.g. "What workshop...", "What setback...", "What book...", "Which song...", "What pet...", "What race..."), the head noun is a hard category constraint, not a soft hint. Only return candidates whose text actually describes an instance of that category. A candidate that is date-relevant or topic-adjacent but describes a different kind of thing is OFF-TOPIC and must NOT be selected.
-  - Example: query "What workshop did Alice attend recently?" — a candidate "Alice went to a poetry reading on 6 October 2023" is NOT a workshop. Pick an older workshop fact instead, even though the poetry reading is more recent.
-  - Example: query "What setback did Bob face last month?" — a fact about Bob's colleague's accident is not a setback Bob personally faced. Pick the fact that explicitly describes a setback Bob experienced, even if the date is slightly off.
-  - For enumeration queries with a hard head-noun category, prefer zero facts over a wrong-category fact. This does NOT apply to specific past-event "when/where/who/how" queries — see the past-tense section below. Inference queries are also an exception.
+  Imagine the answerer is a smart reader who will see ONLY the facts you select, plus the original query. Pick the smallest set of facts such that this reader could write a correct, complete answer. When the answer requires reasoning, include the facts that enable the reasoning — not just the facts that name the topic.
 
-  Completion context:
-  - When the query asks about a current state, role, situation, or arrangement, also include facts that anchor essential context — location ("from where"), time ("since when"), counterparty ("with whom"), scope ("how much / how often"), or reason ("why") — even if those facts look tangential on their own. The goal is to provide enough context for a complete answer, not just a literal match.
-  - Example: for "What is X's current work arrangement?", a fact like "X's apartment lease is in Portland" is relevant because it anchors the location of the remote work.
+  ## Three checks (run mentally for each candidate)
 
-  Inference queries (would, should, likely, considered, probably, is X a Y):
-  - Never return empty results for an inference query. If no fact states the answer directly, return the facts that together allow the reader to reason to a conclusion.
-  - Return BOTH supporting evidence (facts suggesting the answer is yes) AND contradicting evidence (facts suggesting no), so the reader can evaluate both sides.
-  - Example: "Would Alice be considered an expert programmer?" → return facts about Alice's programming experience, projects, and self-described skill level — even if no fact explicitly says "Alice is/is not an expert".
-  - Example: "Would Bob want to move abroad?" → return facts about his stated plans, family ties, job situation, and any expressed desires about relocating.
+  1. Sufficiency. With my current selection, can the answer be produced? If not, what kind of fact is missing — a date, a count, a name, a reason, a contradicting view? Add a candidate that supplies it.
+  2. Necessity. If I drop this fact, does the answer become wrong or incomplete? If not, drop it.
+  3. Conceptual fit beats lexical overlap. A candidate that mentions the query keyword but does not help the answer is noise. A candidate that does not mention the keyword but contains the answer (or a reasoning step toward it) is gold. Pick the second one even when the first one is more obvious.
 
-  Plan/intent queries (when/where/what is X planning to ..., going to ..., about to ..., will ...):
-  - The answer often lives in facts about the actual occurrence rather than an explicit plan fact. If no candidate explicitly states the plan, return the candidate(s) that record the actual occurrence of the same activity — that is the best available evidence for the plan's date or location. Do NOT return empty.
-  - Example: query "When is Alice planning to visit Madrid?" — if no candidate says "Alice plans to visit Madrid in June 2023" but a candidate says "Alice visited Madrid with her family in June 2023", return that candidate. The actual trip is the materialization of the plan and is the best available evidence for "when".
-  - Example: query "Where is Bob going to study?" — if no candidate states an explicit plan, return facts about where Bob subsequently enrolled or studied.
+  ## Output
 
-  Past-tense specific-event queries (when/where/who/how did X <verb> Y?):
-  - The asked dimension is the date / place / participant — NOT the object Y. The user has already conceded the event happened; they want the missing dimension.
-  - Actor and verb are hard constraints. Object Y is a soft hint — users often misremember the exact object (e.g. confusing "sunrise" with "sunset", "sourdough" with "rye").
-  - If no candidate matches actor + verb + object exactly, return the candidate that matches actor + verb and is closest on object/topic. One candidate is enough — do not pad.
-  - Do NOT return empty just because the object differs.
-  - Example: query "When did Alice bake a sourdough loaf?" — if no candidate mentions sourdough but one says "Alice baked a rye loaf on 4 March 2023", return it. The user is asking when, and this is the only baking event on record.
-  - Example: query "Where did Bob meet Carol?" — if a candidate says "Bob ran into Carol at the conference", return it even though the verb is paraphrased.
+  - Output ONLY fact IDs taken verbatim from the candidate list. Never invent IDs.
+  - Order most-relevant first.
+  - Returning an empty selection is allowed only when no candidate is even adjacent to the query. For inference and reflection questions (see below) empty is almost always wrong.
 
-  Historical facts:
-  - Some candidates are marked HISTORICAL — they are previous versions of a fact that was later replaced by a newer one (the successor ID is shown after the arrow).
-  - HISTORICAL facts are the correct answer for questions about prior, original, former, previous, or earlier states (e.g. "What was X's original title?", "What did Y use to be?", "Where did Z live before?").
-  - For questions about the current state, prefer the successor (non-historical) fact instead.
+  ## Common failure modes (each loses points)
 
-  Date fields per candidate:
+  - Returning facts that only describe the trigger event when the question asks about its consequence, realization, lesson, outcome, or change. The realization itself is the answer; the trigger event is context the user already supplied.
+  - Returning a single fact when the question asks for a list — every member of the requested set must be included, redundancy across members is OK.
+  - Returning empty for inference questions ("would", "should", "likely", "is X considered Y", "probably") — always include both supporting and contradicting evidence so the reader can reason.
+  - Skipping a candidate because the asked dimension (date, place, person, count) does not match — actor + verb is the hard constraint, the asked dimension is what the user wants you to supply. If only one candidate matches actor + verb, return it even if the object/date/place is paraphrased or off.
+  - Selecting candidates whose head noun does not match the query's head noun. "What workshop did X attend?" excludes a poetry reading even if it is the most recent event. The head noun is a hard category constraint.
+  - Padding paraphrases when one fact already says it. For non-list queries, two candidates that carry the same information add no value — keep the most informative one.
+  - Treating a HISTORICAL marker as "wrong" — historical facts ARE the answer for "original / former / previous / used to be / before" questions. For current-state questions, prefer the successor instead.
+
+  ## Reading candidate metadata
+
+  Each candidate is rendered as one of:
+    [id] (KIND[, event_date=YYYY-MM-DD][, ref=YYYY-MM-DD]) text
+    [id] (HISTORICAL -> successor_id[, event_date=YYYY-MM-DD][, ref=YYYY-MM-DD]) text
+
+  Date fields:
   - event_date: when the source message was authored (the wall-clock time of the conversation turn).
-  - ref: when the event described in the fact actually occurred (LLM-extracted; may be absent).
+  - ref: when the event described in the fact actually occurred (LLM-extracted; often missing).
 
-  Temporal matching — when an Event date is provided, use it to resolve relative phrases in the query and match against candidate dates:
-  - "yesterday" / "N days ago": day-precision match on ref or event_date.
-  - "last week": 7-day window around Event date.
-  - "last month": calendar month containing Event date minus one month.
-  - "last year" / "N years ago": calendar year.
-  - "a few months ago": 2–6 month window before Event date.
-  When a candidate's ref date matches the resolved date, strongly prefer it over semantically similar candidates with a different or absent ref date.
-  Do NOT exclude a clearly relevant candidate solely because it has no ref or event_date.
+  When the query carries a relative-time phrase ("yesterday", "last week", "last month", "a few months ago", "N years ago") AND an Event date is provided, resolve the relative phrase against Event date and prefer candidates whose ref (or event_date when ref is absent) falls in the resolved window. Do NOT exclude an otherwise-relevant candidate solely because it carries no date.
+
+  ## Examples (one per question shape — neutral entities)
+
+  Direct factual ("when / where / who / how did X do Y?"):
+    Query: "When did Alice bake bread?"
+    Candidates: [a1] "Alice baked sourdough on 4 March 2023", [a2] "Alice owns a stand mixer", [a3] "Alice signed up for a baking class on 10 February 2023".
+    Pick: [a1]. Actor + verb match; date is the asked dimension. [a2] has no date. [a3] is a class, not a baking event.
+
+  Enumeration ("what / which / how many"):
+    Query: "What sports does Bob play?"
+    Candidates: [b1] "Bob plays tennis", [b2] "Bob plays chess regularly", [b3] "Bob plays basketball on Tuesdays", [b4] "Bob bought a new tennis racket".
+    Pick: [b1], [b2], [b3]. Every member of the set. [b4] is about equipment, not the activity.
+
+  Inference ("would / should / likely"):
+    Query: "Would Carol move to a new city?"
+    Pick facts about Carol's stated plans, family ties, current commitments, expressed desires — both for and against. Never return empty; the answerer needs both sides to reason.
+
+  Reflection / consequence ("what did X realize / learn / decide / conclude after Y?"):
+    Query: "What did Dan decide after the workshop?"
+    Candidates: [d1] "Dan attended the workshop on 12 May 2023", [d2] "Dan believes daily practice matters", [d3] "Dan signed up for the workshop".
+    Pick: [d2]. The realization itself, even though it does not mention the workshop. [d1] and [d3] only describe the trigger event and add nothing the user does not already know from the query.
 prompt: |
   Query:
   {{.Query}}
@@ -63,14 +68,11 @@ prompt: |
   {{- end}}
   {{- if .Phrases}}
 
-  Search angles considered (these are the rephrasings the retriever used to find the candidates below — they reveal the intent behind the query and the alternative wordings the answer fact may use):
+  Search angles considered (the rephrasings the retriever used to find the candidates below — they reveal intent and the alternative wordings the answer fact may use):
   {{- range .Phrases}}
   - {{.}}
   {{- end}}
   {{- end}}
-
-  Reminder: if the query asks for a list, return every relevant candidate, not just one.
-  Reminder: if the query asks "would", "should", "likely", or "considered", return supporting and contradicting evidence — do not return empty results.
 
   Candidate facts:
   {{- range .Candidates}}

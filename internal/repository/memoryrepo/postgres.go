@@ -532,7 +532,8 @@ func (r *PostgresRepository) ListFactsBySourceIDs(ctx context.Context, accountID
 		 FROM facts f
 		 JOIN sources s ON s.id = f.source_id
 		 WHERE f.account_id = $1
-		   AND f.source_id = ANY($2)`,
+		   AND f.source_id = ANY($2)
+		 ORDER BY f.created_at ASC, f.id ASC`,
 		accountID, pq.Array(sourceIDs),
 	)
 	if err != nil {
@@ -749,7 +750,7 @@ func (r *PostgresRepository) SearchFactsByEmbeddingWithScores(ctx context.Contex
 		q += fmt.Sprintf(` AND s.event_date <= $%d`, len(args)+1)
 		args = append(args, params.MaxSourceEventDate.UTC())
 	}
-	q += ` ORDER BY f.embedding <=> $4::vector ASC LIMIT $5`
+	q += ` ORDER BY f.embedding <=> $4::vector ASC, f.id ASC LIMIT $5`
 
 	rows, err := r.db.QueryContext(ctx, q, args...)
 	if err != nil {
@@ -834,7 +835,7 @@ func (r *PostgresRepository) SearchFactsByText(ctx context.Context, params Searc
 		q += fmt.Sprintf(` AND s.event_date <= $%d`, len(args)+1)
 		args = append(args, params.MaxSourceEventDate.UTC())
 	}
-	q += ` ORDER BY score DESC LIMIT $5`
+	q += ` ORDER BY score DESC, f.id ASC LIMIT $5`
 
 	rows, err := r.db.QueryContext(ctx, q, args...)
 	if err != nil {
@@ -874,7 +875,7 @@ func (r *PostgresRepository) SearchFactsByEntities(ctx context.Context, params S
 		q += fmt.Sprintf(` AND s.event_date <= $%d`, len(args)+1)
 		args = append(args, params.MaxSourceEventDate.UTC())
 	}
-	q += ` ORDER BY score DESC LIMIT $5`
+	q += ` ORDER BY score DESC, f.id ASC LIMIT $5`
 
 	rows, err := r.db.QueryContext(ctx, q, args...)
 	if err != nil {

@@ -178,9 +178,22 @@ func (e *MemoryEngine) retrieveFactsHybrid(
 		if all[i].score != all[j].score {
 			return all[i].score > all[j].score
 		}
-		// Tiebreaker: best dense score so cosine-strong matches outrank random ties.
-		return denseScores[all[i].fact.ID] > denseScores[all[j].fact.ID]
+		// Primary tiebreaker: best dense score so cosine-strong matches outrank ties.
+		di, dj := denseScores[all[i].fact.ID], denseScores[all[j].fact.ID]
+		if di != dj {
+			return di > dj
+		}
+		// Final tiebreaker: fact ID. Without this, the upstream map iteration
+		// (rrfFuse / rankedSlice) randomizes the order of ties between runs and
+		// the LLM selector reads that random order as a relevance signal.
+		return all[i].fact.ID < all[j].fact.ID
 	})
+
+	for i, r := range all {
+		if r.fact.ID == "e556c7c0-c42b-45da-a790-58f943cdfe0b" {
+			fmt.Printf("fact found at position %d", i)
+		}
+	}
 
 	if len(all) > limit {
 		all = all[:limit]
@@ -191,7 +204,7 @@ func (e *MemoryEngine) retrieveFactsHybrid(
 		facts[i] = rf.fact
 	}
 
-	if hasFactID(facts, "c097c904-3fa2-4928-b868-31caa12a95ac") {
+	if hasFactID(facts, "e556c7c0-c42b-45da-a790-58f943cdfe0b") {
 		fmt.Println("has the fact ")
 	} else {
 		fmt.Println("doesn't have fact")
@@ -334,7 +347,12 @@ func rankedSlice(merged map[string]memoryrepo.FactWithScore) []memoryrepo.FactWi
 	for _, fs := range merged {
 		out = append(out, fs)
 	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].Score > out[j].Score })
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Score != out[j].Score {
+			return out[i].Score > out[j].Score
+		}
+		return out[i].Fact.ID < out[j].Fact.ID
+	})
 	return out
 }
 
@@ -389,9 +407,15 @@ func rrfPlaceSiblings(candidates []models.Fact, fused map[string]float64, denseS
 			if ss[i].fused != ss[j].fused {
 				return ss[i].fused > ss[j].fused
 			}
-			return ss[i].denseBest > ss[j].denseBest
+			if ss[i].denseBest != ss[j].denseBest {
+				return ss[i].denseBest > ss[j].denseBest
+			}
+			return ss[i].fact.ID < ss[j].fact.ID
 		}
-		return ss[i].cosine > ss[j].cosine
+		if ss[i].cosine != ss[j].cosine {
+			return ss[i].cosine > ss[j].cosine
+		}
+		return ss[i].fact.ID < ss[j].fact.ID
 	})
 	out := make([]models.Fact, len(ss))
 	for i, s := range ss {
