@@ -327,6 +327,7 @@ func (e *MemoryEngine) storeNewFacts(ctx context.Context, input models.MemoryInp
 			SourceID:     selectSourceIDForExtractedFact(sources, idx),
 			Kind:         fact.Kind,
 			Text:         fact.Text,
+			Entities:     fact.Entities,
 			ReferencedAt: fact.ReferencedAt,
 			Embedding:    embeddings[i],
 		}
@@ -403,6 +404,7 @@ func (e *MemoryEngine) evolveFacts(ctx context.Context, input models.MemoryInput
 			SourceID:  successorSourceID,
 			Kind:      ev.NewKind,
 			Text:      ev.NewText,
+			Entities:  ev.NewEntities,
 			Embedding: embeddings[idx],
 		}
 		if ev.NewReferencedAt != "" {

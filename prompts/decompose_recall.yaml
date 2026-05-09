@@ -16,6 +16,10 @@ system_prompt: |
   - If the query is already a single atomic phrase, return it as the only query.
   - Cap output at 6 phrases. Fewer is better when the query is narrow.
   - Return only queries — leave the facts array empty.
+  - Also return a top-level `entities` array: the proper nouns and key topical anchors named in the query. Lowercase, deduplicated, 0–5 entries. Includes people, organizations, places, products, books, songs, films, languages, and the central topical noun if distinctive ("python", "wedding"). Skip generic words ("symbols", "things") unless they are the only handle. Empty array when the query has no specific entity.
+    Example: query "What languages does Alice speak?" → entities: ["alice"]
+    Example: query "When did Bob and Carol meet in Berlin?" → entities: ["bob", "carol", "berlin"]
+    Example: query "What's the weather like?" → entities: []
 
   ## Hallucination guard (hard rule — applies to every phrase)
   Every noun, name, topic, subject, or category in your output phrases must either:

@@ -83,6 +83,7 @@ type Fact struct {
 	Kind         FactKind   `json:"kind"`
 	Text         string     `json:"text"`
 	Embedding    []float64  `json:"embedding"`
+	Entities     []string   `json:"entities,omitempty"`      // Lowercased proper nouns / topical anchors used for the entity retrieval channel.
 	EventDate    *time.Time `json:"event_date,omitempty"`    // When the source message was authored. Populated from sources.event_date via JOIN at read time; not a column on facts.
 	ReferencedAt *time.Time `json:"referenced_at,omitempty"` // Calendar date the fact's content refers to, LLM-extracted at decompose time.
 	SupersededAt *time.Time `json:"superseded_at"`           // Non-nil means this fact has been evolved into a successor.
@@ -99,6 +100,7 @@ type Fact struct {
 type Decomposition struct {
 	Facts     []ExtractedFact  `json:"facts"`
 	Queries   []ExtractedQuery `json:"queries"`
+	Entities  []string         `json:"entities,omitempty"`   // Populated by decompose_recall: proper nouns / topics named in the recall query.
 	QueryDate *time.Time       `json:"query_date,omitempty"` // Populated by decompose_recall when the query references a specific date.
 }
 
@@ -106,6 +108,7 @@ type Decomposition struct {
 type ExtractedFact struct {
 	Text         string     `json:"text"`
 	Kind         FactKind   `json:"kind"`
+	Entities     []string   `json:"entities,omitempty"` // Lowercased proper nouns / topical anchors that ground this fact.
 	ReferencedAt *time.Time `json:"referenced_at,omitempty"`
 }
 
@@ -120,10 +123,11 @@ type ExtractedQuery struct {
 
 // FactEvolution describes a fact that should be superseded by a new version.
 type FactEvolution struct {
-	OldFactID      string   `json:"old_fact_id"`
-	NewText        string   `json:"new_text"`
-	NewKind        FactKind `json:"new_kind"`
-	NewReferencedAt string  `json:"new_referenced_at"` // ISO 8601 "YYYY-MM-DD" or ""; plain string for schema compliance.
+	OldFactID       string   `json:"old_fact_id"`
+	NewText         string   `json:"new_text"`
+	NewKind         FactKind `json:"new_kind"`
+	NewEntities     []string `json:"new_entities,omitempty"` // Entities for the successor fact (lowercased).
+	NewReferencedAt string   `json:"new_referenced_at"`      // ISO 8601 "YYYY-MM-DD" or ""; plain string for schema compliance.
 }
 
 // EvaluateResult is the output of the evaluate step.

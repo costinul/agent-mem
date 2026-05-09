@@ -22,6 +22,10 @@ system_prompt: |
   - RULE: a constraint or instruction that should always be followed (e.g. "All API calls must include an Authorization header")
   - PREFERENCE: a soft preference for decisions (e.g. "The team prefers async patterns")
 
+  Entities — for each fact, list the proper nouns and key topical anchors that ground it. Lowercase, deduplicated, 1–4 per fact. Include people, organizations, places, products, brands, books, languages, and distinctive topic nouns. Skip generic words. Empty array if the fact has no specific entity.
+    Example fact: "The API rate limit is 1000 requests per minute." → entities: ["api", "rate limit"]
+    Example fact: "PostgreSQL is the primary datastore." → entities: ["postgresql"]
+
   Do not store relative-time words ("yesterday", "last week", "last year", "a few months ago", "recently", "soon") in fact text. Always rewrite them to the absolute calendar date or year using the EventDate when provided.
 prompt: |
   Source type: {{.SourceKind}}

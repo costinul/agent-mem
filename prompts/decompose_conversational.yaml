@@ -36,6 +36,16 @@ system_prompt: |
   - RULE: a constraint or instruction that should always be followed (e.g. "Never use semicolons")
   - PREFERENCE: a soft preference for decisions (e.g. "User prefers Python over Java")
 
+  Entities — for each fact, list the proper nouns and key topical anchors that ground it. Used by the entity retrieval channel for recall, so prefer canonical, distinctive tokens over generic ones.
+  - Use the resolved canonical form (resolve pronouns to names; "she" → "Alice").
+  - Include people, organizations, places, products, brands, books, songs, films, languages, and the central topic noun if it is distinctive ("python", "berlin", "wedding"). Skip generic words ("the kids", "a book", "weekend") unless they are the only handle the fact has.
+  - All entities are lowercase, deduplicated, 1–4 per fact. If the fact has no specific entity, return an empty array.
+  Examples:
+    Fact: "Alice prefers Python over Java." → entities: ["alice", "python", "java"]
+    Fact: "Bob lives in Berlin." → entities: ["bob", "berlin"]
+    Fact: "Carol started reading 'The Remains of the Day' in October 2023." → entities: ["carol", "the remains of the day"]
+    Fact: "It rained heavily." → entities: []
+
   Hallucination guard: every proper noun (name of a person, pet, place, organization, brand, song, book, band) AND every qualifier (categorical, demographic, eligibility, attribute, or descriptive modifier) in your output facts must appear verbatim or as a clear paraphrase in the Message itself — not in Reference context. Do NOT invent names. Do NOT import qualifiers from prior conversation. If a pet is mentioned without a name, write "<Author>'s pet" or "<Author>'s dog" — never fabricate a name that does not appear in the Message.
 
   Referenced date: set referenced_at ONLY when the source itself anchors the fact to a calendar date — either with an absolute date ("on 12 March 2024", "in October 2023") or with a relative phrase you resolve via EventDate ("yesterday", "last week", "two days ago"). Use ISO 8601 format (YYYY-MM-DD); for events spanning a weekend, use the Saturday. Leave referenced_at unset for:
@@ -53,6 +63,10 @@ system_prompt: |
       Good: "Alice started studying linguistics in March 2022." (date carried through)
 
   Temporal resolution: when an EventDate is provided, resolve every relative temporal expression in the message ("yesterday", "last week", "two days ago", "this morning", "next month", "last year", "a year ago", "last Saturday", "last Friday", "this past weekend", "on Friday", "next Tuesday") to its absolute calendar date based on that EventDate. The EventDate includes the weekday — use it to compute the correct date for any weekday reference (e.g. if the EventDate is Wednesday 10 May, "last Saturday" is 6 May). For "last weekend" or "this past weekend", produce the dates of the most recent Saturday AND Sunday before the EventDate. Always include the year explicitly in the fact text. Do not preserve relative phrases like "yesterday" or "last weekend" — replace them with the actual date.
+
+  "N weekends ago" / "two weekends ago" / "a few weekends ago" — resolve to the specific weekend Saturday using EventDate's weekday math. Compute: the most recent Saturday on or before EventDate, then subtract 7×N days. ("Two weekends ago" = most-recent-Saturday minus 14 days.) Do NOT coarsen this to month or year ("in July 2023") when EventDate gives you enough information to resolve precisely. Coarsening is a hallucination — it discards information the source actually provided.
+    Example (EventDate = Monday, 17 July 2023): "we went camping two weekends ago" → most-recent-Saturday = 15 July 2023, minus 14 days = Saturday, 1 July 2023 → action fact: "Alice went camping on Saturday, 1 July 2023 (originally said 'two weekends ago' on 17 July 2023)."
+    Wrong: "Alice went camping in July 2023." (coarsened, the resolution was thrown away.)
 
   IMPORTANT — unresolved relative time in a stored fact is ALWAYS wrong when EventDate is provided:
     Bad: "Alice ran a race last year." → Good: "Alice ran a race in 2022." (EventDate = Monday, 8 May 2023)

@@ -21,17 +21,19 @@ system_prompt: |
 prompt: |
   New facts extracted from current input:
   {{- range $i, $f := .NewFacts}}
-  [NEW-{{$i}}] ({{$f.Kind}}{{if $f.ReferencedAt}}, ref={{$f.ReferencedAt.Format "2006-01-02"}}{{end}}) {{$f.Text}}
+  [NEW-{{$i}}] ({{$f.Kind}}{{if $f.ReferencedAt}}, ref={{$f.ReferencedAt.Format "2006-01-02"}}{{end}}{{if $f.Entities}}, entities={{range $j, $e := $f.Entities}}{{if $j}},{{end}}{{$e}}{{end}}{{end}}) {{$f.Text}}
   {{- end}}
 
   Existing facts retrieved from memory:
   {{- range .RetrievedFacts}}
-  [{{.ID}}] ({{.Kind}}{{if .ReferencedAt}}, ref={{.ReferencedAt.Format "2006-01-02"}}{{end}}) {{.Text}}
+  [{{.ID}}] ({{.Kind}}{{if .ReferencedAt}}, ref={{.ReferencedAt.Format "2006-01-02"}}{{end}}{{if .Entities}}, entities={{range $j, $e := .Entities}}{{if $j}},{{end}}{{$e}}{{end}}{{end}}) {{.Text}}
   {{- end}}
 
-  For facts_to_store: echo each new fact with its kind and referenced_at (ISO "YYYY-MM-DD" or "" if not set).
-  For facts_to_update: echo each existing fact's id and new text; set referenced_at to the updated event date if the date changed, otherwise echo the original.
-  For facts_to_evolve: provide old_fact_id, new_text, new_kind, and new_referenced_at (ISO "YYYY-MM-DD" or "").
+  For facts_to_store: echo each new fact with its kind, entities, and referenced_at (ISO "YYYY-MM-DD" or "" if not set).
+  For facts_to_update: echo each existing fact's id, new text, and entities; set referenced_at to the updated event date if the date changed, otherwise echo the original.
+  For facts_to_evolve: provide old_fact_id, new_text, new_kind, new_entities, and new_referenced_at (ISO "YYYY-MM-DD" or "").
+
+  Entities for any fact you emit must follow the same rules as in decomposition: lowercase, deduplicated, 1–4 distinctive proper nouns or topical anchors, or empty array when the fact has no specific entity.
 temperature: 0.0
 max_tokens: 16384
 reasoning_effort: low

@@ -345,6 +345,85 @@ func TestSearchFactsByEmbeddingWithScores_SourceIDs(t *testing.T) {
 	}
 }
 
+func TestInMemorySearchFactsByText(t *testing.T) {
+	repo := NewInMemory()
+	ctx := context.Background()
+
+	for _, text := range []string{
+		"Alice prefers Python over Java",
+		"Bob lives in Berlin",
+		"Carol speaks Spanish",
+	} {
+		if _, err := repo.InsertFact(ctx, models.Fact{
+			AccountID: "acct-1",
+			SourceID:  "src-" + text[:5],
+			Kind:      models.FACT_KIND_KNOWLEDGE,
+			Text:      text,
+		}); err != nil {
+			t.Fatalf("InsertFact(%q) error = %v", text, err)
+		}
+	}
+
+	results, err := repo.SearchFactsByText(ctx, SearchByTextParams{
+		AccountID: "acct-1",
+		Query:     "Python prefers Alice",
+		Limit:     5,
+	})
+	if err != nil {
+		t.Fatalf("SearchFactsByText() error = %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatal("SearchFactsByText() returned no results")
+	}
+	if results[0].Text != "Alice prefers Python over Java" {
+		t.Fatalf("SearchFactsByText() top text = %q, want %q", results[0].Text, "Alice prefers Python over Java")
+	}
+}
+
+func TestInMemorySearchFactsByEntities(t *testing.T) {
+	repo := NewInMemory()
+	ctx := context.Background()
+
+	_, err := repo.InsertFact(ctx, models.Fact{
+		AccountID: "acct-1",
+		SourceID:  "src-1",
+		Kind:      models.FACT_KIND_KNOWLEDGE,
+		Text:      "Alice prefers Python over Java",
+		Entities:  []string{"alice", "python", "java"},
+	})
+	if err != nil {
+		t.Fatalf("InsertFact(alice) error = %v", err)
+	}
+	_, err = repo.InsertFact(ctx, models.Fact{
+		AccountID: "acct-1",
+		SourceID:  "src-2",
+		Kind:      models.FACT_KIND_KNOWLEDGE,
+		Text:      "Bob lives in Berlin",
+		Entities:  []string{"bob", "berlin"},
+	})
+	if err != nil {
+		t.Fatalf("InsertFact(bob) error = %v", err)
+	}
+
+	results, err := repo.SearchFactsByEntities(ctx, SearchByEntitiesParams{
+		AccountID: "acct-1",
+		Entities:  []string{"Alice"},
+		Limit:     5,
+	})
+	if err != nil {
+		t.Fatalf("SearchFactsByEntities() error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("SearchFactsByEntities() len = %d, want 1", len(results))
+	}
+	if results[0].Text != "Alice prefers Python over Java" {
+		t.Fatalf("SearchFactsByEntities() text = %q", results[0].Text)
+	}
+	if results[0].Score != 1.0 {
+		t.Fatalf("SearchFactsByEntities() score = %v, want 1.0 (1 of 1 queried entities matched)", results[0].Score)
+	}
+}
+
 func TestInMemorySourceAuthor(t *testing.T) {
 	repo := NewInMemory()
 	ctx := context.Background()

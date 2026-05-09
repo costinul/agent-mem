@@ -208,6 +208,16 @@ func (w *repoWrapper) SearchFactsByEmbeddingWithScores(ctx context.Context, para
 	return w.inner.SearchFactsByEmbeddingWithScores(ctx, params)
 }
 
+func (w *repoWrapper) SearchFactsByText(ctx context.Context, params memoryrepo.SearchByTextParams) ([]memoryrepo.FactWithScore, error) {
+	defer w.observe(ctx, time.Now())
+	return w.inner.SearchFactsByText(ctx, params)
+}
+
+func (w *repoWrapper) SearchFactsByEntities(ctx context.Context, params memoryrepo.SearchByEntitiesParams) ([]memoryrepo.FactWithScore, error) {
+	defer w.observe(ctx, time.Now())
+	return w.inner.SearchFactsByEntities(ctx, params)
+}
+
 func (w *repoWrapper) UpdateFact(ctx context.Context, fact models.Fact) error {
 	defer w.observe(ctx, time.Now())
 	return w.inner.UpdateFact(ctx, fact)

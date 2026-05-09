@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	models "agentmem/internal/models"
@@ -175,8 +176,9 @@ func (a *LLMAdapter) DecomposeWithQueries(ctx context.Context, req DecomposeRequ
 		facts[i] = f.toModel()
 	}
 	return models.Decomposition{
-		Facts:   facts,
-		Queries: out.Queries,
+		Facts:    facts,
+		Queries:  out.Queries,
+		Entities: normalizeEntities(out.Entities),
 	}, nil
 }
 
@@ -214,8 +216,9 @@ func (a *LLMAdapter) DecomposeRecall(ctx context.Context, req DecomposeRecallReq
 		facts[i] = f.toModel()
 	}
 	return models.Decomposition{
-		Facts:   facts,
-		Queries: out.Queries,
+		Facts:    facts,
+		Queries:  out.Queries,
+		Entities: normalizeEntities(out.Entities),
 	}, nil
 }
 
@@ -250,7 +253,7 @@ func (a *LLMAdapter) Evaluate(ctx context.Context, req EvaluateRequest) (models.
 	// LLM echoes referenced_at on each new fact — map it directly, no text-key lookup needed.
 	factsToStore := make([]models.Fact, 0, len(out.FactsToStore))
 	for _, ef := range out.FactsToStore {
-		f := models.Fact{Text: ef.Text, Kind: ef.Kind}
+		f := models.Fact{Text: ef.Text, Kind: ef.Kind, Entities: normalizeEntities(ef.Entities)}
 		if ef.ReferencedAt != "" {
 			if t, err := time.Parse("2006-01-02", ef.ReferencedAt); err == nil {
 				f.ReferencedAt = &t
@@ -263,6 +266,7 @@ func (a *LLMAdapter) Evaluate(ctx context.Context, req EvaluateRequest) (models.
 	for _, u := range out.FactsToUpdate {
 		if f, ok := retrievedByID[u.ID]; ok {
 			f.Text = u.Text
+			f.Entities = normalizeEntities(u.Entities)
 			if u.ReferencedAt != "" {
 				if t, err := time.Parse("2006-01-02", u.ReferencedAt); err == nil {
 					f.ReferencedAt = &t
@@ -272,11 +276,22 @@ func (a *LLMAdapter) Evaluate(ctx context.Context, req EvaluateRequest) (models.
 		}
 	}
 
+	factsToEvolve := make([]models.FactEvolution, len(out.FactsToEvolve))
+	for i, ev := range out.FactsToEvolve {
+		factsToEvolve[i] = models.FactEvolution{
+			OldFactID:       ev.OldFactID,
+			NewText:         ev.NewText,
+			NewKind:         ev.NewKind,
+			NewEntities:     normalizeEntities(ev.NewEntities),
+			NewReferencedAt: ev.NewReferencedAt,
+		}
+	}
+
 	return models.EvaluateResult{
 		FactsToReturn: factsToReturn,
 		FactsToStore:  factsToStore,
 		FactsToUpdate: factsToUpdate,
-		FactsToEvolve: out.FactsToEvolve,
+		FactsToEvolve: factsToEvolve,
 	}, nil
 }
 
@@ -423,11 +438,12 @@ func (a *LLMAdapter) SelectFactsLight(ctx context.Context, req SelectFactsReques
 type extractedFactLLM struct {
 	Text         string          `json:"text"`
 	Kind         models.FactKind `json:"kind" jsonschema:"enum=KNOWLEDGE,enum=RULE,enum=PREFERENCE"`
+	Entities     []string        `json:"entities"`
 	ReferencedAt string          `json:"referenced_at"`
 }
 
 func (f extractedFactLLM) toModel() models.ExtractedFact {
-	ef := models.ExtractedFact{Text: f.Text, Kind: f.Kind}
+	ef := models.ExtractedFact{Text: f.Text, Kind: f.Kind, Entities: normalizeEntities(f.Entities)}
 	if f.ReferencedAt != "" {
 		if t, err := time.Parse("2006-01-02", f.ReferencedAt); err == nil {
 			ef.ReferencedAt = &t
@@ -436,18 +452,46 @@ func (f extractedFactLLM) toModel() models.ExtractedFact {
 	return ef
 }
 
+// normalizeEntities lowercases, trims, and deduplicates entity strings while preserving
+// first-seen order. Empty strings are dropped. Returns nil when the input has no usable
+// entries so that the JSON omitempty tag elides the field.
+func normalizeEntities(in []string) []string {
+	if len(in) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(in))
+	out := make([]string, 0, len(in))
+	for _, raw := range in {
+		s := strings.ToLower(strings.TrimSpace(raw))
+		if s == "" {
+			continue
+		}
+		if _, dup := seen[s]; dup {
+			continue
+		}
+		seen[s] = struct{}{}
+		out = append(out, s)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
 // factUpdateLLM is the evaluate step's wire shape for an existing fact update.
 type factUpdateLLM struct {
-	ID           string `json:"id"`
-	Text         string `json:"text"`
-	ReferencedAt string `json:"referenced_at"` // ISO 8601 "YYYY-MM-DD" or ""; plain string for schema compliance.
+	ID           string   `json:"id"`
+	Text         string   `json:"text"`
+	Entities     []string `json:"entities"`
+	ReferencedAt string   `json:"referenced_at"` // ISO 8601 "YYYY-MM-DD" or ""; plain string for schema compliance.
 }
 
 // decompositionOutput is the legacy combined shape, retained only for decompose_recall
 // which currently emits both fields (facts is always empty in practice).
 type decompositionOutput struct {
-	Facts   []extractedFactLLM      `json:"facts"`
-	Queries []models.ExtractedQuery `json:"queries"`
+	Facts    []extractedFactLLM      `json:"facts"`
+	Queries  []models.ExtractedQuery `json:"queries"`
+	Entities []string                `json:"entities"`
 }
 
 func (o *decompositionOutput) SchemaDescription() string {
@@ -514,11 +558,22 @@ func (o *queriesOnlyOutput) Unmarshal(data []byte) error {
 
 // ──────────────────────────────────────────────
 
+// factEvolutionLLM is the evaluate step's wire shape for a fact evolution.
+// Plain strings rather than pointers/optionals so that Azure's strict schema (every
+// property must be in `required`) is satisfied.
+type factEvolutionLLM struct {
+	OldFactID       string          `json:"old_fact_id"`
+	NewText         string          `json:"new_text"`
+	NewKind         models.FactKind `json:"new_kind" jsonschema:"enum=KNOWLEDGE,enum=RULE,enum=PREFERENCE"`
+	NewEntities     []string        `json:"new_entities"`
+	NewReferencedAt string          `json:"new_referenced_at"`
+}
+
 type evaluateOutput struct {
-	FactsToReturn []string               `json:"facts_to_return"`
-	FactsToStore  []extractedFactLLM     `json:"facts_to_store"`
-	FactsToUpdate []factUpdateLLM        `json:"facts_to_update"`
-	FactsToEvolve []models.FactEvolution `json:"facts_to_evolve"`
+	FactsToReturn []string           `json:"facts_to_return"`
+	FactsToStore  []extractedFactLLM `json:"facts_to_store"`
+	FactsToUpdate []factUpdateLLM    `json:"facts_to_update"`
+	FactsToEvolve []factEvolutionLLM `json:"facts_to_evolve"`
 }
 
 func (o *evaluateOutput) SchemaDescription() string {

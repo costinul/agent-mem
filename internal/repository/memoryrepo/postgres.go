@@ -314,17 +314,18 @@ func (r *PostgresRepository) SearchSourcesByContent(ctx context.Context, account
 
 func (r *PostgresRepository) InsertFact(ctx context.Context, fact models.Fact) (*models.Fact, error) {
 	var (
-		stored        models.Fact
-		agentID       sql.NullString
-		threadID      sql.NullString
-		referencedAt  sql.NullTime
+		stored       models.Fact
+		agentID      sql.NullString
+		threadID     sql.NullString
+		referencedAt sql.NullTime
+		entities     pq.StringArray
 	)
 
 	err := r.db.QueryRowContext(
 		ctx,
-		`INSERT INTO facts (account_id, agent_id, thread_id, source_id, kind, text, embedding, referenced_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7::vector, $8)
-		 RETURNING id, account_id, agent_id, thread_id, source_id, kind, text, referenced_at, created_at, updated_at`,
+		`INSERT INTO facts (account_id, agent_id, thread_id, source_id, kind, text, embedding, referenced_at, entities)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7::vector, $8, $9)
+		 RETURNING id, account_id, agent_id, thread_id, source_id, kind, text, referenced_at, entities, created_at, updated_at`,
 		fact.AccountID,
 		fact.AgentID,
 		fact.ThreadID,
@@ -333,6 +334,7 @@ func (r *PostgresRepository) InsertFact(ctx context.Context, fact models.Fact) (
 		fact.Text,
 		vectorParam(fact.Embedding),
 		fact.ReferencedAt,
+		pq.Array(fact.Entities),
 	).Scan(
 		&stored.ID,
 		&stored.AccountID,
@@ -342,6 +344,7 @@ func (r *PostgresRepository) InsertFact(ctx context.Context, fact models.Fact) (
 		&stored.Kind,
 		&stored.Text,
 		&referencedAt,
+		&entities,
 		&stored.CreatedAt,
 		&stored.UpdatedAt,
 	)
@@ -354,13 +357,14 @@ func (r *PostgresRepository) InsertFact(ctx context.Context, fact models.Fact) (
 	if referencedAt.Valid {
 		stored.ReferencedAt = &referencedAt.Time
 	}
+	stored.Entities = []string(entities)
 	return &stored, nil
 }
 
 func (r *PostgresRepository) ListFactsByScope(ctx context.Context, accountID string, agentID, threadID *string) ([]models.Fact, error) {
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT id, account_id, agent_id, thread_id, source_id, kind, text, created_at, updated_at
+		`SELECT id, account_id, agent_id, thread_id, source_id, kind, text, entities, created_at, updated_at
 		 FROM facts
 		 WHERE account_id = $1
 		   AND (($2::uuid IS NULL AND agent_id IS NULL) OR agent_id = $2)
@@ -379,9 +383,10 @@ func (r *PostgresRepository) ListFactsByScope(ctx context.Context, accountID str
 	facts := make([]models.Fact, 0)
 	for rows.Next() {
 		var (
-			fact   models.Fact
-			agent  sql.NullString
-			thread sql.NullString
+			fact     models.Fact
+			agent    sql.NullString
+			thread   sql.NullString
+			entities pq.StringArray
 		)
 		if err := rows.Scan(
 			&fact.ID,
@@ -391,6 +396,7 @@ func (r *PostgresRepository) ListFactsByScope(ctx context.Context, accountID str
 			&fact.SourceID,
 			&fact.Kind,
 			&fact.Text,
+			&entities,
 			&fact.CreatedAt,
 			&fact.UpdatedAt,
 		); err != nil {
@@ -398,6 +404,7 @@ func (r *PostgresRepository) ListFactsByScope(ctx context.Context, accountID str
 		}
 		fact.AgentID = nullStringPtr(agent)
 		fact.ThreadID = nullStringPtr(thread)
+		fact.Entities = []string(entities)
 		facts = append(facts, fact)
 	}
 	return facts, rows.Err()
@@ -405,7 +412,7 @@ func (r *PostgresRepository) ListFactsByScope(ctx context.Context, accountID str
 
 func (r *PostgresRepository) ListFactsByThreadID(ctx context.Context, threadID string) ([]models.Fact, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, account_id, agent_id, thread_id, source_id, kind, text,
+		`SELECT id, account_id, agent_id, thread_id, source_id, kind, text, entities,
 		        superseded_at, superseded_by, created_at, updated_at
 		 FROM facts WHERE thread_id = $1
 		 ORDER BY created_at ASC`, threadID)
@@ -420,12 +427,13 @@ func (r *PostgresRepository) ListFactsByThreadID(ctx context.Context, threadID s
 			fact         models.Fact
 			agent        sql.NullString
 			thread       sql.NullString
+			entities     pq.StringArray
 			supersededAt sql.NullTime
 			supersededBy sql.NullString
 		)
 		if err := rows.Scan(
 			&fact.ID, &fact.AccountID, &agent, &thread,
-			&fact.SourceID, &fact.Kind, &fact.Text,
+			&fact.SourceID, &fact.Kind, &fact.Text, &entities,
 			&supersededAt, &supersededBy,
 			&fact.CreatedAt, &fact.UpdatedAt,
 		); err != nil {
@@ -433,6 +441,7 @@ func (r *PostgresRepository) ListFactsByThreadID(ctx context.Context, threadID s
 		}
 		fact.AgentID = nullStringPtr(agent)
 		fact.ThreadID = nullStringPtr(thread)
+		fact.Entities = []string(entities)
 		if supersededAt.Valid {
 			fact.SupersededAt = &supersededAt.Time
 		}
@@ -474,7 +483,7 @@ func (r *PostgresRepository) ListFactsFiltered(ctx context.Context, params ListF
 	}
 
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, account_id, agent_id, thread_id, source_id, kind, text, created_at, updated_at
+		`SELECT id, account_id, agent_id, thread_id, source_id, kind, text, entities, created_at, updated_at
 		 FROM facts `+baseWhere+`
 		 ORDER BY created_at DESC
 		 LIMIT $5 OFFSET $6`,
@@ -488,19 +497,21 @@ func (r *PostgresRepository) ListFactsFiltered(ctx context.Context, params ListF
 	facts := make([]models.Fact, 0)
 	for rows.Next() {
 		var (
-			fact   models.Fact
-			agent  sql.NullString
-			thread sql.NullString
+			fact     models.Fact
+			agent    sql.NullString
+			thread   sql.NullString
+			entities pq.StringArray
 		)
 		if err := rows.Scan(
 			&fact.ID, &fact.AccountID, &agent, &thread,
-			&fact.SourceID, &fact.Kind, &fact.Text,
+			&fact.SourceID, &fact.Kind, &fact.Text, &entities,
 			&fact.CreatedAt, &fact.UpdatedAt,
 		); err != nil {
 			return nil, 0, err
 		}
 		fact.AgentID = nullStringPtr(agent)
 		fact.ThreadID = nullStringPtr(thread)
+		fact.Entities = []string(entities)
 		facts = append(facts, fact)
 	}
 	return facts, total, rows.Err()
@@ -516,7 +527,7 @@ func (r *PostgresRepository) ListFactsBySourceIDs(ctx context.Context, accountID
 	}
 
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT f.id, f.account_id, f.agent_id, f.thread_id, f.source_id, f.kind, f.text,
+		`SELECT f.id, f.account_id, f.agent_id, f.thread_id, f.source_id, f.kind, f.text, f.entities,
 		        f.referenced_at, f.superseded_at, f.superseded_by, f.created_at, f.updated_at, s.event_date
 		 FROM facts f
 		 JOIN sources s ON s.id = f.source_id
@@ -535,13 +546,14 @@ func (r *PostgresRepository) ListFactsBySourceIDs(ctx context.Context, accountID
 			fact         models.Fact
 			agent        sql.NullString
 			thread       sql.NullString
+			entities     pq.StringArray
 			referencedAt sql.NullTime
 			supersededAt sql.NullTime
 			supersededBy sql.NullString
 		)
 		if err := rows.Scan(
 			&fact.ID, &fact.AccountID, &agent, &thread,
-			&fact.SourceID, &fact.Kind, &fact.Text,
+			&fact.SourceID, &fact.Kind, &fact.Text, &entities,
 			&referencedAt, &supersededAt, &supersededBy,
 			&fact.CreatedAt, &fact.UpdatedAt, &fact.EventDate,
 		); err != nil {
@@ -549,6 +561,7 @@ func (r *PostgresRepository) ListFactsBySourceIDs(ctx context.Context, accountID
 		}
 		fact.AgentID = nullStringPtr(agent)
 		fact.ThreadID = nullStringPtr(thread)
+		fact.Entities = []string(entities)
 		if referencedAt.Valid {
 			fact.ReferencedAt = &referencedAt.Time
 		}
@@ -569,11 +582,12 @@ func (r *PostgresRepository) GetFactByID(ctx context.Context, factID string) (*m
 		fact     models.Fact
 		agentID  sql.NullString
 		threadID sql.NullString
+		entities pq.StringArray
 	)
 
 	err := r.db.QueryRowContext(
 		ctx,
-		`SELECT id, account_id, agent_id, thread_id, source_id, kind, text, created_at, updated_at
+		`SELECT id, account_id, agent_id, thread_id, source_id, kind, text, entities, created_at, updated_at
 		 FROM facts
 		 WHERE id = $1`,
 		factID,
@@ -585,6 +599,7 @@ func (r *PostgresRepository) GetFactByID(ctx context.Context, factID string) (*m
 		&fact.SourceID,
 		&fact.Kind,
 		&fact.Text,
+		&entities,
 		&fact.CreatedAt,
 		&fact.UpdatedAt,
 	)
@@ -597,6 +612,7 @@ func (r *PostgresRepository) GetFactByID(ctx context.Context, factID string) (*m
 
 	fact.AgentID = nullStringPtr(agentID)
 	fact.ThreadID = nullStringPtr(threadID)
+	fact.Entities = []string(entities)
 	return &fact, nil
 }
 
@@ -604,12 +620,13 @@ func (r *PostgresRepository) UpdateFact(ctx context.Context, fact models.Fact) e
 	_, err := r.db.ExecContext(
 		ctx,
 		`UPDATE facts
-		 SET text = $2, kind = $3, embedding = COALESCE($4::vector, embedding), updated_at = now()
+		 SET text = $2, kind = $3, embedding = COALESCE($4::vector, embedding), entities = $5, updated_at = now()
 		 WHERE id = $1`,
 		fact.ID,
 		fact.Text,
 		fact.Kind,
 		vectorParam(fact.Embedding),
+		pq.Array(fact.Entities),
 	)
 	return err
 }
@@ -625,7 +642,7 @@ func (r *PostgresRepository) SearchFactsByEmbedding(ctx context.Context, params 
 		params.MinSimilarity = 0.65
 	}
 
-	q := `SELECT f.id, f.account_id, f.agent_id, f.thread_id, f.source_id, f.kind, f.text,
+	q := `SELECT f.id, f.account_id, f.agent_id, f.thread_id, f.source_id, f.kind, f.text, f.entities,
 		        f.referenced_at, f.superseded_at, f.superseded_by, f.created_at, f.updated_at, s.event_date
 		 FROM facts f
 		 JOIN sources s ON s.id = f.source_id
@@ -661,6 +678,7 @@ func (r *PostgresRepository) SearchFactsByEmbedding(ctx context.Context, params 
 			fact         models.Fact
 			agent        sql.NullString
 			thread       sql.NullString
+			entities     pq.StringArray
 			referencedAt sql.NullTime
 			supersededAt sql.NullTime
 			supersededBy sql.NullString
@@ -673,6 +691,7 @@ func (r *PostgresRepository) SearchFactsByEmbedding(ctx context.Context, params 
 			&fact.SourceID,
 			&fact.Kind,
 			&fact.Text,
+			&entities,
 			&referencedAt,
 			&supersededAt,
 			&supersededBy,
@@ -684,6 +703,7 @@ func (r *PostgresRepository) SearchFactsByEmbedding(ctx context.Context, params 
 		}
 		fact.AgentID = nullStringPtr(agent)
 		fact.ThreadID = nullStringPtr(thread)
+		fact.Entities = []string(entities)
 		if referencedAt.Valid {
 			fact.ReferencedAt = &referencedAt.Time
 		}
@@ -707,7 +727,7 @@ func (r *PostgresRepository) SearchFactsByEmbeddingWithScores(ctx context.Contex
 		params.Limit = 20
 	}
 
-	q := `SELECT f.id, f.account_id, f.agent_id, f.thread_id, f.source_id, f.kind, f.text,
+	q := `SELECT f.id, f.account_id, f.agent_id, f.thread_id, f.source_id, f.kind, f.text, f.entities,
 		        f.referenced_at, f.superseded_at, f.superseded_by, f.created_at, f.updated_at, s.event_date,
 		        1 - (f.embedding <=> $4::vector) AS score
 		 FROM facts f
@@ -743,6 +763,7 @@ func (r *PostgresRepository) SearchFactsByEmbeddingWithScores(ctx context.Contex
 			fs           FactWithScore
 			agent        sql.NullString
 			thread       sql.NullString
+			entities     pq.StringArray
 			referencedAt sql.NullTime
 			supersededAt sql.NullTime
 			supersededBy sql.NullString
@@ -755,6 +776,7 @@ func (r *PostgresRepository) SearchFactsByEmbeddingWithScores(ctx context.Contex
 			&fs.SourceID,
 			&fs.Kind,
 			&fs.Text,
+			&entities,
 			&referencedAt,
 			&supersededAt,
 			&supersededBy,
@@ -767,6 +789,138 @@ func (r *PostgresRepository) SearchFactsByEmbeddingWithScores(ctx context.Contex
 		}
 		fs.AgentID = nullStringPtr(agent)
 		fs.ThreadID = nullStringPtr(thread)
+		fs.Entities = []string(entities)
+		if referencedAt.Valid {
+			fs.ReferencedAt = &referencedAt.Time
+		}
+		if supersededAt.Valid {
+			fs.SupersededAt = &supersededAt.Time
+		}
+		if supersededBy.Valid {
+			by := supersededBy.String
+			fs.SupersededBy = &by
+		}
+		results = append(results, fs)
+	}
+	return results, rows.Err()
+}
+
+// SearchFactsByText runs a tsvector lexical search using websearch_to_tsquery (the
+// user-style parser is forgiving of bad input). Score is ts_rank_cd over the stored
+// generated text_search column. Returned in score-descending order.
+func (r *PostgresRepository) SearchFactsByText(ctx context.Context, params SearchByTextParams) ([]FactWithScore, error) {
+	query := strings.TrimSpace(params.Query)
+	if query == "" {
+		return nil, nil
+	}
+	if params.Limit <= 0 {
+		params.Limit = 20
+	}
+
+	q := `SELECT f.id, f.account_id, f.agent_id, f.thread_id, f.source_id, f.kind, f.text, f.entities,
+		        f.referenced_at, f.superseded_at, f.superseded_by, f.created_at, f.updated_at, s.event_date,
+		        ts_rank_cd(f.text_search, websearch_to_tsquery('english', $4)) AS score
+		 FROM facts f
+		 JOIN sources s ON s.id = f.source_id
+		 WHERE f.account_id = $1
+		   AND (($2::uuid IS NULL AND f.agent_id IS NULL) OR f.agent_id = $2)
+		   AND (($3::uuid IS NULL AND f.thread_id IS NULL) OR f.thread_id = $3)
+		   AND f.text_search @@ websearch_to_tsquery('english', $4)`
+	if !params.IncludeSuperseded {
+		q += ` AND f.superseded_at IS NULL`
+	}
+	args := []any{params.AccountID, params.AgentID, params.ThreadID, query, params.Limit}
+	if params.MaxSourceEventDate != nil {
+		q += fmt.Sprintf(` AND s.event_date <= $%d`, len(args)+1)
+		args = append(args, params.MaxSourceEventDate.UTC())
+	}
+	q += ` ORDER BY score DESC LIMIT $5`
+
+	rows, err := r.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return scanFactsWithScore(rows)
+}
+
+// SearchFactsByEntities returns facts whose entities array overlaps the provided set,
+// scored by overlap fraction (#matched / #queried). Entities are case-insensitive and
+// expected to be lowercase on both sides; the engine normalizes before calling.
+func (r *PostgresRepository) SearchFactsByEntities(ctx context.Context, params SearchByEntitiesParams) ([]FactWithScore, error) {
+	if len(params.Entities) == 0 {
+		return nil, nil
+	}
+	if params.Limit <= 0 {
+		params.Limit = 20
+	}
+
+	q := `SELECT f.id, f.account_id, f.agent_id, f.thread_id, f.source_id, f.kind, f.text, f.entities,
+		        f.referenced_at, f.superseded_at, f.superseded_by, f.created_at, f.updated_at, s.event_date,
+		        cardinality(ARRAY(SELECT unnest(f.entities) INTERSECT SELECT unnest($4::text[])))::float
+		          / GREATEST(cardinality($4::text[]), 1)::float AS score
+		 FROM facts f
+		 JOIN sources s ON s.id = f.source_id
+		 WHERE f.account_id = $1
+		   AND (($2::uuid IS NULL AND f.agent_id IS NULL) OR f.agent_id = $2)
+		   AND (($3::uuid IS NULL AND f.thread_id IS NULL) OR f.thread_id = $3)
+		   AND f.entities && $4::text[]`
+	if !params.IncludeSuperseded {
+		q += ` AND f.superseded_at IS NULL`
+	}
+	args := []any{params.AccountID, params.AgentID, params.ThreadID, pq.Array(params.Entities), params.Limit}
+	if params.MaxSourceEventDate != nil {
+		q += fmt.Sprintf(` AND s.event_date <= $%d`, len(args)+1)
+		args = append(args, params.MaxSourceEventDate.UTC())
+	}
+	q += ` ORDER BY score DESC LIMIT $5`
+
+	rows, err := r.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return scanFactsWithScore(rows)
+}
+
+// scanFactsWithScore is shared by SearchFactsByText and SearchFactsByEntities — both
+// project the same column list ending with score.
+func scanFactsWithScore(rows *sql.Rows) ([]FactWithScore, error) {
+	results := make([]FactWithScore, 0)
+	for rows.Next() {
+		var (
+			fs           FactWithScore
+			agent        sql.NullString
+			thread       sql.NullString
+			entities     pq.StringArray
+			referencedAt sql.NullTime
+			supersededAt sql.NullTime
+			supersededBy sql.NullString
+		)
+		if err := rows.Scan(
+			&fs.ID,
+			&fs.AccountID,
+			&agent,
+			&thread,
+			&fs.SourceID,
+			&fs.Kind,
+			&fs.Text,
+			&entities,
+			&referencedAt,
+			&supersededAt,
+			&supersededBy,
+			&fs.CreatedAt,
+			&fs.UpdatedAt,
+			&fs.EventDate,
+			&fs.Score,
+		); err != nil {
+			return nil, err
+		}
+		fs.AgentID = nullStringPtr(agent)
+		fs.ThreadID = nullStringPtr(thread)
+		fs.Entities = []string(entities)
 		if referencedAt.Valid {
 			fs.ReferencedAt = &referencedAt.Time
 		}

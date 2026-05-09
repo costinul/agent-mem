@@ -27,6 +27,15 @@ type Repository interface {
 	GetFactByID(ctx context.Context, factID string) (*models.Fact, error)
 	SearchFactsByEmbedding(ctx context.Context, params SearchByEmbeddingParams) ([]models.Fact, error)
 	SearchFactsByEmbeddingWithScores(ctx context.Context, params SearchByEmbeddingParams) ([]FactWithScore, error)
+	// SearchFactsByText runs a lexical (word-overlap) search against fact text.
+	// Used as a parallel channel to dense embedding search so that queries which
+	// share rare lexical tokens with their target fact (e.g. proper nouns) are not
+	// missed by the embedding alone.
+	SearchFactsByText(ctx context.Context, params SearchByTextParams) ([]FactWithScore, error)
+	// SearchFactsByEntities returns facts whose stored entity set overlaps the
+	// provided entities. Entities are case-insensitive and assumed lowercase on both
+	// sides. Score = #matched / #queried.
+	SearchFactsByEntities(ctx context.Context, params SearchByEntitiesParams) ([]FactWithScore, error)
 	UpdateFact(ctx context.Context, fact models.Fact) error
 	DeleteFact(ctx context.Context, factID string) error
 	// SupersedeFact inserts newFact and marks oldFactID as superseded.
@@ -71,5 +80,31 @@ type SearchByEmbeddingParams struct {
 	// MaxSourceEventDate, when non-nil, restricts results to facts whose source.event_date
 	// is <= this value. Used by recall to prevent surfacing facts from conversation turns
 	// that hadn't yet been authored at the recall event_date.
+	MaxSourceEventDate *time.Time
+}
+
+// SearchByTextParams mirrors SearchByEmbeddingParams for the lexical channel.
+// Query is a single free-text query; callers run one search per decomposed phrase
+// and fuse the results with the dense channel.
+type SearchByTextParams struct {
+	AccountID          string
+	AgentID            *string
+	ThreadID           *string
+	Query              string
+	Limit              int
+	IncludeSuperseded  bool
+	MaxSourceEventDate *time.Time
+}
+
+// SearchByEntitiesParams mirrors SearchByEmbeddingParams for the entity channel.
+// Entities are lowercase; the channel returns facts whose stored entities overlap
+// the provided set, scored by overlap fraction.
+type SearchByEntitiesParams struct {
+	AccountID          string
+	AgentID            *string
+	ThreadID           *string
+	Entities           []string
+	Limit              int
+	IncludeSuperseded  bool
 	MaxSourceEventDate *time.Time
 }

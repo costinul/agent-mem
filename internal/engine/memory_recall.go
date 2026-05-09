@@ -61,11 +61,13 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 		return models.RecallOutput{}, fmt.Errorf("embed recall search phrases: %w", err)
 	}
 
-	candidates, retrievalScores, err := e.retrieveFactsWithLimit(ctx, input.AccountID, input.AgentID, input.ThreadID, embeddings, recallCandidateK, true, &eventDate)
+	hybrid, err := e.retrieveFactsHybrid(ctx, input.AccountID, input.AgentID, input.ThreadID, phrases, embeddings, decomposition.Entities, recallCandidateK, true, &eventDate)
 	if err != nil {
 		return models.RecallOutput{}, err
 	}
-	log.Printf("recall retrieved=%d top_texts=%v", len(candidates), recallPreviews(candidates, 5))
+	candidates := hybrid.Facts
+	retrievalScores := hybrid.FusedScores
+	log.Printf("recall retrieved=%d top_texts=%v entities=%v", len(candidates), recallPreviews(candidates, 5), decomposition.Entities)
 	retrievedCount := len(candidates)
 
 	candidates, err = e.expandBySource(ctx, input.AccountID, candidates, recallSiblingBudget)
@@ -75,9 +77,12 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 	log.Printf("recall expanded=%d", len(candidates))
 	expandedCount := len(candidates)
 
-	// Cosine rerank restores semantic ordering after sibling expansion mixes in
-	// source-grouped facts that may not be in similarity order.
-	candidates = cosineRerank(candidates, embeddings)
+	// Re-sort after sibling injection so that scored candidates retain their RRF
+	// ordering. Siblings (no fused score) are appended at the end; the previous
+	// cosineRerank would clobber RRF order by demoting lexical/entity-only matches
+	// with low dense similarity, which is the exact failure mode hybrid retrieval
+	// is supposed to fix.
+	candidates = rrfPlaceSiblings(candidates, hybrid.FusedScores, hybrid.DenseScores, embeddings)
 
 	// Drop near-duplicate candidates whose normalized text matches an
 	// already-kept candidate. This compensates for ingest-time dedup gaps
@@ -126,6 +131,13 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 			selectedIDs = append(selectedIDs, f.ID)
 		}
 
+		channelRank := func(reg channelRanks, id string) int {
+			if r, ok := reg[id]; ok {
+				return r
+			}
+			return -1
+		}
+
 		debugCandidates := make([]models.DebugCandidate, 0, len(candidates))
 		for _, f := range candidates {
 			// Eligible = no referenced_at (timeless) or referenced_at not in the future.
@@ -140,9 +152,13 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 				Text:         text,
 				SourceID:     f.SourceID,
 				Kind:         f.Kind,
+				Entities:     f.Entities,
 				EventDate:    factEventDate,
 				ReferencedAt: f.ReferencedAt,
 				Score:        retrievalScores[f.ID],
+				DenseRank:    channelRank(hybrid.DenseRank, f.ID),
+				LexicalRank:  channelRank(hybrid.LexicalRank, f.ID),
+				EntityRank:   channelRank(hybrid.EntityRank, f.ID),
 				InWindow:     eligible,
 				Selected:     selectedSet[f.ID],
 				Historical:   f.SupersededAt != nil,
@@ -152,6 +168,7 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 		dbg = &models.RecallDebug{
 			Query:            input.Query,
 			Phrases:          phrases,
+			Entities:         decomposition.Entities,
 			EventDate:        eventDateStr,
 			RetrievedCount:   retrievedCount,
 			ExpandedCount:    expandedCount,

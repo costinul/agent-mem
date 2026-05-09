@@ -75,6 +75,7 @@ type RecallOutput struct {
 type RecallDebug struct {
 	Query            string           `json:"query"`
 	Phrases          []string         `json:"phrases"`
+	Entities         []string         `json:"entities,omitempty"`
 	EventDate        string           `json:"event_date,omitempty"`
 	RetrievedCount   int              `json:"retrieved_count"`
 	ExpandedCount    int              `json:"expanded_count"`
@@ -92,11 +93,18 @@ type DebugCandidate struct {
 	Text         string     `json:"text"`
 	SourceID     string     `json:"source_id"`
 	Kind         FactKind   `json:"kind"`
+	Entities     []string   `json:"entities,omitempty"`
 	EventDate    string     `json:"event_date,omitempty"`
 	ReferencedAt *time.Time `json:"referenced_at,omitempty"`
 	Score        float64    `json:"score"`
-	InWindow     bool       `json:"in_window"`
-	Selected     bool       `json:"selected"`
+	// DenseRank, LexicalRank, EntityRank are 0-based ranks of this fact within the
+	// corresponding retrieval channel before fusion. -1 means the fact was not
+	// surfaced by that channel. Used to inspect why a candidate landed in the pool.
+	DenseRank   int  `json:"dense_rank"`
+	LexicalRank int  `json:"lexical_rank"`
+	EntityRank  int  `json:"entity_rank"`
+	InWindow    bool `json:"in_window"`
+	Selected    bool `json:"selected"`
 	// Historical is true when the fact was already superseded as of the recall event_date
 	// (mirrors ReturnedFact.Historical for candidates that were not selected).
 	Historical bool `json:"historical,omitempty"`

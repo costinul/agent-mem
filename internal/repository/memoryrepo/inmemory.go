@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	models "agentmem/internal/models"
 
@@ -526,6 +527,227 @@ func (r *InMemoryRepository) MaxSourceEventDateForThread(ctx context.Context, th
 		}
 	}
 	return max, nil
+}
+
+// SearchFactsByText runs an in-memory tf-idf scoring against fact text. Used by
+// tests; the production path is Postgres tsvector. Tokens are lowercase
+// alphanumeric runs; idf is log((N+1)/(df+1)) over the candidate set, tf is raw count.
+func (r *InMemoryRepository) SearchFactsByText(_ context.Context, params SearchByTextParams) ([]FactWithScore, error) {
+	tokens := tokenizeText(params.Query)
+	if len(tokens) == 0 {
+		return nil, nil
+	}
+	if params.Limit <= 0 {
+		params.Limit = 20
+	}
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	candidates := make([]models.Fact, 0)
+	for _, fact := range r.facts {
+		if !params.IncludeSuperseded && fact.SupersededAt != nil {
+			continue
+		}
+		if fact.AccountID != params.AccountID {
+			continue
+		}
+		if params.AgentID != nil {
+			if fact.AgentID == nil || *fact.AgentID != *params.AgentID {
+				continue
+			}
+		}
+		if params.ThreadID != nil {
+			if fact.ThreadID == nil || *fact.ThreadID != *params.ThreadID {
+				continue
+			}
+		}
+		if params.MaxSourceEventDate != nil {
+			if src, ok := r.sources[fact.SourceID]; ok && src.EventDate.After(*params.MaxSourceEventDate) {
+				continue
+			}
+		}
+		candidates = append(candidates, fact)
+	}
+	if len(candidates) == 0 {
+		return nil, nil
+	}
+
+	df := make(map[string]int, len(tokens))
+	tokenSet := make(map[string]struct{}, len(tokens))
+	for _, t := range tokens {
+		tokenSet[t] = struct{}{}
+	}
+	docTokens := make([][]string, len(candidates))
+	for i, fact := range candidates {
+		docTokens[i] = tokenizeText(fact.Text)
+		seen := make(map[string]struct{}, len(docTokens[i]))
+		for _, w := range docTokens[i] {
+			if _, ok := tokenSet[w]; !ok {
+				continue
+			}
+			if _, dup := seen[w]; dup {
+				continue
+			}
+			seen[w] = struct{}{}
+			df[w]++
+		}
+	}
+
+	type scored struct {
+		fact  models.Fact
+		score float64
+	}
+	scoredFacts := make([]scored, 0, len(candidates))
+	N := float64(len(candidates))
+	for i, fact := range candidates {
+		tf := make(map[string]int, len(docTokens[i]))
+		for _, w := range docTokens[i] {
+			if _, ok := tokenSet[w]; ok {
+				tf[w]++
+			}
+		}
+		score := 0.0
+		for _, t := range tokens {
+			if tf[t] == 0 {
+				continue
+			}
+			idf := math.Log((N + 1.0) / (float64(df[t]) + 1.0))
+			score += float64(tf[t]) * idf
+		}
+		if score > 0 {
+			scoredFacts = append(scoredFacts, scored{fact: fact, score: score})
+		}
+	}
+
+	sort.Slice(scoredFacts, func(i, j int) bool {
+		if scoredFacts[i].score == scoredFacts[j].score {
+			return scoredFacts[i].fact.CreatedAt.Before(scoredFacts[j].fact.CreatedAt)
+		}
+		return scoredFacts[i].score > scoredFacts[j].score
+	})
+	if len(scoredFacts) > params.Limit {
+		scoredFacts = scoredFacts[:params.Limit]
+	}
+	out := make([]FactWithScore, 0, len(scoredFacts))
+	for _, s := range scoredFacts {
+		out = append(out, FactWithScore{Fact: s.fact, Score: s.score})
+	}
+	return out, nil
+}
+
+// SearchFactsByEntities returns facts whose stored entities overlap the queried
+// entities. Score = #matched / #queried. Both sides are compared lowercased.
+func (r *InMemoryRepository) SearchFactsByEntities(_ context.Context, params SearchByEntitiesParams) ([]FactWithScore, error) {
+	if len(params.Entities) == 0 {
+		return nil, nil
+	}
+	if params.Limit <= 0 {
+		params.Limit = 20
+	}
+
+	queried := make(map[string]struct{}, len(params.Entities))
+	for _, e := range params.Entities {
+		s := strings.ToLower(strings.TrimSpace(e))
+		if s != "" {
+			queried[s] = struct{}{}
+		}
+	}
+	if len(queried) == 0 {
+		return nil, nil
+	}
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	type scored struct {
+		fact  models.Fact
+		score float64
+	}
+	out := make([]scored, 0)
+	for _, fact := range r.facts {
+		if !params.IncludeSuperseded && fact.SupersededAt != nil {
+			continue
+		}
+		if fact.AccountID != params.AccountID {
+			continue
+		}
+		if params.AgentID != nil {
+			if fact.AgentID == nil || *fact.AgentID != *params.AgentID {
+				continue
+			}
+		}
+		if params.ThreadID != nil {
+			if fact.ThreadID == nil || *fact.ThreadID != *params.ThreadID {
+				continue
+			}
+		}
+		if params.MaxSourceEventDate != nil {
+			if src, ok := r.sources[fact.SourceID]; ok && src.EventDate.After(*params.MaxSourceEventDate) {
+				continue
+			}
+		}
+		matched := 0
+		seen := make(map[string]struct{}, len(fact.Entities))
+		for _, e := range fact.Entities {
+			s := strings.ToLower(strings.TrimSpace(e))
+			if s == "" {
+				continue
+			}
+			if _, dup := seen[s]; dup {
+				continue
+			}
+			seen[s] = struct{}{}
+			if _, ok := queried[s]; ok {
+				matched++
+			}
+		}
+		if matched == 0 {
+			continue
+		}
+		out = append(out, scored{fact: fact, score: float64(matched) / float64(len(queried))})
+	}
+
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].score == out[j].score {
+			return out[i].fact.CreatedAt.Before(out[j].fact.CreatedAt)
+		}
+		return out[i].score > out[j].score
+	})
+	if len(out) > params.Limit {
+		out = out[:params.Limit]
+	}
+	results := make([]FactWithScore, 0, len(out))
+	for _, s := range out {
+		results = append(results, FactWithScore{Fact: s.fact, Score: s.score})
+	}
+	return results, nil
+}
+
+// tokenizeText splits free text into lowercase alphanumeric tokens. Anything that is
+// not a letter or digit acts as a separator. This is intentionally simple — Postgres
+// does the real lexical work in production, in-memory is just for tests.
+func tokenizeText(s string) []string {
+	if s == "" {
+		return nil
+	}
+	out := make([]string, 0, 8)
+	var b strings.Builder
+	flush := func() {
+		if b.Len() > 0 {
+			out = append(out, b.String())
+			b.Reset()
+		}
+	}
+	for _, r := range strings.ToLower(s) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(r)
+		} else {
+			flush()
+		}
+	}
+	flush()
+	return out
 }
 
 func cosineSimilarity(a, b []float64) float64 {
