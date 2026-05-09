@@ -1161,9 +1161,9 @@ func (h *Handler) playgroundRecallLight(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	limit := 10
+	limit := 0
 	if limitStr != "" {
-		if v, err := strconv.Atoi(limitStr); err == nil && v > 0 {
+		if v, err := strconv.Atoi(limitStr); err == nil && v >= 0 {
 			limit = v
 		}
 	}
@@ -1209,9 +1209,9 @@ func (h *Handler) playgroundRecall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	limit := 10
+	limit := 0
 	if limitStr != "" {
-		if v, err := strconv.Atoi(limitStr); err == nil && v > 0 {
+		if v, err := strconv.Atoi(limitStr); err == nil && v >= 0 {
 			limit = v
 		}
 	}
@@ -1320,6 +1320,9 @@ func (h *Handler) renderPlaygroundResult(w http.ResponseWriter, result *Playgrou
               {{if eq (printf "%s" .SourceKind) "text"}}bg-gray-100 text-gray-600
               {{else if eq (printf "%s" .SourceKind) "tool"}}bg-teal-100 text-teal-700
               {{else}}bg-orange-100 text-orange-700{{end}}">{{.SourceKind}}</span>
+            {{if .Historical}}
+            <span class="inline-flex shrink-0 px-2 py-0.5 text-xs font-medium rounded-full mt-0.5 bg-orange-100 text-orange-700">historical</span>
+            {{end}}
             <p class="text-sm text-gray-900 flex-1">{{.Text}}</p>
           </div>
           <p class="mt-1 text-xs font-mono text-gray-400 pl-0">{{.ID}}</p>
@@ -1354,6 +1357,9 @@ func (h *Handler) renderPlaygroundResult(w http.ResponseWriter, result *Playgrou
               {{else}}bg-amber-100 text-amber-700{{end}}">{{.Kind}}</span>
             {{if not .InWindow}}
             <span class="inline-flex shrink-0 px-2 py-0.5 text-[10px] font-medium rounded-full mt-0.5 bg-yellow-100 text-yellow-700">out of window</span>
+            {{end}}
+            {{if .Historical}}
+            <span class="inline-flex shrink-0 px-2 py-0.5 text-[10px] font-medium rounded-full mt-0.5 bg-orange-100 text-orange-700">historical</span>
             {{end}}
             <p class="text-sm text-gray-900 flex-1">{{.Text}}</p>
             {{if .Selected}}

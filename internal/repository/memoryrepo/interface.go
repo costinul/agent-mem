@@ -68,4 +68,8 @@ type SearchByEmbeddingParams struct {
 	// hard-filtered at SQL time. The ingest pipeline keeps it false to compare new facts
 	// only against the current state.
 	IncludeSuperseded bool
+	// MaxSourceEventDate, when non-nil, restricts results to facts whose source.event_date
+	// is <= this value. Used by recall to prevent surfacing facts from conversation turns
+	// that hadn't yet been authored at the recall event_date.
+	MaxSourceEventDate *time.Time
 }

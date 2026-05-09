@@ -122,52 +122,44 @@ func (e *MemoryEngine) buildSearchEmbeddings(ctx context.Context, decompositions
 }
 
 // retrieveFacts searches the thread, agent, and account scopes for facts similar to the given embeddings,
-// returning up to 10 top-scored results deduplicated across scopes.
+// returning up to 30 top-scored results deduplicated across scopes.
 //
 // Used by the ingest pipeline: superseded facts are excluded so new candidates are
 // compared only against the current state of memory (not against historical versions).
 func (e *MemoryEngine) retrieveFacts(ctx context.Context, accountID, agentID, threadID string, embeddings [][]float64) ([]models.Fact, error) {
-	facts, _, err := e.retrieveFactsWithLimit(ctx, accountID, agentID, threadID, embeddings, 10, false)
+	facts, _, err := e.retrieveFactsWithLimit(ctx, accountID, agentID, threadID, embeddings, 30, false, nil)
 	return facts, err
 }
 
-// retrieveFactsWithLimit is the same as retrieveFacts but with a configurable result cap
-// and an explicit knob for including superseded facts (recall sets it true so the
-// HISTORICAL marker can be evaluated relative to the recall event_date instead of being
-// hard-filtered at SQL time).
+// retrieveFactsWithLimit queries three scopes (thread → agent → account) per phrase,
+// deduplicates across all phrases and scopes by highest score, and returns the global
+// top-`limit` facts.
 //
-// It queries three scopes in order (thread → agent → account) per phrase and deduplicates
-// by highest score.
+// includeSuperseded: recall passes true so HISTORICAL facts are surfaced for the
+// as-of projection; ingest passes false.
 //
-// Per-phrase budget: each phrase is guaranteed a slice of the final budget (perPhraseLimit
-// = limit / nPhrases). Without this, a single phrase whose embedding produces a tight
-// cluster of high-similarity hits can squeeze every other phrase out of the top-`limit`
-// after global sort. That breaks plan/intent recall, where a verb-form phrase
-// ("Alice thinking about visiting Madrid") may rank lower than a noun-form phrase
-// ("Alice's Madrid trip plans") yet produce the only candidate that actually answers
-// the question.
-// retrieveFactsWithLimit returns (facts, scoreByID, error). scoreByID maps each fact ID to its
-// best retrieval score across all phrases and scopes; callers that only need facts may ignore it.
-func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, agentID, threadID string, embeddings [][]float64, limit int, includeSuperseded bool) ([]models.Fact, map[string]float64, error) {
+// maxSourceEventDate: when non-nil, only facts whose source.event_date <= this value
+// are returned (enforced at SQL/in-memory level). Recall passes &eventDate; ingest
+// passes nil.
+//
+// Returns (facts, scoreByID, error). scoreByID maps each fact ID to its best retrieval
+// score across all phrases and scopes; callers that only need facts may ignore it.
+func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, agentID, threadID string, embeddings [][]float64, limit int, includeSuperseded bool, maxSourceEventDate *time.Time) ([]models.Fact, map[string]float64, error) {
 	if limit <= 0 {
 		limit = 10
 	}
 	aid := ptrString(agentID)
 	tid := ptrString(threadID)
 
-	nonEmptyPhrases := 0
+	hasEmbeddings := false
 	for _, emb := range embeddings {
 		if len(emb) > 0 {
-			nonEmptyPhrases++
+			hasEmbeddings = true
+			break
 		}
 	}
-	if nonEmptyPhrases == 0 {
+	if !hasEmbeddings {
 		return nil, nil, nil
-	}
-
-	perPhraseLimit := limit / nonEmptyPhrases
-	if perPhraseLimit < 1 {
-		perPhraseLimit = 1
 	}
 
 	scored := map[string]memoryrepo.FactWithScore{}
@@ -198,10 +190,11 @@ func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, ag
 		}
 
 		params := memoryrepo.SearchByEmbeddingParams{
-			AccountID:         accountID,
-			Embedding:         emb,
-			Limit:             limit,
-			IncludeSuperseded: includeSuperseded,
+			AccountID:          accountID,
+			Embedding:          emb,
+			Limit:              limit,
+			IncludeSuperseded:  includeSuperseded,
+			MaxSourceEventDate: maxSourceEventDate,
 		}
 
 		params.AgentID = aid
@@ -226,17 +219,7 @@ func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, ag
 		}
 		collect(accountResults)
 
-		phraseSorted := make([]memoryrepo.FactWithScore, 0, len(phraseScored))
 		for _, fs := range phraseScored {
-			phraseSorted = append(phraseSorted, fs)
-		}
-		sort.Slice(phraseSorted, func(i, j int) bool {
-			return phraseSorted[i].Score > phraseSorted[j].Score
-		})
-		if len(phraseSorted) > perPhraseLimit {
-			phraseSorted = phraseSorted[:perPhraseLimit]
-		}
-		for _, fs := range phraseSorted {
 			mergeIntoGlobal(fs)
 		}
 	}

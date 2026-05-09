@@ -40,7 +40,7 @@ func (e *MemoryEngine) RecallLight(ctx context.Context, input models.RecallInput
 		return models.RecallOutput{}, fmt.Errorf("embed recall query: %w", err)
 	}
 
-	candidates, retrievalScores, err := e.retrieveFactsWithLimit(ctx, input.AccountID, input.AgentID, input.ThreadID, embeddings, recallLightCandidateK, true)
+	candidates, retrievalScores, err := e.retrieveFactsWithLimit(ctx, input.AccountID, input.AgentID, input.ThreadID, embeddings, recallLightCandidateK, true, &eventDate)
 	if err != nil {
 		return models.RecallOutput{}, err
 	}
@@ -99,16 +99,17 @@ func (e *MemoryEngine) RecallLight(ctx context.Context, input models.RecallInput
 			if f.EventDate != nil {
 				factEventDate = f.EventDate.Format("2006-01-02")
 			}
-			debugCandidates = append(debugCandidates, models.DebugCandidate{
-				ID:           f.ID,
-				Text:         text,
-				SourceID:     f.SourceID,
-				Kind:         f.Kind,
-				EventDate:    factEventDate,
-				ReferencedAt: f.ReferencedAt,
-				Score:        retrievalScores[f.ID],
-				InWindow:     eligible,
-				Selected:     selectedSet[f.ID],
+		debugCandidates = append(debugCandidates, models.DebugCandidate{
+			ID:           f.ID,
+			Text:         text,
+			SourceID:     f.SourceID,
+			Kind:         f.Kind,
+			EventDate:    factEventDate,
+			ReferencedAt: f.ReferencedAt,
+			Score:        retrievalScores[f.ID],
+			InWindow:     eligible,
+			Selected:     selectedSet[f.ID],
+			Historical:   f.SupersededAt != nil,
 			})
 		}
 		dbg = &models.RecallDebug{

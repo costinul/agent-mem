@@ -14,14 +14,13 @@ import (
 const (
 	recallZeroCandidateK    = 200
 	recallZeroSiblingBudget = 35
-	recallZeroDefaultLimit  = 30
 )
 
 // RecallZero answers a free-text query with no LLM calls at all: a single
 // embedding pass feeds vector retrieval, the deterministic post-processing
 // chain (sibling expansion, cosine rerank, text dedup, date rerank) ranks
-// candidates, and the top recallZeroDefaultLimit (or input.Limit) facts are
-// returned as-is. Faster and cheaper than RecallLight; trades the LLM's
+// candidates, and applies input.Limit when > 0. Faster and cheaper than
+// RecallLight; trades the LLM's
 // category/inference reasoning for raw embedding-driven recall.
 func (e *MemoryEngine) RecallZero(ctx context.Context, input models.RecallInput) (models.RecallOutput, error) {
 	if strings.TrimSpace(input.AccountID) == "" {
@@ -45,7 +44,7 @@ func (e *MemoryEngine) RecallZero(ctx context.Context, input models.RecallInput)
 		return models.RecallOutput{}, fmt.Errorf("embed recall query: %w", err)
 	}
 
-	candidates, retrievalScores, err := e.retrieveFactsWithLimit(ctx, input.AccountID, input.AgentID, input.ThreadID, embeddings, recallZeroCandidateK, true)
+	candidates, retrievalScores, err := e.retrieveFactsWithLimit(ctx, input.AccountID, input.AgentID, input.ThreadID, embeddings, recallZeroCandidateK, true, &eventDate)
 	if err != nil {
 		return models.RecallOutput{}, err
 	}
@@ -72,13 +71,9 @@ func (e *MemoryEngine) RecallZero(ctx context.Context, input models.RecallInput)
 
 	candidates = projectSupersessionAsOf(candidates, eventDate)
 
-	limit := recallZeroDefaultLimit
-	if input.Limit > 0 {
-		limit = input.Limit
-	}
 	selected := candidates
-	if len(selected) > limit {
-		selected = selected[:limit]
+	if input.Limit > 0 && len(selected) > input.Limit {
+		selected = selected[:input.Limit]
 	}
 	log.Printf("recall-zero selected=%d ids=%v", len(selected), recallIDs(selected))
 
@@ -100,16 +95,17 @@ func (e *MemoryEngine) RecallZero(ctx context.Context, input models.RecallInput)
 			if f.EventDate != nil {
 				factEventDate = f.EventDate.Format("2006-01-02")
 			}
-			debugCandidates = append(debugCandidates, models.DebugCandidate{
-				ID:           f.ID,
-				Text:         text,
-				SourceID:     f.SourceID,
-				Kind:         f.Kind,
-				EventDate:    factEventDate,
-				ReferencedAt: f.ReferencedAt,
-				Score:        retrievalScores[f.ID],
-				InWindow:     eligible,
-				Selected:     selectedSet[f.ID],
+		debugCandidates = append(debugCandidates, models.DebugCandidate{
+			ID:           f.ID,
+			Text:         text,
+			SourceID:     f.SourceID,
+			Kind:         f.Kind,
+			EventDate:    factEventDate,
+			ReferencedAt: f.ReferencedAt,
+			Score:        retrievalScores[f.ID],
+			InWindow:     eligible,
+			Selected:     selectedSet[f.ID],
+			Historical:   f.SupersededAt != nil,
 			})
 		}
 		dbg = &models.RecallDebug{

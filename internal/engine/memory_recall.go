@@ -59,7 +59,7 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 		return models.RecallOutput{}, fmt.Errorf("embed recall search phrases: %w", err)
 	}
 
-	candidates, retrievalScores, err := e.retrieveFactsWithLimit(ctx, input.AccountID, input.AgentID, input.ThreadID, embeddings, recallCandidateK, true)
+	candidates, retrievalScores, err := e.retrieveFactsWithLimit(ctx, input.AccountID, input.AgentID, input.ThreadID, embeddings, recallCandidateK, true, &eventDate)
 	if err != nil {
 		return models.RecallOutput{}, err
 	}
@@ -143,6 +143,7 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 				Score:        retrievalScores[f.ID],
 				InWindow:     eligible,
 				Selected:     selectedSet[f.ID],
+				Historical:   f.SupersededAt != nil,
 			})
 		}
 

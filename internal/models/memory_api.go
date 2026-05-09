@@ -97,6 +97,9 @@ type DebugCandidate struct {
 	Score        float64    `json:"score"`
 	InWindow     bool       `json:"in_window"`
 	Selected     bool       `json:"selected"`
+	// Historical is true when the fact was already superseded as of the recall event_date
+	// (mirrors ReturnedFact.Historical for candidates that were not selected).
+	Historical bool `json:"historical,omitempty"`
 }
 
 // ThreadMessagesOutput is the response from the thread messages endpoint.

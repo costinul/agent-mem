@@ -637,10 +637,15 @@ func (r *PostgresRepository) SearchFactsByEmbedding(ctx context.Context, params 
 	if !params.IncludeSuperseded {
 		q += ` AND f.superseded_at IS NULL`
 	}
+	// args: $1=AccountID $2=AgentID $3=ThreadID $4=embedding $5=MinSimilarity $6=Limit
 	args := []any{params.AccountID, params.AgentID, params.ThreadID, vectorLiteral(params.Embedding), params.MinSimilarity, params.Limit}
 	if len(params.SourceIDs) > 0 {
-		q += ` AND f.source_id = ANY($7)`
+		q += fmt.Sprintf(` AND f.source_id = ANY($%d)`, len(args)+1)
 		args = append(args, pq.Array(params.SourceIDs))
+	}
+	if params.MaxSourceEventDate != nil {
+		q += fmt.Sprintf(` AND s.event_date <= $%d`, len(args)+1)
+		args = append(args, params.MaxSourceEventDate.UTC())
 	}
 	q += ` ORDER BY f.embedding <=> $4::vector ASC LIMIT $6`
 
@@ -714,10 +719,15 @@ func (r *PostgresRepository) SearchFactsByEmbeddingWithScores(ctx context.Contex
 	if !params.IncludeSuperseded {
 		q += ` AND f.superseded_at IS NULL`
 	}
+	// args: $1=AccountID $2=AgentID $3=ThreadID $4=embedding $5=Limit
 	args := []any{params.AccountID, params.AgentID, params.ThreadID, vectorLiteral(params.Embedding), params.Limit}
 	if len(params.SourceIDs) > 0 {
-		q += ` AND f.source_id = ANY($6)`
+		q += fmt.Sprintf(` AND f.source_id = ANY($%d)`, len(args)+1)
 		args = append(args, pq.Array(params.SourceIDs))
+	}
+	if params.MaxSourceEventDate != nil {
+		q += fmt.Sprintf(` AND s.event_date <= $%d`, len(args)+1)
+		args = append(args, params.MaxSourceEventDate.UTC())
 	}
 	q += ` ORDER BY f.embedding <=> $4::vector ASC LIMIT $5`
 

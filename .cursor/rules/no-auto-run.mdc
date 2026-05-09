@@ -1,0 +1,11 @@
+---
+description: Never run tests or restart the server autonomously
+alwaysApply: true
+---
+
+# No autonomous test or server execution
+
+- Do NOT run `go test`, `python eval/locomo/run.py`, or any other test command. Tell the user what to run and let them do it.
+- Do NOT start, restart, or kill the API server. The user controls the server process.
+- This applies to the locomo Python eval (`eval/locomo/run.py`) in particular — never invoke it directly.
+- When a change requires verification, say: "Run `<command>` to verify" and stop there.

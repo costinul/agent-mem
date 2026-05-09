@@ -389,6 +389,11 @@ func (r *InMemoryRepository) SearchFactsByEmbedding(_ context.Context, params Se
 				continue
 			}
 		}
+		if params.MaxSourceEventDate != nil {
+			if src, ok := r.sources[fact.SourceID]; ok && src.EventDate.After(*params.MaxSourceEventDate) {
+				continue
+			}
+		}
 		similarity := cosineSimilarity(params.Embedding, fact.Embedding)
 		if similarity >= params.MinSimilarity {
 			candidates = append(candidates, candidate{fact: fact, similarity: similarity})
@@ -453,6 +458,11 @@ func (r *InMemoryRepository) SearchFactsByEmbeddingWithScores(_ context.Context,
 		}
 		if len(sourceSet) > 0 {
 			if _, ok := sourceSet[fact.SourceID]; !ok {
+				continue
+			}
+		}
+		if params.MaxSourceEventDate != nil {
+			if src, ok := r.sources[fact.SourceID]; ok && src.EventDate.After(*params.MaxSourceEventDate) {
 				continue
 			}
 		}
