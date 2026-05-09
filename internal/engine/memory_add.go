@@ -127,7 +127,8 @@ func (e *MemoryEngine) buildSearchEmbeddings(ctx context.Context, decompositions
 // Used by the ingest pipeline: superseded facts are excluded so new candidates are
 // compared only against the current state of memory (not against historical versions).
 func (e *MemoryEngine) retrieveFacts(ctx context.Context, accountID, agentID, threadID string, embeddings [][]float64) ([]models.Fact, error) {
-	return e.retrieveFactsWithLimit(ctx, accountID, agentID, threadID, embeddings, 10, false)
+	facts, _, err := e.retrieveFactsWithLimit(ctx, accountID, agentID, threadID, embeddings, 10, false)
+	return facts, err
 }
 
 // retrieveFactsWithLimit is the same as retrieveFacts but with a configurable result cap
@@ -145,7 +146,9 @@ func (e *MemoryEngine) retrieveFacts(ctx context.Context, accountID, agentID, th
 // ("Alice thinking about visiting Madrid") may rank lower than a noun-form phrase
 // ("Alice's Madrid trip plans") yet produce the only candidate that actually answers
 // the question.
-func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, agentID, threadID string, embeddings [][]float64, limit int, includeSuperseded bool) ([]models.Fact, error) {
+// retrieveFactsWithLimit returns (facts, scoreByID, error). scoreByID maps each fact ID to its
+// best retrieval score across all phrases and scopes; callers that only need facts may ignore it.
+func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, agentID, threadID string, embeddings [][]float64, limit int, includeSuperseded bool) ([]models.Fact, map[string]float64, error) {
 	if limit <= 0 {
 		limit = 10
 	}
@@ -159,7 +162,7 @@ func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, ag
 		}
 	}
 	if nonEmptyPhrases == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	perPhraseLimit := limit / nonEmptyPhrases
@@ -205,21 +208,21 @@ func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, ag
 		params.ThreadID = tid
 		threadResults, err := e.repo.SearchFactsByEmbeddingWithScores(ctx, params)
 		if err != nil {
-			return nil, fmt.Errorf("search thread facts: %w", err)
+			return nil, nil, fmt.Errorf("search thread facts: %w", err)
 		}
 		collect(threadResults)
 
 		params.ThreadID = nil
 		agentResults, err := e.repo.SearchFactsByEmbeddingWithScores(ctx, params)
 		if err != nil {
-			return nil, fmt.Errorf("search agent facts: %w", err)
+			return nil, nil, fmt.Errorf("search agent facts: %w", err)
 		}
 		collect(agentResults)
 
 		params.AgentID = nil
 		accountResults, err := e.repo.SearchFactsByEmbeddingWithScores(ctx, params)
 		if err != nil {
-			return nil, fmt.Errorf("search account facts: %w", err)
+			return nil, nil, fmt.Errorf("search account facts: %w", err)
 		}
 		collect(accountResults)
 
@@ -249,11 +252,13 @@ func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, ag
 		sorted = sorted[:limit]
 	}
 
+	scoreByID := make(map[string]float64, len(sorted))
 	facts := make([]models.Fact, len(sorted))
 	for i, fs := range sorted {
 		facts[i] = fs.Fact
+		scoreByID[fs.Fact.ID] = fs.Score
 	}
-	return facts, nil
+	return facts, scoreByID, nil
 }
 
 // applyEvaluateResult persists the LLM evaluation decision. The retrieved set

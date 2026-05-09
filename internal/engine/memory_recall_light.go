@@ -40,7 +40,7 @@ func (e *MemoryEngine) RecallLight(ctx context.Context, input models.RecallInput
 		return models.RecallOutput{}, fmt.Errorf("embed recall query: %w", err)
 	}
 
-	candidates, err := e.retrieveFactsWithLimit(ctx, input.AccountID, input.AgentID, input.ThreadID, embeddings, recallLightCandidateK, true)
+	candidates, retrievalScores, err := e.retrieveFactsWithLimit(ctx, input.AccountID, input.AgentID, input.ThreadID, embeddings, recallLightCandidateK, true)
 	if err != nil {
 		return models.RecallOutput{}, err
 	}
@@ -106,6 +106,7 @@ func (e *MemoryEngine) RecallLight(ctx context.Context, input models.RecallInput
 				Kind:         f.Kind,
 				EventDate:    factEventDate,
 				ReferencedAt: f.ReferencedAt,
+				Score:        retrievalScores[f.ID],
 				InWindow:     eligible,
 				Selected:     selectedSet[f.ID],
 			})

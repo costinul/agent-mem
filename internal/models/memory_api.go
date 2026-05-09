@@ -94,6 +94,7 @@ type DebugCandidate struct {
 	Kind         FactKind   `json:"kind"`
 	EventDate    string     `json:"event_date,omitempty"`
 	ReferencedAt *time.Time `json:"referenced_at,omitempty"`
+	Score        float64    `json:"score"`
 	InWindow     bool       `json:"in_window"`
 	Selected     bool       `json:"selected"`
 }

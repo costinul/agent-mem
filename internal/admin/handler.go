@@ -1365,6 +1365,7 @@ func (h *Handler) renderPlaygroundResult(w http.ResponseWriter, result *Playgrou
           <div class="mt-1 flex items-center gap-3 text-[10px] font-mono text-gray-400">
             <span>{{.ID}}</span>
             {{if .EventDate}}<span class="text-gray-300">·</span><span>{{.EventDate}}</span>{{end}}
+            <span class="text-gray-300">·</span><span class="{{if ge .Score 0.7}}text-green-600{{else if ge .Score 0.5}}text-amber-600{{else}}text-gray-400{{end}}">{{printf "%.4f" .Score}}</span>
           </div>
         </li>
         {{end}}
