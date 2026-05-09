@@ -129,6 +129,28 @@ answer_score (production quality, accounting for noise):
   fail    - the answerer would produce a wrong answer, refuse, or say
             "I don't know".
 
+Date equivalence:
+  The ground truth (or a fact) may express a date as a relative phrase rather
+  than an absolute calendar date, e.g. "the <weekday> before <D>", "<weekday>
+  the week before <D>", "<N> days before <D>", "the week of <D>". Before
+  comparing, resolve these with real calendar arithmetic — never by string
+  matching.
+
+  The phrase "the <weekday> before <D>" is conversationally AMBIGUOUS: it
+  may mean (a) the <weekday> in the 1-7 days strictly before <D>, OR (b) the
+  <weekday> of the calendar week immediately preceding the week containing
+  <D> (which can fall 7-14 days before <D>). Both readings are equally valid.
+
+  A fact that supplies an absolute calendar date which falls on the named
+  <weekday> within 14 days strictly before <D> SATISFIES the ground truth
+  for that question and MUST NOT be penalised. The same applies symmetrically
+  if the relative phrase appears in a fact and the ground truth is absolute.
+  Verify the day-of-week from the calendar; do not assume.
+
+  Format differences (e.g. "7 July 2023", "July 7 2023", "2023-07-07",
+  "Friday, 7 July 2023") all denote the same date and must be treated as
+  equivalent.
+
 Hard rules:
   - fact_relevance MUST have exactly the same length as the input facts list.
     If the facts list is empty, return [].

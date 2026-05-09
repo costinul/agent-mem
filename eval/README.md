@@ -90,3 +90,14 @@ python locomo/run.py --limit 1 --reuse-thread <thread_id> --out debug_recall.jso
 ```bash
 python locomo/run.py --limit 1 --no-judge
 ```
+
+**Re-judge an existing results file (skip backend recall):**
+Useful after changing the judge prompt — re-scores stored facts without re-ingesting or re-calling the memory API:
+```bash
+python locomo/run.py --rejudge results_v5_standard.json --out results_v5_rejudged.json
+```
+
+**Re-judge with a top-K cap (apples-to-apples comparison):**
+```bash
+python locomo/run.py --rejudge results_v5_standard.json --max-facts 5 --out results_v5_k5.json
+```
