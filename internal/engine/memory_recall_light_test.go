@@ -10,7 +10,7 @@ import (
 )
 
 func newLightTestEngine() *MemoryEngine {
-	return NewMemoryEngine(nil, memoryrepo.NewInMemory(), LLMModels{}, "", config.IngestionConfig{ChunkMaxTokens: 4000, ChunkOverlapTokens: 400}, NewTrackerRegistry())
+	return NewMemoryEngine(nil, memoryrepo.NewInMemory(), LLMModels{}, "", config.IngestionConfig{ChunkMaxTokens: 4000, ChunkOverlapTokens: 400}, DefaultRecall(), NewTrackerRegistry())
 }
 
 func TestRecallLight_MissingAccountIDReturnsValidationError(t *testing.T) {

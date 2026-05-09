@@ -15,6 +15,7 @@ type MemoryEngine struct {
 	repo      memoryrepo.Repository
 	ai        *LLMAdapter
 	ingestion config.IngestionConfig
+	recall    config.RecallConfig
 }
 
 // DefaultIngestion returns the default ingestion configuration (used in tests).
@@ -22,11 +23,18 @@ func DefaultIngestion() config.IngestionConfig {
 	return config.IngestionConfig{ChunkMaxTokens: 4000, ChunkOverlapTokens: 400}
 }
 
-func NewMemoryEngine(client *bwaiclient.BWAIClient, repo memoryrepo.Repository, llmModels LLMModels, embeddingModel string, ingestion config.IngestionConfig, reg *trackerRegistry) *MemoryEngine {
+// DefaultRecall returns the default recall configuration (used in tests).
+// Two-step is OFF by default so legacy behavior is preserved.
+func DefaultRecall() config.RecallConfig {
+	return config.RecallConfig{TwoStepEnabled: false, FirstStepK: 50, SecondStepK: 150}
+}
+
+func NewMemoryEngine(client *bwaiclient.BWAIClient, repo memoryrepo.Repository, llmModels LLMModels, embeddingModel string, ingestion config.IngestionConfig, recall config.RecallConfig, reg *trackerRegistry) *MemoryEngine {
 	return &MemoryEngine{
 		repo:      &repoWrapper{inner: repo},
 		ai:        NewLLMAdapter(client, llmModels, embeddingModel, reg),
 		ingestion: ingestion,
+		recall:    recall,
 	}
 }
 

@@ -14,9 +14,17 @@ system_prompt: |
 
   ## Output
 
-  - Output ONLY fact IDs taken verbatim from the candidate list. Never invent IDs.
-  - Order most-relevant first.
-  - Returning an empty selection is allowed only when no candidate is even adjacent to the query. For inference and reflection questions (see below) empty is almost always wrong.
+  - fact_ids: ONLY fact IDs taken verbatim from the candidate list. Never invent IDs. Order most-relevant first.
+  - need_more: set to true ONLY if your selected fact_ids are not enough to write a correct, complete answer AND you can name what specific kind of fact would close the gap. Set to false when you have what you need or when no realistic fact would help.
+  - missing: a SHORT noun phrase (1-5 words) describing the missing piece. Examples: "the book title", "an exact date", "where she works", "the number of children". Set only when need_more=true.
+  - Returning an empty fact_ids list is allowed only when no candidate is even adjacent to the query. For inference and reflection questions (see below) empty is almost always wrong.
+
+  Examples of good need_more usage:
+  - You picked facts about <X> reading a <Y>-recommended book but no candidate names the title → need_more=true, missing="the book title".
+  - You picked facts saying <X> attended an event but no candidate names the date → need_more=true, missing="the event date".
+  - You picked facts that fully answer the question → need_more=false, missing="".
+
+  Do NOT set need_more=true for vague reasons like "more context would help". The missing piece must be a specific noun phrase.
 
   ## Common failure modes (each loses points)
 

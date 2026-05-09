@@ -18,6 +18,21 @@ const (
 	recallSiblingBudget = 35
 )
 
+// recallCandidateLimit returns the total number of fused-retrieval candidates the
+// hybrid pass should return. In two-step mode we need enough headroom to feed the
+// round-2 gap-filling selector (FirstStepK + SecondStepK); in single-step mode
+// the legacy recallCandidateK budget applies.
+func (e *MemoryEngine) recallCandidateLimit() int {
+	if e.recall.TwoStepEnabled {
+		k := e.recall.FirstStepK + e.recall.SecondStepK
+		if k <= 0 {
+			return recallCandidateK
+		}
+		return k
+	}
+	return recallCandidateK
+}
+
 // Recall answers a free-text query by decomposing it into search phrases, retrieving
 // candidate facts across all scopes, then asking the LLM to select the most relevant ones.
 func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (models.RecallOutput, error) {
@@ -61,7 +76,7 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 		return models.RecallOutput{}, fmt.Errorf("embed recall search phrases: %w", err)
 	}
 
-	hybrid, err := e.retrieveFactsHybrid(ctx, input.AccountID, input.AgentID, input.ThreadID, phrases, embeddings, decomposition.Entities, recallCandidateK, true, &eventDate)
+	hybrid, err := e.retrieveFactsHybrid(ctx, input.AccountID, input.AgentID, input.ThreadID, phrases, embeddings, decomposition.Entities, e.recallCandidateLimit(), true, &eventDate)
 	if err != nil {
 		return models.RecallOutput{}, err
 	}
@@ -104,14 +119,9 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 	// eventDate and must not carry the HISTORICAL marker into SelectFacts.
 	candidates = projectSupersessionAsOf(candidates, eventDate)
 
-	selected, err := e.ai.SelectFacts(ctx, SelectFactsRequest{
-		Query:      input.Query,
-		EventDate:  eventDateStr,
-		Phrases:    phrases,
-		Candidates: candidates,
-	})
+	selected, err := e.runSelector(ctx, input.Query, eventDateStr, phrases, candidates)
 	if err != nil {
-		return models.RecallOutput{}, fmt.Errorf("select facts: %w", err)
+		return models.RecallOutput{}, err
 	}
 	log.Printf("recall selected=%d ids=%v", len(selected), recallIDs(selected))
 
@@ -433,6 +443,99 @@ func recallIDs(facts []models.Fact) []string {
 		ids[i] = f.ID
 	}
 	return ids
+}
+
+// runSelector runs either the legacy single-shot selector or the two-step
+// (gap-filling) selector, depending on RecallConfig.TwoStepEnabled.
+//
+// Two-step mode:
+//  1. Send the top FirstStepK candidates to the strong selector. It returns its
+//     picks plus an optional NeedMore signal naming what's missing.
+//  2. If NeedMore=true and there are unseen candidates (positions FirstStepK..
+//     FirstStepK+SecondStepK), send THOSE to the cheap light selector along with
+//     the already-selected fact texts and the missing-piece hint. Merge the
+//     additional picks with round 1, deduping by ID.
+//
+// The light model only sees fresh candidates, never re-evaluates round-1's picks,
+// which keeps the round-2 prompt small and the cost low.
+func (e *MemoryEngine) runSelector(ctx context.Context, query, eventDateStr string, phrases []string, candidates []models.Fact) ([]models.Fact, error) {
+	if !e.recall.TwoStepEnabled {
+		res, err := e.ai.SelectFacts(ctx, SelectFactsRequest{
+			Query:      query,
+			EventDate:  eventDateStr,
+			Phrases:    phrases,
+			Candidates: candidates,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("select facts: %w", err)
+		}
+		return res.Facts, nil
+	}
+
+	firstK := e.recall.FirstStepK
+	if firstK <= 0 || firstK > len(candidates) {
+		firstK = len(candidates)
+	}
+	firstBatch := candidates[:firstK]
+
+	res, err := e.ai.SelectFacts(ctx, SelectFactsRequest{
+		Query:      query,
+		EventDate:  eventDateStr,
+		Phrases:    phrases,
+		Candidates: firstBatch,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("select facts (round 1): %w", err)
+	}
+	log.Printf("recall round1 selected=%d need_more=%t missing=%q", len(res.Facts), res.NeedMore, res.Missing)
+
+	if !res.NeedMore || res.Missing == "" || firstK >= len(candidates) {
+		return res.Facts, nil
+	}
+
+	end := firstK + e.recall.SecondStepK
+	if end > len(candidates) {
+		end = len(candidates)
+	}
+	secondBatch := candidates[firstK:end]
+	if len(secondBatch) == 0 {
+		return res.Facts, nil
+	}
+
+	alreadyTexts := make([]string, len(res.Facts))
+	for i, f := range res.Facts {
+		alreadyTexts[i] = f.Text
+	}
+
+	gap, err := e.ai.SelectFactsGap(ctx, SelectFactsGapRequest{
+		Query:           query,
+		EventDate:       eventDateStr,
+		Phrases:         phrases,
+		AlreadySelected: alreadyTexts,
+		Missing:         res.Missing,
+		Candidates:      secondBatch,
+	})
+	if err != nil {
+		// Round-2 failure is non-fatal: better to return round-1 picks than nothing.
+		log.Printf("recall round2 gap-fill failed: %v (returning round-1 selection)", err)
+		return res.Facts, nil
+	}
+	log.Printf("recall round2 gap-fill added=%d", len(gap))
+
+	merged := make([]models.Fact, 0, len(res.Facts)+len(gap))
+	seen := make(map[string]struct{}, len(res.Facts)+len(gap))
+	for _, f := range res.Facts {
+		merged = append(merged, f)
+		seen[f.ID] = struct{}{}
+	}
+	for _, f := range gap {
+		if _, dup := seen[f.ID]; dup {
+			continue
+		}
+		merged = append(merged, f)
+		seen[f.ID] = struct{}{}
+	}
+	return merged, nil
 }
 
 func (e *MemoryEngine) ListThreadMessages(ctx context.Context, threadID string, limit int) ([]models.ConversationMessage, error) {

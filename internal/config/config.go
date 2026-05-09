@@ -16,6 +16,7 @@ type Config struct {
 	AI        AIConfig
 	Admin     AdminConfig
 	Ingestion IngestionConfig
+	Recall    RecallConfig
 }
 
 type AdminConfig struct {
@@ -46,6 +47,24 @@ type IngestionConfig struct {
 	ChunkOverlapTokens int // INGEST_CHUNK_OVERLAP_TOKENS, default 400
 }
 
+// RecallConfig controls the two-step (gap-filling) selector path used by Recall.
+//
+// When TwoStepEnabled is false (default), Recall sends every retrieved candidate
+// to the strong selector in a single call (legacy behavior). When true, Recall
+// runs in two passes:
+//  1. Send the top FirstStepK candidates to the strong selector. The selector may
+//     return need_more=true with a short noun phrase naming the missing piece.
+//  2. If need_more, send the next SecondStepK candidates (positions FirstStepK ..
+//     FirstStepK+SecondStepK) plus the missing-piece hint to the cheaper light
+//     selector, which returns additional facts to merge with the round-1 selection.
+//
+// Total candidates considered across both rounds is at most FirstStepK + SecondStepK.
+type RecallConfig struct {
+	TwoStepEnabled bool // RECALL_TWO_STEP_ENABLED, default false
+	FirstStepK     int  // RECALL_FIRST_STEP_K, default 50
+	SecondStepK    int  // RECALL_SECOND_STEP_K, default 150
+}
+
 func Load() (*Config, error) {
 	googleClientID := strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_ID"))
 	googleClientSecret := strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_SECRET"))
@@ -70,6 +89,11 @@ func Load() (*Config, error) {
 		Ingestion: IngestionConfig{
 			ChunkMaxTokens:     getEnvIntOrDefault("INGEST_CHUNK_MAX_TOKENS", 4000),
 			ChunkOverlapTokens: getEnvIntOrDefault("INGEST_CHUNK_OVERLAP_TOKENS", 400),
+		},
+		Recall: RecallConfig{
+			TwoStepEnabled: getEnvBoolOrDefault("RECALL_TWO_STEP_ENABLED", false),
+			FirstStepK:     getEnvIntOrDefault("RECALL_FIRST_STEP_K", 50),
+			SecondStepK:    getEnvIntOrDefault("RECALL_SECOND_STEP_K", 150),
 		},
 		Admin: AdminConfig{
 			GoogleClientID:     googleClientID,
@@ -158,4 +182,16 @@ func getEnvIntOrDefault(key string, defaultValue int) int {
 	}
 
 	return value
+}
+
+func getEnvBoolOrDefault(key string, defaultValue bool) bool {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return defaultValue
+	}
+	v, err := strconv.ParseBool(raw)
+	if err != nil {
+		return defaultValue
+	}
+	return v
 }
