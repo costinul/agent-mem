@@ -138,7 +138,7 @@ func main() {
 		DecomposeQueries: cfg.AI.ModelDecomposeQueries,
 		DecomposeRecall:  cfg.AI.ModelDecomposeRecall,
 	}
-	engine := engine.NewMemoryEngine(bwaiClient, memoryRepo, llmModels, cfg.AI.EmbeddingModel, cfg.Ingestion, trackerReg)
+	engine := engine.NewMemoryEngine(bwaiClient, memoryRepo, llmModels, cfg.AI.EmbeddingModel, cfg.Ingestion, cfg.Recall, trackerReg)
 
 	var adminDeps *api.AdminDeps
 	if cfg.Admin.Enabled {
