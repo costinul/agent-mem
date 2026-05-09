@@ -90,24 +90,25 @@ func (e *MemoryEngine) RecallZero(ctx context.Context, input models.RecallInput)
 			selectedIDs = append(selectedIDs, f.ID)
 		}
 		debugCandidates := make([]models.DebugCandidate, 0, len(candidates))
-		for _, f := range candidates {
+		for i, f := range candidates {
 			eligible := f.ReferencedAt == nil || !f.ReferencedAt.After(eventDate)
 			text := f.Text
 			var factEventDate string
 			if f.EventDate != nil {
 				factEventDate = f.EventDate.Format("2006-01-02")
 			}
-		debugCandidates = append(debugCandidates, models.DebugCandidate{
-			ID:           f.ID,
-			Text:         text,
-			SourceID:     f.SourceID,
-			Kind:         f.Kind,
-			EventDate:    factEventDate,
-			ReferencedAt: f.ReferencedAt,
-			Score:        retrievalScores[f.ID],
-			InWindow:     eligible,
-			Selected:     selectedSet[f.ID],
-			Historical:   f.SupersededAt != nil,
+			debugCandidates = append(debugCandidates, models.DebugCandidate{
+				Index:        i + 1,
+				ID:           f.ID,
+				Text:         text,
+				SourceID:     f.SourceID,
+				Kind:         f.Kind,
+				EventDate:    factEventDate,
+				ReferencedAt: f.ReferencedAt,
+				Score:        retrievalScores[f.ID],
+				InWindow:     eligible,
+				Selected:     selectedSet[f.ID],
+				Historical:   f.SupersededAt != nil,
 			})
 		}
 		dbg = &models.RecallDebug{

@@ -58,8 +58,8 @@ func NewHandler(
 // when multiple page templates define the same "content" block.
 func tmpl(page string) *template.Template {
 	return template.Must(template.New("").Funcs(template.FuncMap{
-		"not":         func(b bool) bool { return !b },
-		"derefString": func(s *string) string { return *s },
+		"not":          func(b bool) bool { return !b },
+		"derefString":  func(s *string) string { return *s },
 		"derefTimeStr": func(t *time.Time) string { return t.Format("2006-01-02") },
 	}).ParseFS(templateFS, "templates/layout.html", "templates/"+page))
 }
@@ -141,7 +141,7 @@ type pageData struct {
 }
 
 type newAPIKeyResult struct {
-	Key      *models.APIKey
+	Key       *models.APIKey
 	Plaintext string
 }
 
@@ -408,8 +408,8 @@ func (h *Handler) renderAPIKeysSection(w http.ResponseWriter, data apiKeysSectio
 </div>
 {{end}}`
 	t := template.Must(template.New("api-keys-section").Funcs(template.FuncMap{
-		"not":      func(b bool) bool { return !b },
-		"deref":    func(s *string) string { return *s },
+		"not":       func(b bool) bool { return !b },
+		"deref":     func(s *string) string { return *s },
 		"derefTime": func(t *time.Time) string { return t.Format("2006-01-02") },
 	}).Parse(tmplStr))
 	_ = t.ExecuteTemplate(w, "api-keys-section", data)
@@ -1351,6 +1351,7 @@ func (h *Handler) renderPlaygroundResult(w http.ResponseWriter, result *Playgrou
         {{range .Debug.Candidates}}
         <li class="px-4 py-3 {{if .Selected}}bg-green-50{{end}}">
           <div class="flex items-start gap-2">
+            <span class="inline-flex shrink-0 px-2 py-0.5 text-[10px] font-semibold rounded-full mt-0.5 bg-gray-100 text-gray-600">#{{.Index}}</span>
             <span class="inline-flex shrink-0 px-2 py-0.5 text-[10px] font-medium rounded-full mt-0.5
               {{if eq (printf "%s" .Kind) "KNOWLEDGE"}}bg-blue-100 text-blue-700
               {{else if eq (printf "%s" .Kind) "RULE"}}bg-purple-100 text-purple-700

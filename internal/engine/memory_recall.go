@@ -139,7 +139,7 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 		}
 
 		debugCandidates := make([]models.DebugCandidate, 0, len(candidates))
-		for _, f := range candidates {
+		for i, f := range candidates {
 			// Eligible = no referenced_at (timeless) or referenced_at not in the future.
 			eligible := f.ReferencedAt == nil || !f.ReferencedAt.After(eventDate)
 			text := f.Text
@@ -148,6 +148,7 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 				factEventDate = f.EventDate.Format("2006-01-02")
 			}
 			debugCandidates = append(debugCandidates, models.DebugCandidate{
+				Index:        i + 1,
 				ID:           f.ID,
 				Text:         text,
 				SourceID:     f.SourceID,

@@ -89,6 +89,7 @@ type RecallDebug struct {
 
 // DebugCandidate is a single candidate fact entry in RecallDebug.
 type DebugCandidate struct {
+	Index        int        `json:"index"`
 	ID           string     `json:"id"`
 	Text         string     `json:"text"`
 	SourceID     string     `json:"source_id"`
