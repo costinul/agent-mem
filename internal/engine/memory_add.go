@@ -123,11 +123,18 @@ func (e *MemoryEngine) buildSearchEmbeddings(ctx context.Context, decompositions
 
 // retrieveFacts searches the thread, agent, and account scopes for facts similar to the given embeddings,
 // returning up to 10 top-scored results deduplicated across scopes.
+//
+// Used by the ingest pipeline: superseded facts are excluded so new candidates are
+// compared only against the current state of memory (not against historical versions).
 func (e *MemoryEngine) retrieveFacts(ctx context.Context, accountID, agentID, threadID string, embeddings [][]float64) ([]models.Fact, error) {
-	return e.retrieveFactsWithLimit(ctx, accountID, agentID, threadID, embeddings, 10)
+	return e.retrieveFactsWithLimit(ctx, accountID, agentID, threadID, embeddings, 10, false)
 }
 
-// retrieveFactsWithLimit is the same as retrieveFacts but with a configurable result cap.
+// retrieveFactsWithLimit is the same as retrieveFacts but with a configurable result cap
+// and an explicit knob for including superseded facts (recall sets it true so the
+// HISTORICAL marker can be evaluated relative to the recall event_date instead of being
+// hard-filtered at SQL time).
+//
 // It queries three scopes in order (thread → agent → account) per phrase and deduplicates
 // by highest score.
 //
@@ -138,7 +145,7 @@ func (e *MemoryEngine) retrieveFacts(ctx context.Context, accountID, agentID, th
 // ("Alice thinking about visiting Madrid") may rank lower than a noun-form phrase
 // ("Alice's Madrid trip plans") yet produce the only candidate that actually answers
 // the question.
-func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, agentID, threadID string, embeddings [][]float64, limit int) ([]models.Fact, error) {
+func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, agentID, threadID string, embeddings [][]float64, limit int, includeSuperseded bool) ([]models.Fact, error) {
 	if limit <= 0 {
 		limit = 10
 	}
@@ -188,9 +195,10 @@ func (e *MemoryEngine) retrieveFactsWithLimit(ctx context.Context, accountID, ag
 		}
 
 		params := memoryrepo.SearchByEmbeddingParams{
-			AccountID: accountID,
-			Embedding: emb,
-			Limit:     limit,
+			AccountID:         accountID,
+			Embedding:         emb,
+			Limit:             limit,
+			IncludeSuperseded: includeSuperseded,
 		}
 
 		params.AgentID = aid
@@ -374,6 +382,11 @@ func (e *MemoryEngine) updateExistingFacts(ctx context.Context, facts []models.F
 // evolveFacts supersedes each old fact with a successor created from the current event's sources.
 // The first source is used as the successor's source; this is the non-obvious bit —
 // the evolve decision is driven by the most recent ingest, so the new source is always the current one.
+//
+// supersession boundary: the old fact's superseded_at is set to the successor's referenced_at
+// when present, falling back to the successor source's event_date. This is the content boundary,
+// not the wall-clock of ingestion — so as-of recall can ask "was the old fact still active at
+// time T?" by comparing T against superseded_at.
 func (e *MemoryEngine) evolveFacts(ctx context.Context, input models.MemoryInput, sources []models.Source, evolutions []models.FactEvolution) ([]models.Fact, error) {
 	if len(evolutions) == 0 {
 		return nil, nil
@@ -394,11 +407,12 @@ func (e *MemoryEngine) evolveFacts(ctx context.Context, input models.MemoryInput
 		if len(embeddings[idx]) == 0 {
 			return nil, fmt.Errorf("embed evolved facts: empty embedding for fact index %d", idx)
 		}
+		successorSourceID := selectSourceIDForExtractedFact(sources, 0)
 		successor := models.Fact{
 			AccountID: input.AccountID,
 			AgentID:   ptrString(input.AgentID),
 			ThreadID:  ptrString(input.ThreadID),
-			SourceID:  selectSourceIDForExtractedFact(sources, 0),
+			SourceID:  successorSourceID,
 			Kind:      ev.NewKind,
 			Text:      ev.NewText,
 			Embedding: embeddings[idx],
@@ -408,13 +422,28 @@ func (e *MemoryEngine) evolveFacts(ctx context.Context, input models.MemoryInput
 				successor.ReferencedAt = &t
 			}
 		}
-		inserted, err := e.repo.SupersedeFact(ctx, ev.OldFactID, successor)
+		boundary := supersessionBoundary(successor.ReferencedAt, sources, successorSourceID)
+		inserted, err := e.repo.SupersedeFact(ctx, ev.OldFactID, successor, boundary)
 		if err != nil {
 			return nil, fmt.Errorf("evolve fact %s: %w", ev.OldFactID, err)
 		}
 		evolved = append(evolved, *inserted)
 	}
 	return evolved, nil
+}
+
+// supersessionBoundary returns the timestamp at which the old fact stopped being active.
+// Preference order: successor's referenced_at -> successor source's event_date -> now().
+func supersessionBoundary(successorRef *time.Time, sources []models.Source, successorSourceID string) time.Time {
+	if successorRef != nil {
+		return *successorRef
+	}
+	for _, s := range sources {
+		if s.ID == successorSourceID {
+			return s.EventDate
+		}
+	}
+	return time.Now().UTC()
 }
 
 func printFacts(facts []models.Fact) {

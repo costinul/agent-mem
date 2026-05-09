@@ -1641,11 +1641,12 @@ func (h *Handler) playgroundDecomposeFacts(w http.ResponseWriter, r *http.Reques
 			continue
 		}
 		scored, err := h.engine.SearchWithScores(r.Context(), q, memoryrepo.SearchByEmbeddingParams{
-			AccountID:     accountID,
-			AgentID:       &agentID,
-			ThreadID:      threadIDPtr,
-			MinSimilarity: 0,
-			Limit:         10000,
+			AccountID:         accountID,
+			AgentID:           &agentID,
+			ThreadID:          threadIDPtr,
+			MinSimilarity:     0,
+			Limit:             10000,
+			IncludeSuperseded: true,
 		})
 		if err != nil {
 			slog.Error("playground decompose-facts search", "query", q, "error", err)

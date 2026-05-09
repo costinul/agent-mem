@@ -129,15 +129,20 @@ func (e *MemoryEngine) buildRecallOutput(ctx context.Context, input models.Recal
 
 // mapFactForOutput converts a stored Fact to the API-facing ReturnedFact,
 // optionally loading the original source content.
+//
+// Historical is set from SupersededAt presence. In the recall path the fact has
+// already been projected onto the recall event_date (see projectSupersessionAsOf),
+// so a non-nil SupersededAt here means "historical as of the recall event_date".
 func (e *MemoryEngine) mapFactForOutput(ctx context.Context, fact models.Fact, includeSource bool) (models.ReturnedFact, error) {
 	source, err := e.repo.GetSourceByID(ctx, fact.SourceID)
 	if err != nil {
 		return models.ReturnedFact{}, fmt.Errorf("load source for fact %s: %w", fact.ID, err)
 	}
 	returned := models.ReturnedFact{
-		ID:   fact.ID,
-		Text: withProvenanceSuffix(fact),
-		Kind: fact.Kind,
+		ID:         fact.ID,
+		Text:       withProvenanceSuffix(fact),
+		Kind:       fact.Kind,
+		Historical: fact.SupersededAt != nil,
 	}
 	if source != nil {
 		returned.SourceKind = source.Kind

@@ -626,15 +626,17 @@ func (r *PostgresRepository) SearchFactsByEmbedding(ctx context.Context, params 
 	}
 
 	q := `SELECT f.id, f.account_id, f.agent_id, f.thread_id, f.source_id, f.kind, f.text,
-		        f.referenced_at, f.created_at, f.updated_at, s.event_date
+		        f.referenced_at, f.superseded_at, f.superseded_by, f.created_at, f.updated_at, s.event_date
 		 FROM facts f
 		 JOIN sources s ON s.id = f.source_id
 		 WHERE f.account_id = $1
 		   AND (($2::uuid IS NULL AND f.agent_id IS NULL) OR f.agent_id = $2)
 		   AND (($3::uuid IS NULL AND f.thread_id IS NULL) OR f.thread_id = $3)
 		   AND f.embedding IS NOT NULL
-		   AND f.superseded_at IS NULL
 		   AND (1 - (f.embedding <=> $4::vector)) >= $5`
+	if !params.IncludeSuperseded {
+		q += ` AND f.superseded_at IS NULL`
+	}
 	args := []any{params.AccountID, params.AgentID, params.ThreadID, vectorLiteral(params.Embedding), params.MinSimilarity, params.Limit}
 	if len(params.SourceIDs) > 0 {
 		q += ` AND f.source_id = ANY($7)`
@@ -655,6 +657,8 @@ func (r *PostgresRepository) SearchFactsByEmbedding(ctx context.Context, params 
 			agent        sql.NullString
 			thread       sql.NullString
 			referencedAt sql.NullTime
+			supersededAt sql.NullTime
+			supersededBy sql.NullString
 		)
 		if err := rows.Scan(
 			&fact.ID,
@@ -665,6 +669,8 @@ func (r *PostgresRepository) SearchFactsByEmbedding(ctx context.Context, params 
 			&fact.Kind,
 			&fact.Text,
 			&referencedAt,
+			&supersededAt,
+			&supersededBy,
 			&fact.CreatedAt,
 			&fact.UpdatedAt,
 			&fact.EventDate,
@@ -675,6 +681,13 @@ func (r *PostgresRepository) SearchFactsByEmbedding(ctx context.Context, params 
 		fact.ThreadID = nullStringPtr(thread)
 		if referencedAt.Valid {
 			fact.ReferencedAt = &referencedAt.Time
+		}
+		if supersededAt.Valid {
+			fact.SupersededAt = &supersededAt.Time
+		}
+		if supersededBy.Valid {
+			by := supersededBy.String
+			fact.SupersededBy = &by
 		}
 		facts = append(facts, fact)
 	}
@@ -690,15 +703,17 @@ func (r *PostgresRepository) SearchFactsByEmbeddingWithScores(ctx context.Contex
 	}
 
 	q := `SELECT f.id, f.account_id, f.agent_id, f.thread_id, f.source_id, f.kind, f.text,
-		        f.referenced_at, f.created_at, f.updated_at, s.event_date,
+		        f.referenced_at, f.superseded_at, f.superseded_by, f.created_at, f.updated_at, s.event_date,
 		        1 - (f.embedding <=> $4::vector) AS score
 		 FROM facts f
 		 JOIN sources s ON s.id = f.source_id
 		 WHERE f.account_id = $1
 		   AND (($2::uuid IS NULL AND f.agent_id IS NULL) OR f.agent_id = $2)
 		   AND (($3::uuid IS NULL AND f.thread_id IS NULL) OR f.thread_id = $3)
-		   AND f.embedding IS NOT NULL
-		   AND f.superseded_at IS NULL`
+		   AND f.embedding IS NOT NULL`
+	if !params.IncludeSuperseded {
+		q += ` AND f.superseded_at IS NULL`
+	}
 	args := []any{params.AccountID, params.AgentID, params.ThreadID, vectorLiteral(params.Embedding), params.Limit}
 	if len(params.SourceIDs) > 0 {
 		q += ` AND f.source_id = ANY($6)`
@@ -719,6 +734,8 @@ func (r *PostgresRepository) SearchFactsByEmbeddingWithScores(ctx context.Contex
 			agent        sql.NullString
 			thread       sql.NullString
 			referencedAt sql.NullTime
+			supersededAt sql.NullTime
+			supersededBy sql.NullString
 		)
 		if err := rows.Scan(
 			&fs.ID,
@@ -729,6 +746,8 @@ func (r *PostgresRepository) SearchFactsByEmbeddingWithScores(ctx context.Contex
 			&fs.Kind,
 			&fs.Text,
 			&referencedAt,
+			&supersededAt,
+			&supersededBy,
 			&fs.CreatedAt,
 			&fs.UpdatedAt,
 			&fs.EventDate,
@@ -741,6 +760,13 @@ func (r *PostgresRepository) SearchFactsByEmbeddingWithScores(ctx context.Contex
 		if referencedAt.Valid {
 			fs.ReferencedAt = &referencedAt.Time
 		}
+		if supersededAt.Valid {
+			fs.SupersededAt = &supersededAt.Time
+		}
+		if supersededBy.Valid {
+			by := supersededBy.String
+			fs.SupersededBy = &by
+		}
 		results = append(results, fs)
 	}
 	return results, rows.Err()
@@ -751,14 +777,14 @@ func (r *PostgresRepository) DeleteFact(ctx context.Context, factID string) erro
 	return err
 }
 
-func (r *PostgresRepository) SupersedeFact(ctx context.Context, oldFactID string, newFact models.Fact) (*models.Fact, error) {
+func (r *PostgresRepository) SupersedeFact(ctx context.Context, oldFactID string, newFact models.Fact, supersededAt time.Time) (*models.Fact, error) {
 	inserted, err := r.InsertFact(ctx, newFact)
 	if err != nil {
 		return nil, fmt.Errorf("insert successor fact: %w", err)
 	}
 	_, err = r.db.ExecContext(ctx,
-		`UPDATE facts SET superseded_at = now(), superseded_by = $2, updated_at = now() WHERE id = $1`,
-		oldFactID, inserted.ID,
+		`UPDATE facts SET superseded_at = $3, superseded_by = $2, updated_at = now() WHERE id = $1`,
+		oldFactID, inserted.ID, supersededAt.UTC(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("supersede fact %s: %w", oldFactID, err)

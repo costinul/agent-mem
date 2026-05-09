@@ -45,7 +45,7 @@ func (e *MemoryEngine) RecallZero(ctx context.Context, input models.RecallInput)
 		return models.RecallOutput{}, fmt.Errorf("embed recall query: %w", err)
 	}
 
-	candidates, err := e.retrieveFactsWithLimit(ctx, input.AccountID, input.AgentID, input.ThreadID, embeddings, recallZeroCandidateK)
+	candidates, err := e.retrieveFactsWithLimit(ctx, input.AccountID, input.AgentID, input.ThreadID, embeddings, recallZeroCandidateK, true)
 	if err != nil {
 		return models.RecallOutput{}, err
 	}
@@ -69,6 +69,8 @@ func (e *MemoryEngine) RecallZero(ctx context.Context, input models.RecallInput)
 
 	candidates, eligibleCount, futureCount := dateRerank(candidates, eventDate)
 	log.Printf("recall-zero date-reranked eligible=%d future=%d", eligibleCount, futureCount)
+
+	candidates = projectSupersessionAsOf(candidates, eventDate)
 
 	limit := recallZeroDefaultLimit
 	if input.Limit > 0 {

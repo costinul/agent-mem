@@ -29,7 +29,12 @@ type Repository interface {
 	SearchFactsByEmbeddingWithScores(ctx context.Context, params SearchByEmbeddingParams) ([]FactWithScore, error)
 	UpdateFact(ctx context.Context, fact models.Fact) error
 	DeleteFact(ctx context.Context, factID string) error
-	SupersedeFact(ctx context.Context, oldFactID string, newFact models.Fact) (*models.Fact, error)
+	// SupersedeFact inserts newFact and marks oldFactID as superseded.
+	// supersededAt is the boundary timestamp written to the old fact's superseded_at:
+	// the old fact is "active at time T" iff supersededAt > T. Callers should pass the
+	// successor's content boundary (typically the successor's referenced_at, falling back
+	// to its source event_date) so as-of recall can reconstruct the timeline.
+	SupersedeFact(ctx context.Context, oldFactID string, newFact models.Fact, supersededAt time.Time) (*models.Fact, error)
 
 	// MaxSourceEventDateForThread returns the most recent event_date across all sources for the thread.
 	// Returns nil when the thread has no sources.
@@ -58,4 +63,9 @@ type SearchByEmbeddingParams struct {
 	MinSimilarity float64
 	Limit         int
 	SourceIDs     []string // optional; when non-empty, restricts scoring to facts from these sources
+	// IncludeSuperseded keeps superseded facts in the result set. Recall sets this so the
+	// HISTORICAL marker can be evaluated relative to the recall event_date instead of being
+	// hard-filtered at SQL time. The ingest pipeline keeps it false to compare new facts
+	// only against the current state.
+	IncludeSuperseded bool
 }

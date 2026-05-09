@@ -368,7 +368,7 @@ func (r *InMemoryRepository) SearchFactsByEmbedding(_ context.Context, params Se
 	}
 	candidates := make([]candidate, 0)
 	for _, fact := range r.facts {
-		if fact.SupersededAt != nil {
+		if !params.IncludeSuperseded && fact.SupersededAt != nil {
 			continue
 		}
 		if fact.AccountID != params.AccountID {
@@ -435,7 +435,7 @@ func (r *InMemoryRepository) SearchFactsByEmbeddingWithScores(_ context.Context,
 	}
 	candidates := make([]candidate, 0)
 	for _, fact := range r.facts {
-		if fact.SupersededAt != nil {
+		if !params.IncludeSuperseded && fact.SupersededAt != nil {
 			continue
 		}
 		if fact.AccountID != params.AccountID {
@@ -477,7 +477,7 @@ func (r *InMemoryRepository) SearchFactsByEmbeddingWithScores(_ context.Context,
 	return result, nil
 }
 
-func (r *InMemoryRepository) SupersedeFact(_ context.Context, oldFactID string, newFact models.Fact) (*models.Fact, error) {
+func (r *InMemoryRepository) SupersedeFact(_ context.Context, oldFactID string, newFact models.Fact, supersededAt time.Time) (*models.Fact, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -491,8 +491,9 @@ func (r *InMemoryRepository) SupersedeFact(_ context.Context, oldFactID string, 
 	newFact.UpdatedAt = now
 	r.facts[newFact.ID] = newFact
 
+	boundary := supersededAt.UTC()
 	if old, ok := r.facts[oldFactID]; ok {
-		old.SupersededAt = &now
+		old.SupersededAt = &boundary
 		old.SupersededBy = &newFact.ID
 		old.UpdatedAt = now
 		r.facts[oldFactID] = old

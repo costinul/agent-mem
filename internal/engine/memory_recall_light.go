@@ -40,7 +40,7 @@ func (e *MemoryEngine) RecallLight(ctx context.Context, input models.RecallInput
 		return models.RecallOutput{}, fmt.Errorf("embed recall query: %w", err)
 	}
 
-	candidates, err := e.retrieveFactsWithLimit(ctx, input.AccountID, input.AgentID, input.ThreadID, embeddings, recallLightCandidateK)
+	candidates, err := e.retrieveFactsWithLimit(ctx, input.AccountID, input.AgentID, input.ThreadID, embeddings, recallLightCandidateK, true)
 	if err != nil {
 		return models.RecallOutput{}, err
 	}
@@ -64,6 +64,8 @@ func (e *MemoryEngine) RecallLight(ctx context.Context, input models.RecallInput
 
 	candidates, eligibleCount, futureCount := dateRerank(candidates, eventDate)
 	log.Printf("recall-light date-reranked eligible=%d future=%d", eligibleCount, futureCount)
+
+	candidates = projectSupersessionAsOf(candidates, eventDate)
 
 	selected, err := e.ai.SelectFactsLight(ctx, SelectFactsRequest{
 		Query:      input.Query,

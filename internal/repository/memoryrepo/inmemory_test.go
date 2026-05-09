@@ -3,6 +3,7 @@ package memoryrepo
 import (
 	"context"
 	"testing"
+	"time"
 
 	models "agentmem/internal/models"
 )
@@ -51,7 +52,7 @@ func TestInMemoryFactLifecycle(t *testing.T) {
 		Kind:      models.FACT_KIND_KNOWLEDGE,
 		Text:      "previously: hello",
 		Embedding: []float64{1, 0, 0},
-	})
+	}, time.Now().UTC())
 	if err != nil {
 		t.Fatalf("SupersedeFact() error = %v", err)
 	}

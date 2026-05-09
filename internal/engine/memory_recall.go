@@ -59,7 +59,7 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 		return models.RecallOutput{}, fmt.Errorf("embed recall search phrases: %w", err)
 	}
 
-	candidates, err := e.retrieveFactsWithLimit(ctx, input.AccountID, input.AgentID, input.ThreadID, embeddings, recallCandidateK)
+	candidates, err := e.retrieveFactsWithLimit(ctx, input.AccountID, input.AgentID, input.ThreadID, embeddings, recallCandidateK, true)
 	if err != nil {
 		return models.RecallOutput{}, err
 	}
@@ -91,6 +91,11 @@ func (e *MemoryEngine) Recall(ctx context.Context, input models.RecallInput) (mo
 	// (future facts). Timeless facts and past/present facts retain embedding order.
 	candidates, eligibleCount, futureCount := dateRerank(candidates, eventDate)
 	log.Printf("recall date-reranked event_date=%s eligible=%d future=%d", eventDateStr, eligibleCount, futureCount)
+
+	// Project supersession onto the recall event_date so HISTORICAL is decided as-of,
+	// not by absolute timeline. A fact superseded after eventDate is still current at
+	// eventDate and must not carry the HISTORICAL marker into SelectFacts.
+	candidates = projectSupersessionAsOf(candidates, eventDate)
 
 	selected, err := e.ai.SelectFacts(ctx, SelectFactsRequest{
 		Query:      input.Query,
@@ -237,6 +242,31 @@ func (e *MemoryEngine) expandBySource(ctx context.Context, accountID string, see
 		log.Printf("recall sibling expansion: added=%d sources=%d total=%d", added, len(rankedSourceIDs), len(seeds))
 	}
 	return seeds, nil
+}
+
+// projectSupersessionAsOf rewrites each candidate's supersession fields so that the
+// HISTORICAL marker reflects the recall event_date, not the absolute timeline.
+//
+//   - superseded_at <= eventDate: supersession has already happened from the recall's
+//     perspective — keep both fields so the prompt renders HISTORICAL and the API
+//     output reports historical=true.
+//   - superseded_at > eventDate: supersession is in the future from the recall's
+//     perspective — clear both fields so the fact is treated as current.
+//   - superseded_at IS NULL: never superseded — already current.
+//
+// Returns the modified slice (candidates are passed by value as Fact structs, so
+// mutating in place affects only the local copies).
+func projectSupersessionAsOf(candidates []models.Fact, eventDate time.Time) []models.Fact {
+	for i := range candidates {
+		if candidates[i].SupersededAt == nil {
+			continue
+		}
+		if candidates[i].SupersededAt.After(eventDate) {
+			candidates[i].SupersededAt = nil
+			candidates[i].SupersededBy = nil
+		}
+	}
+	return candidates
 }
 
 // dateRerank partitions candidates using the recall event_date as an as-of boundary.

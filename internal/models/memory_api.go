@@ -110,6 +110,10 @@ type ReturnedFact struct {
 	Kind           FactKind   `json:"kind"`
 	SourceKind     SourceKind `json:"source_kind"`
 	OriginalSource *string    `json:"original_source"` // Populated only if IncludeSources is true.
+	// Historical is true when the fact was already superseded as of the recall event_date
+	// (or "now" for non-recall reads). The fact is still returned because it is the correct
+	// answer for past-state questions; the flag tells the consumer it is no longer current.
+	Historical bool `json:"historical,omitempty"`
 }
 
 // ConversationMessage is a conversation message projected from sources.

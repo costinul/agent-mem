@@ -218,9 +218,9 @@ func (w *repoWrapper) DeleteFact(ctx context.Context, factID string) error {
 	return w.inner.DeleteFact(ctx, factID)
 }
 
-func (w *repoWrapper) SupersedeFact(ctx context.Context, oldFactID string, newFact models.Fact) (*models.Fact, error) {
+func (w *repoWrapper) SupersedeFact(ctx context.Context, oldFactID string, newFact models.Fact, supersededAt time.Time) (*models.Fact, error) {
 	defer w.observe(ctx, time.Now())
-	return w.inner.SupersedeFact(ctx, oldFactID, newFact)
+	return w.inner.SupersedeFact(ctx, oldFactID, newFact, supersededAt)
 }
 
 func (w *repoWrapper) MaxSourceEventDateForThread(ctx context.Context, threadID string) (*time.Time, error) {

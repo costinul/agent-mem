@@ -38,7 +38,19 @@ system_prompt: |
 
   Hallucination guard: every proper noun (name of a person, pet, place, organization, brand, song, book, band) AND every qualifier (categorical, demographic, eligibility, attribute, or descriptive modifier) in your output facts must appear verbatim or as a clear paraphrase in the Message itself — not in Reference context. Do NOT invent names. Do NOT import qualifiers from prior conversation. If a pet is mentioned without a name, write "<Author>'s pet" or "<Author>'s dog" — never fabricate a name that does not appear in the Message.
 
-  Referenced date: when a fact describes an event or state with a clear calendar date (after temporal resolution), set referenced_at to that date in ISO 8601 format (YYYY-MM-DD). For events spanning a weekend, use the Saturday. Leave referenced_at unset for timeless facts (e.g. "Alice enjoys hiking") and for facts whose date is unclear.
+  Referenced date: set referenced_at ONLY when the source itself anchors the fact to a calendar date — either with an absolute date ("on 12 March 2024", "in October 2023") or with a relative phrase you resolve via EventDate ("yesterday", "last week", "two days ago"). Use ISO 8601 format (YYYY-MM-DD); for events spanning a weekend, use the Saturday. Leave referenced_at unset for:
+  - timeless attribute facts ("Alice enjoys hiking", "Bob lives in Berlin", "Carol speaks Spanish");
+  - present-tense stative facts where the source carries no temporal expression at all ("I'm studying linguistics", "I'm working on a side project", "I work at TechCorp" — the fact describes an ongoing state, not a dated event).
+  Do NOT default referenced_at to EventDate. EventDate is the conversation timestamp, not the fact's content date — using it as referenced_at falsely turns every stative claim into a dated event.
+
+  Date in fact text: include a date inside the fact text only when the source itself mentions one (absolute or relative-and-resolved). Do NOT inject "as of <EventDate>" or any other date into a stative fact whose source had no temporal expression.
+    Source (no temporal expression): "I'm studying linguistics." (EventDate = 12 February 2023)
+      Good: "Alice is studying linguistics." (no date in text, referenced_at unset)
+      Bad:  "Alice is studying linguistics as of 12 February 2023." ← EventDate injected with no source warrant
+    Source (relative phrase): "I've been studying linguistics for a while now." (EventDate = 12 February 2023)
+      Good: "Alice has been studying linguistics as of February 2023 (originally said 'for a while now' on 12 February 2023)." (resolution + anchor)
+    Source (absolute date): "I started studying linguistics in March 2022."
+      Good: "Alice started studying linguistics in March 2022." (date carried through)
 
   Temporal resolution: when an EventDate is provided, resolve every relative temporal expression in the message ("yesterday", "last week", "two days ago", "this morning", "next month", "last year", "a year ago", "last Saturday", "last Friday", "this past weekend", "on Friday", "next Tuesday") to its absolute calendar date based on that EventDate. The EventDate includes the weekday — use it to compute the correct date for any weekday reference (e.g. if the EventDate is Wednesday 10 May, "last Saturday" is 6 May). For "last weekend" or "this past weekend", produce the dates of the most recent Saturday AND Sunday before the EventDate. Always include the year explicitly in the fact text. Do not preserve relative phrases like "yesterday" or "last weekend" — replace them with the actual date.
 
