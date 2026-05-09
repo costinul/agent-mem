@@ -258,12 +258,28 @@ function recallFacts(idx) {
                     : f.kind === 'RULE'
                     ? 'bg-purple-50 text-purple-700'
                     : 'bg-amber-50 text-amber-700';
+                var factUrl = f.thread_id ? '/admin/threads/' + f.thread_id + '#fact-' + f.id : null;
+                var suppByUrl = (f.superseded_by && f.thread_id) ? '/admin/threads/' + f.thread_id + '#fact-' + f.superseded_by : null;
+                var idHtml = factUrl
+                    ? '<a href="' + escAttr(factUrl) + '" target="_blank" class="text-blue-600 hover:underline font-mono">' + escHtml(f.id) + '</a>'
+                    : '<span class="text-gray-400 font-mono">' + escHtml(f.id) + '</span>';
+                var suppHtml = '';
+                if (f.superseded_by) {
+                    suppHtml += '<span class="text-orange-600">Superseded</span>';
+                    if (f.superseded_at) suppHtml += ' <span class="text-gray-400">' + escHtml(f.superseded_at) + '</span>';
+                    if (suppByUrl) suppHtml += ' <a href="' + escAttr(suppByUrl) + '" target="_blank" class="text-blue-600 hover:underline">\u2192 successor</a>';
+                    else if (f.superseded_by) suppHtml += ' <span class="text-gray-400">\u2192 ' + escHtml(f.superseded_by) + '</span>';
+                }
                 return '<li class="flex items-start gap-2 text-sm">' +
                     '<span class="shrink-0 text-xs text-gray-400 font-mono w-4 mt-0.5">' + (i+1) + '</span>' +
                     '<span class="shrink-0 px-1.5 py-0.5 text-[10px] font-medium rounded ' + kindCls + '">' + escHtml(f.kind) + '</span>' +
-                    '<div class="flex flex-col">' +
+                    '<div class="flex-1 flex flex-col gap-0.5">' +
                         '<span class="text-gray-900">' + escHtml(f.text) + '</span>' +
-                        '<span class="text-[10px] text-gray-400 font-mono mt-0.5 select-all" title="Fact ID">' + escHtml(f.id) + '</span>' +
+                        '<div class="flex items-center gap-2 flex-wrap text-[10px] mt-0.5">' +
+                            idHtml +
+                            (suppHtml ? '<span class="text-gray-300">\u00b7</span>' + suppHtml : '') +
+                            (f.source_id ? '<button onclick="openSourceModal(\'' + escAttr(f.source_id) + '\')" class="text-blue-600 hover:underline">View source</button>' : '') +
+                        '</div>' +
                     '</div>' +
                 '</li>';
             }).join('') +

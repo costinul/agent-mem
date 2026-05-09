@@ -22,86 +22,93 @@
     </div>
 </div>
 
-<!-- Events -->
+<!-- Events (collapsed by default) -->
 <div class="mb-8">
     <div class="flex items-center justify-between mb-3">
-        <h3 class="text-md font-semibold text-gray-800">Events ({{len .EventRows}})</h3>
+        <button onclick="toggleEventsSection()" class="flex items-center gap-1.5 text-md font-semibold text-gray-800 hover:text-gray-600">
+            <svg id="events-chevron" class="w-4 h-4 text-gray-400 transition-transform duration-150" style="transform:rotate(-90deg)" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
+            </svg>
+            Events ({{len .EventRows}})
+        </button>
         <input id="source-filter" name="source_filter" type="text" placeholder="Filter events by source text (e.g. *hello*)"
                oninput="filterEvents()"
                class="w-72 border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
     </div>
-    {{if .EventRows}}
-    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <table class="w-full text-sm" id="events-table">
-            <thead class="bg-gray-50 border-b border-gray-200">
-                <tr>
-                    <th class="w-6 px-3 py-2"></th>
-                    <th class="text-left px-4 py-2 font-medium text-gray-500">Event ID</th>
-                    <th class="text-left px-4 py-2 font-medium text-gray-500">Created</th>
-                    <th class="text-left px-4 py-2 font-medium text-gray-500">Sources</th>
-                    <th class="px-4 py-2"></th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100">
-                {{range .EventRows}}
-                <tr class="event-row cursor-pointer hover:bg-gray-50"
-                    data-source-text="{{.SourceText}}"
-                    onclick="toggleEvent('{{.ID}}')">
-                    <td class="px-3 py-2 text-gray-400">
-                        <svg id="toggle-icon-{{.ID}}" class="w-3 h-3 transition-transform duration-150" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
-                        </svg>
-                    </td>
-                    <td class="px-4 py-2 font-mono text-xs text-gray-600">{{.ID}}</td>
-                    <td class="px-4 py-2 text-gray-500 text-xs whitespace-nowrap">{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
-                    <td class="px-4 py-2 text-xs text-gray-500 max-w-sm truncate">{{.SourceText}}</td>
-                    <td class="px-4 py-2 text-right">
-                        <button onclick="event.stopPropagation()"
-                                hx-post="/admin/threads/{{$.Thread.ID}}/similarity"
-                                hx-target="#facts-section"
-                                hx-swap="outerHTML"
-                                hx-vals='{"event_id": "{{.ID}}"}'
-                                hx-include="#sim-query,#source-filter"
-                                class="text-xs text-blue-600 hover:underline font-medium">Filter facts</button>
-                    </td>
-                </tr>
-                <tr id="event-detail-{{.ID}}" class="hidden bg-gray-50 border-t border-gray-100">
-                    <td></td>
-                    <td colspan="4" class="px-4 py-3">
-                        {{if .Sources}}
-                        <div class="space-y-2">
-                            {{range .Sources}}
-                            <div class="text-xs">
-                                <div class="flex items-center gap-2 mb-0.5">
-                                    <span class="inline-flex px-1.5 py-0.5 rounded text-xs font-medium
-                                        {{if eq (printf "%s" .Kind) "USER"}}bg-blue-100 text-blue-700
-                                        {{else if eq (printf "%s" .Kind) "AGENT"}}bg-green-100 text-green-700
-                                        {{else if eq (printf "%s" .Kind) "TOOL"}}bg-teal-100 text-teal-700
-                                        {{else if eq (printf "%s" .Kind) "SYSTEM"}}bg-gray-100 text-gray-600
-                                        {{else}}bg-purple-100 text-purple-700{{end}}">{{.Kind}}</span>
-                                    {{if .Author}}<span class="text-gray-400">by {{derefString .Author}}</span>{{end}}
-                                    <span class="text-gray-300">{{.CreatedAt.Format "15:04:05"}}</span>
+    <div id="events-body" class="hidden">
+        {{if .EventRows}}
+        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <table class="w-full text-sm" id="events-table">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        <th class="w-6 px-3 py-2"></th>
+                        <th class="text-left px-4 py-2 font-medium text-gray-500">Event ID</th>
+                        <th class="text-left px-4 py-2 font-medium text-gray-500">Created</th>
+                        <th class="text-left px-4 py-2 font-medium text-gray-500">Sources</th>
+                        <th class="px-4 py-2"></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {{range .EventRows}}
+                    <tr class="event-row cursor-pointer hover:bg-gray-50"
+                        data-source-text="{{.SourceText}}"
+                        onclick="toggleEvent('{{.ID}}')">
+                        <td class="px-3 py-2 text-gray-400">
+                            <svg id="toggle-icon-{{.ID}}" class="w-3 h-3 transition-transform duration-150" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                            </svg>
+                        </td>
+                        <td class="px-4 py-2 font-mono text-xs text-gray-600">{{.ID}}</td>
+                        <td class="px-4 py-2 text-gray-500 text-xs whitespace-nowrap">{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
+                        <td class="px-4 py-2 text-xs text-gray-500 max-w-sm truncate">{{.SourceText}}</td>
+                        <td class="px-4 py-2 text-right">
+                            <button onclick="event.stopPropagation()"
+                                    hx-post="/admin/threads/{{$.Thread.ID}}/similarity"
+                                    hx-target="#facts-section"
+                                    hx-swap="outerHTML"
+                                    hx-vals='{"event_id": "{{.ID}}"}'
+                                    hx-include="#sim-query,#source-filter"
+                                    class="text-xs text-blue-600 hover:underline font-medium">Filter facts</button>
+                        </td>
+                    </tr>
+                    <tr id="event-detail-{{.ID}}" class="hidden bg-gray-50 border-t border-gray-100">
+                        <td></td>
+                        <td colspan="4" class="px-4 py-3">
+                            {{if .Sources}}
+                            <div class="space-y-2">
+                                {{range .Sources}}
+                                <div class="text-xs">
+                                    <div class="flex items-center gap-2 mb-0.5">
+                                        <span class="inline-flex px-1.5 py-0.5 rounded text-xs font-medium
+                                            {{if eq (printf "%s" .Kind) "USER"}}bg-blue-100 text-blue-700
+                                            {{else if eq (printf "%s" .Kind) "AGENT"}}bg-green-100 text-green-700
+                                            {{else if eq (printf "%s" .Kind) "TOOL"}}bg-teal-100 text-teal-700
+                                            {{else if eq (printf "%s" .Kind) "SYSTEM"}}bg-gray-100 text-gray-600
+                                            {{else}}bg-purple-100 text-purple-700{{end}}">{{.Kind}}</span>
+                                        {{if .Author}}<span class="text-gray-400">by {{derefString .Author}}</span>{{end}}
+                                        <span class="text-gray-300">{{.CreatedAt.Format "15:04:05"}}</span>
+                                    </div>
+                                    {{if .Content}}
+                                    <p class="text-gray-700 whitespace-pre-wrap pl-1">{{derefString .Content}}</p>
+                                    {{else if .BucketPath}}
+                                    <p class="text-gray-400 italic pl-1">file: {{derefString .BucketPath}}</p>
+                                    {{end}}
                                 </div>
-                                {{if .Content}}
-                                <p class="text-gray-700 whitespace-pre-wrap pl-1">{{derefString .Content}}</p>
-                                {{else if .BucketPath}}
-                                <p class="text-gray-400 italic pl-1">file: {{derefString .BucketPath}}</p>
                                 {{end}}
                             </div>
+                            {{else}}
+                            <p class="text-xs text-gray-400">No sources</p>
                             {{end}}
-                        </div>
-                        {{else}}
-                        <p class="text-xs text-gray-400">No sources</p>
-                        {{end}}
-                    </td>
-                </tr>
-                {{end}}
-            </tbody>
-        </table>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+        {{else}}
+        <p class="text-sm text-gray-400">No events</p>
+        {{end}}
     </div>
-    {{else}}
-    <p class="text-sm text-gray-400">No events</p>
-    {{end}}
 </div>
 
 <!-- Facts -->
@@ -136,17 +143,18 @@
                 <tr>
                     <th class="text-left px-4 py-2 font-medium text-gray-500">ID</th>
                     <th class="text-left px-4 py-2 font-medium text-gray-500">Kind</th>
-                    <th class="text-left px-4 py-2 font-medium text-gray-500 w-1/2">Text</th>
+                    <th class="text-left px-4 py-2 font-medium text-gray-500 w-2/5">Text</th>
                     <th class="text-left px-4 py-2 font-medium text-gray-500">Status</th>
                     <th class="text-left px-4 py-2 font-medium text-gray-500">Ref Date</th>
                     <th class="text-left px-4 py-2 font-medium text-gray-500">Created</th>
                     <th class="text-right px-4 py-2 font-medium text-gray-500">Score</th>
+                    <th class="px-4 py-2"></th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
                 {{range .FactRows}}
-                <tr class="{{if .SupersededAt}}opacity-50{{end}}">
-                    <td class="px-4 py-2 font-mono text-xs text-gray-600">{{.ID}}</td>
+                <tr id="fact-{{.ID}}" class="{{if .SupersededAt}}opacity-50{{end}}">
+                    <td class="px-4 py-2 font-mono text-xs text-gray-600 whitespace-nowrap">{{.ID}}</td>
                     <td class="px-4 py-2">
                         <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-full
                             {{if eq (printf "%s" .Kind) "KNOWLEDGE"}}bg-blue-100 text-blue-700
@@ -155,10 +163,15 @@
                             {{.Kind}}
                         </span>
                     </td>
-                    <td class="px-4 py-2 text-gray-900 max-w-md truncate">{{.Text}}</td>
+                    <td class="px-4 py-2 text-gray-900">{{.Text}}</td>
                     <td class="px-4 py-2 text-xs">
                         {{if .SupersededAt}}
-                        <span class="text-orange-600">Superseded</span>
+                        <div class="text-orange-600 font-medium">Superseded</div>
+                        <div class="text-gray-400 font-mono mt-0.5">{{derefTimeStr .SupersededAt}}</div>
+                        {{if .SupersededBy}}
+                        <a href="#fact-{{derefString .SupersededBy}}"
+                           class="text-blue-600 hover:underline text-xs mt-0.5 inline-block">→ successor</a>
+                        {{end}}
                         {{else}}
                         <span class="text-green-600">Active</span>
                         {{end}}
@@ -166,8 +179,12 @@
                     <td class="px-4 py-2 text-xs font-mono text-indigo-600">
                         {{if .ReferencedAt}}{{.ReferencedAt.Format "2006-01-02"}}{{else}}<span class="text-gray-300">—</span>{{end}}
                     </td>
-                    <td class="px-4 py-2 text-gray-500 text-xs">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
+                    <td class="px-4 py-2 text-gray-500 text-xs whitespace-nowrap">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
                     <td class="px-4 py-2 text-right font-mono text-xs text-gray-400">{{.Score}}</td>
+                    <td class="px-4 py-2 whitespace-nowrap">
+                        <button onclick="openSourceModal('{{.SourceID}}')"
+                                class="text-xs text-blue-600 hover:underline">View source</button>
+                    </td>
                 </tr>
                 {{end}}
             </tbody>
@@ -179,6 +196,13 @@
 </div>
 
 <script>
+function toggleEventsSection() {
+    var body = document.getElementById('events-body');
+    var icon = document.getElementById('events-chevron');
+    var hidden = body.classList.toggle('hidden');
+    icon.style.transform = hidden ? 'rotate(-90deg)' : 'rotate(0deg)';
+}
+
 function toggleEvent(id) {
     const detail = document.getElementById('event-detail-' + id);
     const icon = document.getElementById('toggle-icon-' + id);
@@ -190,7 +214,7 @@ function filterEvents() {
     const raw = document.getElementById('source-filter').value.trim();
     const rows = document.querySelectorAll('#events-table .event-row');
     rows.forEach(function(row) {
-        const next = row.nextElementSibling; // detail row
+        const next = row.nextElementSibling;
         if (!raw) {
             row.classList.remove('hidden');
             return;
@@ -199,7 +223,6 @@ function filterEvents() {
         const pattern = raw.toLowerCase();
         const match = wildcardMatch(pattern, text);
         row.classList.toggle('hidden', !match);
-        // collapse hidden event detail rows
         if (!match && next && next.id && next.id.startsWith('event-detail-')) {
             next.classList.add('hidden');
             const icon = next.previousElementSibling.querySelector('svg');
@@ -209,7 +232,6 @@ function filterEvents() {
 }
 
 function wildcardMatch(pattern, text) {
-    // Convert wildcard pattern to regex: * → .*, ? → .
     let regStr = '^';
     for (let i = 0; i < pattern.length; i++) {
         const c = pattern[i];

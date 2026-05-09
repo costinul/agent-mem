@@ -11,6 +11,8 @@
         .htmx-request .htmx-indicator { opacity: 1; }
         .fade-out { animation: fadeOut 0.3s ease forwards; }
         @keyframes fadeOut { to { opacity: 0; height: 0; padding: 0; margin: 0; overflow: hidden; } }
+        .fact-highlight { animation: factHighlight 2.5s ease forwards; }
+        @keyframes factHighlight { 0%, 25% { background-color: #fef9c3; } 100% { background-color: transparent; } }
     </style>
 </head>
 <body class="h-full" hx-boost="true">
@@ -78,5 +80,41 @@
             </div>
         </main>
     </div>
+
+<!-- Source preview modal -->
+<dialog id="source-modal" class="rounded-lg shadow-xl w-full max-w-2xl p-0 backdrop:bg-black/40">
+    <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-gray-50">
+        <h3 class="text-sm font-semibold text-gray-800">Source</h3>
+        <button onclick="document.getElementById('source-modal').close()"
+                class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+    </div>
+    <div id="source-modal-content" class="px-5 py-4 text-sm text-gray-700 max-h-[28rem] overflow-y-auto"></div>
+</dialog>
+
+<script>
+function openSourceModal(sourceId) {
+    var modal = document.getElementById('source-modal');
+    var content = document.getElementById('source-modal-content');
+    content.innerHTML = '<p class="text-xs text-gray-400">Loading\u2026</p>';
+    modal.showModal();
+    fetch('/admin/sources/' + encodeURIComponent(sourceId))
+        .then(function(r) { return r.text(); })
+        .then(function(html) { content.innerHTML = html; })
+        .catch(function(e) { content.innerHTML = '<p class="text-xs text-red-600">Error: ' + e.message + '</p>'; });
+}
+
+function scrollToFact() {
+    var hash = window.location.hash;
+    if (!hash || !hash.startsWith('#fact-')) return;
+    var el = document.querySelector(hash);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('fact-highlight');
+    setTimeout(function() { el.classList.remove('fact-highlight'); }, 2500);
+}
+window.addEventListener('load', scrollToFact);
+window.addEventListener('hashchange', scrollToFact);
+document.addEventListener('htmx:afterSettle', function() { scrollToFact(); });
+</script>
 </body>
 </html>

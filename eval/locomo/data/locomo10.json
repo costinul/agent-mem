@@ -44,7 +44,8 @@
       },
       {
         "question": "When did Melanie run a charity race?",
-        "answer": "The sunday before 25 May 2023",
+        "answer": "The saturday before 25 May 2023",
+        "answer_revised": "The saturday before 25 May 2023, 20 May 2023",
         "evidence": [
           "D2:1"
         ],
@@ -803,6 +804,7 @@
       {
         "question": "What is Melanie's hand-painted bowl a reminder of?",
         "answer": "art and self-expression",
+        "answer_revised": "Caroline's hand-painted bowl reminds her of art and self-expression.",
         "evidence": [
           "D4:5"
         ],
@@ -1153,7 +1155,7 @@
         "category": 4
       },
       {
-        "question": "What kind of painting did Caroline share with Melanie on October 13, 2023?",
+        "question": "What kind of painting did Melanie share with Caroline on October 13, 2023?",
         "answer": "An abstract painting with blue streaks on a wall.",
         "evidence": [
           "D17:14"

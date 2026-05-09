@@ -83,6 +83,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, adminMw func(http.Handler) 
 	protected.HandleFunc("GET /admin/threads/{id}", h.threadDetail)
 	protected.HandleFunc("DELETE /admin/threads/{id}", h.deleteThread)
 	protected.HandleFunc("POST /admin/threads/{id}/similarity", h.threadSimilarity)
+	protected.HandleFunc("GET /admin/sources/{id}", h.sourcePreview)
 	protected.HandleFunc("GET /admin/users", h.listUsers)
 	protected.HandleFunc("PUT /admin/users/{id}/role", h.updateUserRole)
 	protected.HandleFunc("DELETE /admin/users/{id}", h.deleteUser)
@@ -797,33 +798,40 @@ func (h *Handler) renderFactsSection(w http.ResponseWriter, thread *models.Threa
         <tr>
           <th class="text-left px-4 py-2 font-medium text-gray-500">ID</th>
           <th class="text-left px-4 py-2 font-medium text-gray-500">Kind</th>
-          <th class="text-left px-4 py-2 font-medium text-gray-500 w-1/2">Text</th>
+          <th class="text-left px-4 py-2 font-medium text-gray-500 w-2/5">Text</th>
           <th class="text-left px-4 py-2 font-medium text-gray-500">Status</th>
           <th class="text-left px-4 py-2 font-medium text-gray-500">Ref Date</th>
           <th class="text-left px-4 py-2 font-medium text-gray-500">Created</th>
           <th class="text-right px-4 py-2 font-medium text-gray-500">Score</th>
+          <th class="px-4 py-2"></th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
         {{range .Rows}}
-        <tr class="{{if .SupersededAt}}opacity-50{{end}}">
-          <td class="px-4 py-2 font-mono text-xs text-gray-600">{{.ID}}</td>
+        <tr id="fact-{{.ID}}" class="{{if .SupersededAt}}opacity-50{{end}}">
+          <td class="px-4 py-2 font-mono text-xs text-gray-600 whitespace-nowrap">{{.ID}}</td>
           <td class="px-4 py-2">
             <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded-full
               {{if eq (printf "%s" .Kind) "KNOWLEDGE"}}bg-blue-100 text-blue-700
               {{else if eq (printf "%s" .Kind) "RULE"}}bg-purple-100 text-purple-700
               {{else}}bg-amber-100 text-amber-700{{end}}">{{.Kind}}</span>
           </td>
-          <td class="px-4 py-2 text-gray-900 max-w-md truncate">{{.Text}}</td>
+          <td class="px-4 py-2 text-gray-900">{{.Text}}</td>
           <td class="px-4 py-2 text-xs">
-            {{if .SupersededAt}}<span class="text-orange-600">Superseded</span>
+            {{if .SupersededAt}}
+            <div class="text-orange-600 font-medium">Superseded</div>
+            <div class="text-gray-400 font-mono mt-0.5">{{derefTimeStr .SupersededAt}}</div>
+            {{if .SupersededBy}}<a href="#fact-{{derefString .SupersededBy}}" class="text-blue-600 hover:underline mt-0.5 inline-block">→ successor</a>{{end}}
             {{else}}<span class="text-green-600">Active</span>{{end}}
           </td>
           <td class="px-4 py-2 text-xs font-mono text-indigo-600">
             {{if .ReferencedAt}}{{.ReferencedAt.Format "2006-01-02"}}{{else}}<span class="text-gray-300">—</span>{{end}}
           </td>
-          <td class="px-4 py-2 text-gray-500 text-xs">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
+          <td class="px-4 py-2 text-gray-500 text-xs whitespace-nowrap">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
           <td class="px-4 py-2 text-right font-mono text-xs text-gray-600">{{.Score}}</td>
+          <td class="px-4 py-2 whitespace-nowrap">
+            <button onclick="openSourceModal('{{.SourceID}}')" class="text-xs text-blue-600 hover:underline">View source</button>
+          </td>
         </tr>
         {{end}}
       </tbody>
@@ -840,13 +848,53 @@ func (h *Handler) renderFactsSection(w http.ResponseWriter, thread *models.Threa
 		EventID  string
 		Rows     []factRow
 	}
-	t := template.Must(template.New("facts-section").Parse(tmplStr))
+	t := template.Must(template.New("facts-section").Funcs(template.FuncMap{
+		"derefString":  func(s *string) string { return *s },
+		"derefTimeStr": func(t *time.Time) string { return t.Format("2006-01-02") },
+	}).Parse(tmplStr))
 	_ = t.ExecuteTemplate(w, "facts-section", data{
 		ThreadID: thread.ID,
 		Query:    filter.Query,
 		EventID:  filter.EventID,
 		Rows:     rows,
 	})
+}
+
+func (h *Handler) sourcePreview(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	source, err := h.memoryRepo.GetSourceByID(r.Context(), id)
+	if err != nil || source == nil {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	tmplStr := `<div class="space-y-3">
+  <div>
+    <p class="text-xs font-medium text-gray-500 mb-0.5">ID</p>
+    <p class="font-mono text-xs text-gray-800 select-all break-all">{{.ID}}</p>
+  </div>
+  {{if .Content}}
+  <div>
+    <p class="text-xs font-medium text-gray-500 mb-0.5">Text</p>
+    <p class="text-sm text-gray-800 whitespace-pre-wrap">{{derefStr .Content}}</p>
+  </div>
+  {{end}}
+  {{if .BucketPath}}
+  <div>
+    <p class="text-xs font-medium text-gray-500 mb-0.5">File</p>
+    <p class="font-mono text-xs text-gray-600">{{derefStr .BucketPath}}</p>
+  </div>
+  {{end}}
+</div>`
+	t := template.Must(template.New("src").Funcs(template.FuncMap{
+		"derefStr": func(s *string) string {
+			if s == nil {
+				return ""
+			}
+			return *s
+		},
+	}).Parse(tmplStr))
+	_ = t.Execute(w, source)
 }
 
 func (h *Handler) listUsers(w http.ResponseWriter, r *http.Request) {
@@ -1659,11 +1707,26 @@ func (h *Handler) renderDecomposeFactsResult(w http.ResponseWriter, result *Deco
         {{kindClass .Kind}}">{{.Kind}}</span>
       <span class="flex-1 min-w-0">
         <span class="block text-sm text-gray-900 leading-snug">{{.Text}}</span>
-        <span class="flex flex-wrap items-center gap-1 mt-1">
+        <span class="flex flex-wrap items-center gap-1.5 mt-1">
+          {{if .ThreadID}}
+          <a href="/admin/threads/{{derefString .ThreadID}}#fact-{{.ID}}"
+             target="_blank" class="text-xs text-blue-600 hover:underline font-mono">{{.ID}}</a>
+          {{else}}
           <span class="text-xs text-gray-400 font-mono">{{.ID}}</span>
-          {{range .Queries}}
-          <span class="inline-flex px-1.5 py-0 rounded text-xs bg-indigo-50 text-indigo-600 border border-indigo-100 truncate max-w-[18rem]" title="{{.}}">{{.}}</span>
           {{end}}
+          {{if .SupersededAt}}
+          <span class="text-xs text-orange-600">Superseded {{derefTimeStr .SupersededAt}}</span>
+          {{end}}
+          {{if .SupersededBy}}
+            {{if .ThreadID}}
+            <a href="/admin/threads/{{derefString .ThreadID}}#fact-{{derefString .SupersededBy}}"
+               target="_blank" class="text-xs text-blue-600 hover:underline">&rarr; successor</a>
+            {{else}}
+            <span class="text-xs text-gray-400">&rarr; {{derefString .SupersededBy}}</span>
+            {{end}}
+          {{end}}
+          <button onclick="openSourceModal('{{.SourceID}}')"
+                  class="text-xs text-blue-600 hover:underline">View source</button>
         </span>
       </span>
     </li>
@@ -1705,6 +1768,8 @@ function filterDecomposeFacts(input) {
 				return "bg-amber-100 text-amber-700"
 			}
 		},
+		"derefString":  func(s *string) string { return *s },
+		"derefTimeStr": func(t *time.Time) string { return t.Format("2006-01-02") },
 	}).Parse(tmplStr))
 	_ = t.ExecuteTemplate(w, "decompose-facts", result)
 }

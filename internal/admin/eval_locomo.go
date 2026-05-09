@@ -316,9 +316,13 @@ type locomoRecallReq struct {
 }
 
 type locomoFactResult struct {
-	ID   string `json:"id"`
-	Text string `json:"text"`
-	Kind string `json:"kind"`
+	ID           string  `json:"id"`
+	Text         string  `json:"text"`
+	Kind         string  `json:"kind"`
+	SourceID     string  `json:"source_id"`
+	ThreadID     *string `json:"thread_id"`
+	SupersededBy *string `json:"superseded_by"`
+	SupersededAt *string `json:"superseded_at"`
 }
 
 func jsonError(w http.ResponseWriter, msg string, status int) {
@@ -361,7 +365,20 @@ func (h *Handler) locomoRecall(w http.ResponseWriter, r *http.Request) {
 
 	out := make([]locomoFactResult, len(facts))
 	for i, f := range facts {
-		out[i] = locomoFactResult{ID: f.ID, Text: f.Text, Kind: string(f.Kind)}
+		var supersededAt *string
+		if f.SupersededAt != nil {
+			s := f.SupersededAt.Format("2006-01-02")
+			supersededAt = &s
+		}
+		out[i] = locomoFactResult{
+			ID:           f.ID,
+			Text:         f.Text,
+			Kind:         string(f.Kind),
+			SourceID:     f.SourceID,
+			ThreadID:     f.ThreadID,
+			SupersededBy: f.SupersededBy,
+			SupersededAt: supersededAt,
+		}
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{"facts": out})
