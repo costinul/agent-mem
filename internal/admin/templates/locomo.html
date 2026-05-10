@@ -1,7 +1,14 @@
 {{template "layout.html" .}}
 {{define "content"}}
 <div class="mb-6">
-    <h2 class="text-lg font-semibold text-gray-900">Locomo Explorer</h2>
+    <div class="flex items-center gap-2">
+        <h2 class="text-lg font-semibold text-gray-900">Locomo Explorer</h2>
+        {{if .LocomoSourceID}}
+        <span class="inline-flex items-center gap-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 text-xs font-mono">
+            source: {{.LocomoSourceID}}
+        </span>
+        {{end}}
+    </div>
     <p class="text-sm text-gray-500 mt-1">Search the LoCoMo-10 dataset by turn text or dia_id (e.g. D1:12 or D112), then recall facts from the live DB.</p>
 </div>
 
@@ -20,7 +27,7 @@
                     class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">— select account —</option>
                 {{range .Accounts}}
-                <option value="{{.ID}}">{{.Name}}</option>
+                <option value="{{.ID}}" {{if eq $.LocomoAccountID .ID}}selected{{end}}>{{.Name}}</option>
                 {{end}}
             </select>
         </div>
@@ -29,6 +36,7 @@
             <label class="block text-xs font-medium text-gray-600 mb-1">Agent</label>
             <div class="relative">
                 <input id="ctx-agent-search" type="text" placeholder="Search agents…"
+                       value="{{range .Agents}}{{if eq .ID $.LocomoAgentID}}{{.Name}} ({{.ID}}){{end}}{{end}}"
                        oninput="filterCombo('ctx-agent-select', this.value)"
                        onfocus="document.getElementById('ctx-agent-dropdown').classList.remove('hidden')"
                        class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -41,17 +49,25 @@
                             hx-trigger="change"
                             onchange="pickCombo('ctx-agent', 'ctx-agent-dropdown')"
                             class="w-full text-sm border-0 focus:outline-none [&>option]:px-3 [&>option]:py-2 [&>option]:cursor-pointer [&>option:hover]:bg-blue-50">
-                        <option value="">— select account first —</option>
+                        {{if .Agents}}
+                            <option value="">— select agent —</option>
+                            {{range .Agents}}
+                            <option value="{{.ID}}" {{if eq .ID $.LocomoAgentID}}selected{{end}}>{{.Name}} ({{.ID}})</option>
+                            {{end}}
+                        {{else}}
+                            <option value="">— select account first —</option>
+                        {{end}}
                     </select>
                 </div>
             </div>
-            <input id="ctx-agent-value" type="hidden">
+            <input id="ctx-agent-value" type="hidden" value="{{.LocomoAgentID}}">
         </div>
 
         <div>
             <label class="block text-xs font-medium text-gray-600 mb-1">Thread <span class="text-gray-400 font-normal">(optional)</span></label>
             <div class="relative">
                 <input id="ctx-thread-search" type="text" placeholder="Search threads…"
+                       value="{{range .Threads}}{{if eq .ID $.LocomoThreadID}}{{.ID}}{{end}}{{end}}"
                        oninput="filterCombo('ctx-thread-select', this.value)"
                        onfocus="document.getElementById('ctx-thread-dropdown').classList.remove('hidden')"
                        class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -60,11 +76,18 @@
                     <select id="ctx-thread-select" size="6"
                             onchange="pickCombo('ctx-thread', 'ctx-thread-dropdown')"
                             class="w-full text-sm border-0 focus:outline-none [&>option]:px-3 [&>option]:py-2 [&>option]:cursor-pointer [&>option:hover]:bg-blue-50">
-                        <option value="">— select agent first —</option>
+                        {{if .Threads}}
+                            <option value="">— no thread —</option>
+                            {{range .Threads}}
+                            <option value="{{.ID}}" {{if eq .ID $.LocomoThreadID}}selected{{end}}>{{.ID}} ({{.CreatedAt.Format "Jan 2 15:04"}})</option>
+                            {{end}}
+                        {{else}}
+                            <option value="">— select agent first —</option>
+                        {{end}}
                     </select>
                 </div>
             </div>
-            <input id="ctx-thread-value" type="hidden">
+            <input id="ctx-thread-value" type="hidden" value="{{.LocomoThreadID}}">
         </div>
     </div>
 </div>
@@ -72,7 +95,7 @@
 <!-- Search -->
 <div class="bg-white rounded-lg border border-gray-200 p-5 mb-6">
     <div class="flex gap-3">
-        <input id="search-input" type="text" placeholder="Search by question, turn text, or dia_id (e.g. D1:12, D112, &quot;When did Melanie paint&quot;)…"
+        <input id="search-input" type="text" value="{{.LocomoQuery}}" placeholder="Search by question, turn text, or dia_id (e.g. D1:12, D112, &quot;When did Melanie paint&quot;)…"
                class="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                onkeydown="if(event.key==='Enter') doSearch()">
         <button onclick="doSearch()"
@@ -93,6 +116,13 @@
 <div id="search-results" class="space-y-4"></div>
 
 <script>
+var initialLocomoContext = {
+    accountID: {{printf "%q" .LocomoAccountID}},
+    agentID: {{printf "%q" .LocomoAgentID}},
+    threadID: {{printf "%q" .LocomoThreadID}},
+    query: {{printf "%q" .LocomoQuery}}
+};
+
 // ─── Combobox helpers (same pattern as playground) ───────────────────────────
 function filterCombo(selectId, q) {
     q = q.toLowerCase();
@@ -303,6 +333,10 @@ function escHtml(s) {
 function escAttr(s) {
     if (!s) return '';
     return String(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+if (initialLocomoContext.query) {
+    doSearch();
 }
 </script>
 {{end}}

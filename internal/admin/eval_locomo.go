@@ -62,9 +62,10 @@ type locomoQARef struct {
 
 // LocomoStore lazy-loads and caches the parsed locomo dataset.
 type LocomoStore struct {
-	path    string
-	mu      sync.RWMutex
-	samples []locomoSample
+	path        string
+	mu          sync.RWMutex
+	samples     []locomoSample
+	diaByText   map[string]string // turn text → dia_id
 }
 
 func NewLocomoStore(path string) *LocomoStore {
@@ -95,8 +96,41 @@ func (s *LocomoStore) load() ([]locomoSample, error) {
 		return nil, fmt.Errorf("parse locomo dataset: %w", err)
 	}
 	s.samples = samples
+	s.diaByText = buildDiaByTextIndex(samples)
 	slog.Info("locomo dataset loaded", "samples", len(samples))
 	return samples, nil
+}
+
+func buildDiaByTextIndex(samples []locomoSample) map[string]string {
+	idx := make(map[string]string)
+	for i := range samples {
+		for si := range samples[i].Sessions {
+			for ti := range samples[i].Sessions[si].Turns {
+				t := &samples[i].Sessions[si].Turns[ti]
+				if t.DiaID == "" {
+					continue
+				}
+				key := strings.TrimSpace(t.Text)
+				if key == "" {
+					continue
+				}
+				if _, exists := idx[key]; !exists {
+					idx[key] = t.DiaID
+				}
+			}
+		}
+	}
+	return idx
+}
+
+// LookupDiaID returns the dia_id of a locomo turn whose text matches the given content.
+func (s *LocomoStore) LookupDiaID(content string) string {
+	if _, err := s.load(); err != nil {
+		return ""
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.diaByText[strings.TrimSpace(content)]
 }
 
 // ─── Parser ───────────────────────────────────────────────────────────────────
@@ -290,6 +324,24 @@ func (h *Handler) locomoPage(w http.ResponseWriter, r *http.Request) {
 	accounts, _ := h.accountRepo.ListAllAccounts(r.Context())
 	data := h.page(r, "Locomo Explorer", "locomo")
 	data.Accounts = accounts
+	data.LocomoQuery = strings.TrimSpace(r.URL.Query().Get("q"))
+	data.LocomoSourceID = strings.TrimSpace(r.URL.Query().Get("source_id"))
+	data.LocomoAccountID = strings.TrimSpace(r.URL.Query().Get("account_id"))
+	data.LocomoAgentID = strings.TrimSpace(r.URL.Query().Get("agent_id"))
+	data.LocomoThreadID = strings.TrimSpace(r.URL.Query().Get("thread_id"))
+
+	if data.LocomoAccountID != "" {
+		if agents, err := h.agentRepo.ListAllAgents(r.Context(), data.LocomoAccountID); err == nil {
+			data.Agents = agents
+		}
+	}
+	if data.LocomoAgentID != "" {
+		agentIDPtr := data.LocomoAgentID
+		if threads, err := h.agentRepo.ListAllThreads(r.Context(), "", &agentIDPtr); err == nil {
+			data.Threads = threads
+		}
+	}
+
 	h.render(w, "locomo.html", data)
 }
 

@@ -92,12 +92,46 @@
 </dialog>
 
 <script>
+var pageSourceContext = {
+    account_id: {{if .Thread}}{{printf "%q" .Thread.AccountID}}{{else}}""{{end}},
+    agent_id: {{if .Thread}}{{printf "%q" .Thread.AgentID}}{{else}}""{{end}},
+    thread_id: {{if .Thread}}{{printf "%q" .Thread.ID}}{{else}}""{{end}}
+};
+
+function valueFromElements(ids) {
+    for (var i = 0; i < ids.length; i++) {
+        var el = document.getElementById(ids[i]);
+        if (el && el.value) return el.value;
+    }
+    return '';
+}
+
+function collectSourceContext() {
+    var ctx = {};
+    var accountID = valueFromElements(['ctx-account']);
+    var agentID = valueFromElements(['ctx-agent-value', 'ctx-agent-select']);
+    var threadID = valueFromElements(['ctx-thread-value', 'ctx-thread-select']);
+
+    if (accountID || pageSourceContext.account_id) ctx.account_id = accountID || pageSourceContext.account_id;
+    if (agentID || pageSourceContext.agent_id) ctx.agent_id = agentID || pageSourceContext.agent_id;
+    if (threadID || pageSourceContext.thread_id) ctx.thread_id = threadID || pageSourceContext.thread_id;
+
+    return ctx;
+}
+
 function openSourceModal(sourceId) {
     var modal = document.getElementById('source-modal');
     var content = document.getElementById('source-modal-content');
+    var ctx = collectSourceContext();
+    var q = new URLSearchParams();
+    if (ctx.account_id) q.set('account_id', ctx.account_id);
+    if (ctx.agent_id) q.set('agent_id', ctx.agent_id);
+    if (ctx.thread_id) q.set('thread_id', ctx.thread_id);
+    var qs = q.toString();
+    var url = '/admin/sources/' + encodeURIComponent(sourceId) + (qs ? '?' + qs : '');
     content.innerHTML = '<p class="text-xs text-gray-400">Loading\u2026</p>';
     modal.showModal();
-    fetch('/admin/sources/' + encodeURIComponent(sourceId))
+    fetch(url)
         .then(function(r) { return r.text(); })
         .then(function(html) { content.innerHTML = html; })
         .catch(function(e) { content.innerHTML = '<p class="text-xs text-red-600">Error: ' + e.message + '</p>'; });

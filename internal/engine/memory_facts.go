@@ -142,6 +142,7 @@ func (e *MemoryEngine) mapFactForOutput(ctx context.Context, fact models.Fact, i
 		ID:         fact.ID,
 		Text:       withProvenanceSuffix(fact),
 		Kind:       fact.Kind,
+		SourceID:   fact.SourceID,
 		Historical: fact.SupersededAt != nil,
 	}
 	if source != nil {

@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -138,6 +139,13 @@ type pageData struct {
 
 	// playground
 	PlaygroundResult *PlaygroundResult
+
+	// locomo
+	LocomoQuery     string
+	LocomoSourceID  string
+	LocomoAccountID string
+	LocomoAgentID   string
+	LocomoThreadID  string
 }
 
 type newAPIKeyResult struct {
@@ -867,8 +875,42 @@ func (h *Handler) sourcePreview(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+
+	accountID := strings.TrimSpace(r.URL.Query().Get("account_id"))
+	agentID := strings.TrimSpace(r.URL.Query().Get("agent_id"))
+	threadID := strings.TrimSpace(r.URL.Query().Get("thread_id"))
+
+	locomoParams := url.Values{}
+	locomoParams.Set("source_id", source.ID)
+	if source.Content != nil && strings.TrimSpace(*source.Content) != "" {
+		locomoParams.Set("q", strings.TrimSpace(*source.Content))
+	}
+	if accountID != "" {
+		locomoParams.Set("account_id", accountID)
+	}
+	if agentID != "" {
+		locomoParams.Set("agent_id", agentID)
+	}
+	if threadID != "" {
+		locomoParams.Set("thread_id", threadID)
+	}
+	locomoURL := "/admin/locomo?" + locomoParams.Encode()
+
+	var diaID string
+	if source.Content != nil {
+		diaID = h.locomoStore.LookupDiaID(*source.Content)
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	tmplStr := `<div class="space-y-3">
+  <div class="flex items-center gap-3">
+    <a href="{{.LocomoURL}}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline">
+      Open in Locomo
+    </a>
+    {{if .DiaID}}
+    <span class="inline-flex items-center px-2 py-0.5 rounded font-mono text-xs font-medium bg-blue-50 text-blue-700">{{.DiaID}}</span>
+    {{end}}
+  </div>
   <div>
     <p class="text-xs font-medium text-gray-500 mb-0.5">ID</p>
     <p class="font-mono text-xs text-gray-800 select-all break-all">{{.ID}}</p>
@@ -894,7 +936,15 @@ func (h *Handler) sourcePreview(w http.ResponseWriter, r *http.Request) {
 			return *s
 		},
 	}).Parse(tmplStr))
-	_ = t.Execute(w, source)
+	_ = t.Execute(w, struct {
+		*models.Source
+		LocomoURL string
+		DiaID     string
+	}{
+		Source:    source,
+		LocomoURL: locomoURL,
+		DiaID:     diaID,
+	})
 }
 
 func (h *Handler) listUsers(w http.ResponseWriter, r *http.Request) {
@@ -1258,6 +1308,32 @@ func (h *Handler) playgroundRecall(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) renderPlaygroundResult(w http.ResponseWriter, result *PlaygroundResult) {
+	sourceDiaByID := make(map[string]string)
+	resolveDia := func(sourceID string) {
+		if sourceID == "" {
+			return
+		}
+		if _, seen := sourceDiaByID[sourceID]; seen {
+			return
+		}
+		sourceDiaByID[sourceID] = ""
+		src, err := h.memoryRepo.GetSourceByID(context.Background(), sourceID)
+		if err != nil || src == nil || src.Content == nil {
+			return
+		}
+		if diaID := h.locomoStore.LookupDiaID(*src.Content); diaID != "" {
+			sourceDiaByID[sourceID] = diaID
+		}
+	}
+	for _, f := range result.Facts {
+		resolveDia(f.SourceID)
+	}
+	if result.Debug != nil {
+		for _, c := range result.Debug.Candidates {
+			resolveDia(c.SourceID)
+		}
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	tmplStr := `{{define "result"}}
 <div id="playground-result" class="mt-6">
@@ -1325,7 +1401,11 @@ func (h *Handler) renderPlaygroundResult(w http.ResponseWriter, result *Playgrou
             {{end}}
             <p class="text-sm text-gray-900 flex-1">{{.Text}}</p>
           </div>
-          <p class="mt-1 text-xs font-mono text-gray-400 pl-0">{{.ID}}</p>
+          <div class="mt-1 flex items-center gap-3 text-xs">
+            <span class="font-mono text-gray-400">{{.ID}}</span>
+            {{if .SourceID}}<button onclick="openSourceModal('{{.SourceID}}')" class="text-blue-600 hover:underline">View source</button>{{end}}
+            {{if .SourceID}}{{with sourceDia .SourceID}}<span class="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] bg-blue-50 text-blue-700">{{.}}</span>{{end}}{{end}}
+          </div>
           {{if .OriginalSource}}
           <p class="mt-1 text-xs text-gray-500 italic pl-0">Source: {{.OriginalSource}}</p>
           {{end}}
@@ -1373,6 +1453,8 @@ func (h *Handler) renderPlaygroundResult(w http.ResponseWriter, result *Playgrou
             <span>{{.ID}}</span>
             {{if .EventDate}}<span class="text-gray-300">·</span><span>{{.EventDate}}</span>{{end}}
             <span class="text-gray-300">·</span><span class="{{if ge .Score 0.7}}text-green-600{{else if ge .Score 0.5}}text-amber-600{{else}}text-gray-400{{end}}">{{printf "%.4f" .Score}}</span>
+            {{if .SourceID}}<span class="text-gray-300">·</span><button onclick="openSourceModal('{{.SourceID}}')" class="text-blue-600 hover:underline">View source</button>{{end}}
+            {{if .SourceID}}{{with sourceDia .SourceID}}<span class="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[10px] bg-blue-50 text-blue-700">{{.}}</span>{{end}}{{end}}
           </div>
         </li>
         {{end}}
@@ -1429,7 +1511,9 @@ func (h *Handler) renderPlaygroundResult(w http.ResponseWriter, result *Playgrou
 <input id="ctx-thread-value" type="hidden" value="{{.NewThreadID}}" hx-swap-oob="true">
 {{end}}
 {{end}}`
-	t := template.Must(template.New("result").Parse(tmplStr))
+	t := template.Must(template.New("result").Funcs(template.FuncMap{
+		"sourceDia": func(sourceID string) string { return sourceDiaByID[sourceID] },
+	}).Parse(tmplStr))
 	_ = t.ExecuteTemplate(w, "result", result)
 }
 

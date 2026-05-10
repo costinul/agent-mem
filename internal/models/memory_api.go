@@ -121,6 +121,7 @@ type ReturnedFact struct {
 	ID             string     `json:"id"`
 	Text           string     `json:"text"`
 	Kind           FactKind   `json:"kind"`
+	SourceID       string     `json:"source_id,omitempty"`
 	SourceKind     SourceKind `json:"source_kind"`
 	OriginalSource *string    `json:"original_source"` // Populated only if IncludeSources is true.
 	// Historical is true when the fact was already superseded as of the recall event_date
