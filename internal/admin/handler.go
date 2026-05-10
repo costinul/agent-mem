@@ -176,7 +176,7 @@ func (h *Handler) dashboard(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	http.Redirect(w, r, "/admin/accounts", http.StatusTemporaryRedirect)
+	http.Redirect(w, r, "/admin/threads", http.StatusTemporaryRedirect)
 }
 
 func (h *Handler) listAccounts(w http.ResponseWriter, r *http.Request) {

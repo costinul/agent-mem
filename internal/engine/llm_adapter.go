@@ -39,40 +39,34 @@ type EvaluateRequest struct {
 	RetrievedFacts []models.Fact
 }
 
-// SelectFactsRequest is the input for the fact selection step.
+// SelectFactsRequest is the input for the fact selection step. The same shape is
+// reused for both rounds of two-step recall: round 1 leaves AlreadySelected nil,
+// round 2 fills it with the round-1 fact texts so the selector knows what's
+// already committed and only picks complementary facts from the new candidates.
 type SelectFactsRequest struct {
 	Query      string
 	EventDate  string   // ISO "YYYY-MM-DD" when the question is asked; used by the LLM to resolve relative-time phrases.
 	Phrases    []string // decomposed search angles produced by the recall planner; empty when decomposition was skipped (e.g. RecallLight).
 	Candidates []models.Fact
+	// AlreadySelected is non-nil only on round-2 calls. It carries the TEXTS of
+	// the facts the previous selector pass already picked so the model can avoid
+	// re-recommending them and focus on candidates that complement the current set.
+	AlreadySelected []string
 }
 
 // SelectFactsResult carries the selector's choice plus an optional gap signal.
 //
 // NeedMore=true means the selector judged its candidates insufficient to write a
 // complete answer; Missing is a short noun phrase (1-5 words) describing what
-// kind of fact would close the gap (e.g. "the book title", "an exact date",
-// "Bob's location"). The two-step recall loop uses this to decide whether to
-// run a second selector pass over additional candidates.
+// kind of fact would close the gap. The two-step recall loop uses this to decide
+// whether to run a second selector pass over additional candidates. On round-2
+// calls the loop currently only LOGS NeedMore (it does not trigger a round 3) —
+// the signal is collected so we can decide later whether a third pass is worth
+// the cost.
 type SelectFactsResult struct {
 	Facts    []models.Fact
 	NeedMore bool
 	Missing  string
-}
-
-// SelectFactsGapRequest is the input for the round-2 gap-filling selector.
-type SelectFactsGapRequest struct {
-	Query     string
-	EventDate string
-	Phrases   []string
-	// AlreadySelected holds the texts of facts the round-1 selector already picked.
-	// They are NOT re-evaluated; the round-2 selector only sees them so it knows
-	// what's already in and avoids re-recommending them.
-	AlreadySelected []string
-	// Missing is the short noun phrase the round-1 selector named as the gap.
-	Missing string
-	// Candidates are the round-2 candidate facts (not seen by round 1).
-	Candidates []models.Fact
 }
 
 // LLMModels holds per-operation model IDs for the LLM adapter.
@@ -323,19 +317,35 @@ func (a *LLMAdapter) Evaluate(ctx context.Context, req EvaluateRequest) (models.
 	}, nil
 }
 
-// SelectFacts uses the LLM to filter and rank candidate facts by relevance to the
-// query. The returned SelectFactsResult also carries the model's NeedMore signal,
-// which the two-step recall loop consults before deciding whether to run a
-// gap-filling second pass. Returned facts preserve the order produced by the model.
+// SelectFacts runs the strong selector model on the given candidates and returns
+// its picks plus the NeedMore signal. Used as round 1 of two-step recall and as
+// the only call in single-step recall.
 func (a *LLMAdapter) SelectFacts(ctx context.Context, req SelectFactsRequest) (SelectFactsResult, error) {
+	return a.selectFactsCore(ctx, "select_facts", a.models.SelectFacts, req)
+}
+
+// SelectFactsGap runs the round-2 selector pass on a fresh batch of candidates
+// using the cheap light model. It uses the SAME prompt as SelectFacts; the only
+// differences are the model and that req.AlreadySelected is populated so the
+// model treats the round-1 picks as committed and only picks complementary
+// facts. The returned NeedMore is currently only logged by the caller — it is
+// collected so we can later judge whether a round 3 is worth implementing.
+func (a *LLMAdapter) SelectFactsGap(ctx context.Context, req SelectFactsRequest) (SelectFactsResult, error) {
+	return a.selectFactsCore(ctx, "select_facts_gap", a.models.SelectFactsLight, req)
+}
+
+// selectFactsCore is the shared implementation behind every selector call. The op
+// label is used only for tracking/observability — the prompt itself is always
+// "select_facts", so round 1 and round 2 share rules and examples and can never
+// silently diverge.
+func (a *LLMAdapter) selectFactsCore(ctx context.Context, op, modelID string, req SelectFactsRequest) (SelectFactsResult, error) {
 	if len(req.Candidates) == 0 {
 		return SelectFactsResult{}, nil
 	}
-	defer observeLLM(ctx, "select_facts", time.Now())
+	defer observeLLM(ctx, op, time.Now())
 	refID, done := a.bind(ctx)
 	defer done()
 
-	// Build a template-friendly representation so the prompt can access pre-formatted dates.
 	type candidateView struct {
 		ID           string
 		Kind         models.FactKind
@@ -345,94 +355,16 @@ func (a *LLMAdapter) SelectFacts(ctx context.Context, req SelectFactsRequest) (S
 		SupersededBy string
 	}
 	type templateData struct {
-		Query      string
-		EventDate  string // ISO "YYYY-MM-DD" when the question is asked; "" when unset
-		Phrases    []string
-		Candidates []candidateView
-	}
-	td := templateData{Query: req.Query, EventDate: req.EventDate, Phrases: req.Phrases}
-	for _, f := range req.Candidates {
-		cv := candidateView{ID: f.ID, Kind: f.Kind, Text: f.Text}
-		if f.EventDate != nil {
-			cv.EventDate = f.EventDate.Format("2006-01-02")
-		}
-		if f.ReferencedAt != nil {
-			cv.ReferencedAt = f.ReferencedAt.Format("2006-01-02")
-		}
-		if f.SupersededBy != nil {
-			cv.SupersededBy = *f.SupersededBy
-		}
-		td.Candidates = append(td.Candidates, cv)
-	}
-
-	out := &selectFactsOutput{}
-	err := a.client.ExecuteAs(ctx, refID, "select_facts", a.models.SelectFacts, &bwai.PromptData{
-		Data: td,
-	}, out)
-	if err != nil {
-		return SelectFactsResult{}, fmt.Errorf("select facts: %w", err)
-	}
-
-	byID := make(map[string]models.Fact, len(req.Candidates))
-	for _, f := range req.Candidates {
-		byID[f.ID] = f
-	}
-
-	selected := make([]models.Fact, 0, len(out.FactIDs))
-	seen := make(map[string]struct{}, len(out.FactIDs))
-	for _, id := range out.FactIDs {
-		if _, dup := seen[id]; dup {
-			continue
-		}
-		if f, ok := byID[id]; ok {
-			selected = append(selected, f)
-			seen[id] = struct{}{}
-		}
-	}
-	return SelectFactsResult{
-		Facts:    selected,
-		NeedMore: out.NeedMore,
-		Missing:  strings.TrimSpace(out.Missing),
-	}, nil
-}
-
-// SelectFactsGap runs the round-2 gap-filling selector against a fresh batch of
-// candidate facts using the cheap light model. It is called only when the round-1
-// strong selector returned NeedMore=true; the Missing hint and the texts of the
-// already-selected facts are passed in so the model can focus on filling the gap
-// without re-recommending what's already in.
-//
-// Returned facts are the ADDITIONAL picks to merge with round 1 — callers must
-// concatenate (deduping by ID) themselves.
-func (a *LLMAdapter) SelectFactsGap(ctx context.Context, req SelectFactsGapRequest) ([]models.Fact, error) {
-	if len(req.Candidates) == 0 {
-		return nil, nil
-	}
-	defer observeLLM(ctx, "select_facts_gap", time.Now())
-	refID, done := a.bind(ctx)
-	defer done()
-
-	type candidateView struct {
-		ID           string
-		Kind         models.FactKind
-		Text         string
-		EventDate    string
-		ReferencedAt string
-		SupersededBy string
-	}
-	type templateData struct {
 		Query           string
-		EventDate       string
+		EventDate       string // ISO "YYYY-MM-DD" when the question is asked; "" when unset
 		Phrases         []string
-		Missing         string
-		AlreadySelected []string
+		AlreadySelected []string // empty/nil for round-1 calls
 		Candidates      []candidateView
 	}
 	td := templateData{
 		Query:           req.Query,
 		EventDate:       req.EventDate,
 		Phrases:         req.Phrases,
-		Missing:         req.Missing,
 		AlreadySelected: req.AlreadySelected,
 	}
 	for _, f := range req.Candidates {
@@ -449,12 +381,9 @@ func (a *LLMAdapter) SelectFactsGap(ctx context.Context, req SelectFactsGapReque
 		td.Candidates = append(td.Candidates, cv)
 	}
 
-	out := &selectFactsGapOutput{}
-	err := a.client.ExecuteAs(ctx, refID, "select_facts_gap", a.models.SelectFactsLight, &bwai.PromptData{
-		Data: td,
-	}, out)
-	if err != nil {
-		return nil, fmt.Errorf("select facts gap: %w", err)
+	out := &selectFactsOutput{}
+	if err := a.client.ExecuteAs(ctx, refID, "select_facts", modelID, &bwai.PromptData{Data: td}, out); err != nil {
+		return SelectFactsResult{}, fmt.Errorf("%s: %w", op, err)
 	}
 
 	byID := make(map[string]models.Fact, len(req.Candidates))
@@ -472,7 +401,11 @@ func (a *LLMAdapter) SelectFactsGap(ctx context.Context, req SelectFactsGapReque
 			seen[id] = struct{}{}
 		}
 	}
-	return selected, nil
+	return SelectFactsResult{
+		Facts:    selected,
+		NeedMore: out.NeedMore,
+		Missing:  strings.TrimSpace(out.Missing),
+	}, nil
 }
 
 // SelectFactsLight runs the same select_facts prompt on the cheaper light model.
@@ -728,20 +661,3 @@ func (o *selectFactsOutput) Unmarshal(data []byte) error {
 	return json.Unmarshal(data, o)
 }
 
-// selectFactsGapOutput is the round-2 selector output: just the additional facts
-// to merge with round-1's selection.
-type selectFactsGapOutput struct {
-	FactIDs []string `json:"fact_ids"`
-}
-
-func (o *selectFactsGapOutput) SchemaDescription() string {
-	return "IDs of the candidate facts that fill the named missing piece, ordered most-relevant first."
-}
-
-func (o *selectFactsGapOutput) Validate() error {
-	return nil
-}
-
-func (o *selectFactsGapOutput) Unmarshal(data []byte) error {
-	return json.Unmarshal(data, o)
-}

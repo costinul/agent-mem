@@ -489,7 +489,7 @@ func (e *MemoryEngine) runSelector(ctx context.Context, query, eventDateStr stri
 	}
 	log.Printf("recall round1 selected=%d need_more=%t missing=%q", len(res.Facts), res.NeedMore, res.Missing)
 
-	if !res.NeedMore || res.Missing == "" || firstK >= len(candidates) {
+	if !res.NeedMore || firstK >= len(candidates) {
 		return res.Facts, nil
 	}
 
@@ -507,28 +507,30 @@ func (e *MemoryEngine) runSelector(ctx context.Context, query, eventDateStr stri
 		alreadyTexts[i] = f.Text
 	}
 
-	gap, err := e.ai.SelectFactsGap(ctx, SelectFactsGapRequest{
+	gap, err := e.ai.SelectFactsGap(ctx, SelectFactsRequest{
 		Query:           query,
 		EventDate:       eventDateStr,
 		Phrases:         phrases,
-		AlreadySelected: alreadyTexts,
-		Missing:         res.Missing,
 		Candidates:      secondBatch,
+		AlreadySelected: alreadyTexts,
 	})
 	if err != nil {
 		// Round-2 failure is non-fatal: better to return round-1 picks than nothing.
 		log.Printf("recall round2 gap-fill failed: %v (returning round-1 selection)", err)
 		return res.Facts, nil
 	}
-	log.Printf("recall round2 gap-fill added=%d", len(gap))
+	// Round-2 NeedMore is observability only — we do NOT recurse into round 3
+	// today. Logging it lets us measure how often a third pass would have been
+	// requested before deciding whether the cost is worth building.
+	log.Printf("recall round2 gap-fill added=%d need_more=%t missing=%q", len(gap.Facts), gap.NeedMore, gap.Missing)
 
-	merged := make([]models.Fact, 0, len(res.Facts)+len(gap))
-	seen := make(map[string]struct{}, len(res.Facts)+len(gap))
+	merged := make([]models.Fact, 0, len(res.Facts)+len(gap.Facts))
+	seen := make(map[string]struct{}, len(res.Facts)+len(gap.Facts))
 	for _, f := range res.Facts {
 		merged = append(merged, f)
 		seen[f.ID] = struct{}{}
 	}
-	for _, f := range gap {
+	for _, f := range gap.Facts {
 		if _, dup := seen[f.ID]; dup {
 			continue
 		}

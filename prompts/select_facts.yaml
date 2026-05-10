@@ -26,6 +26,10 @@ system_prompt: |
 
   Do NOT set need_more=true for vague reasons like "more context would help". The missing piece must be a specific noun phrase.
 
+  ## Already-selected facts (round-2 only)
+
+  When the prompt body lists "Already selected (committed picks from a previous pass over earlier candidates)", treat those facts as already in the answer set: do NOT re-pick them, and do NOT pick a candidate that conceptually duplicates them. Pick only from the NEW candidate list, focusing on facts that complement what's already in. The need_more output still applies — set it if even after your additions the selection is insufficient.
+
   ## Common failure modes (each loses points)
 
   - Returning facts that only describe the trigger event when the question asks about its consequence, realization, lesson, outcome, or change. The realization itself is the answer; the trigger event is context the user already supplied.
@@ -78,6 +82,13 @@ prompt: |
 
   Search angles considered (the rephrasings the retriever used to find the candidates below — they reveal intent and the alternative wordings the answer fact may use):
   {{- range .Phrases}}
+  - {{.}}
+  {{- end}}
+  {{- end}}
+  {{- if .AlreadySelected}}
+
+  Already selected (committed picks from a previous pass over earlier candidates — do NOT re-pick or duplicate these; pick only from the candidates below to complement them):
+  {{- range .AlreadySelected}}
   - {{.}}
   {{- end}}
   {{- end}}
