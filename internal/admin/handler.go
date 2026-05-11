@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"log/slog"
@@ -82,6 +83,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, adminMw func(http.Handler) 
 	protected.HandleFunc("DELETE /admin/agents/{id}", h.deleteAgent)
 	protected.HandleFunc("GET /admin/threads", h.listThreads)
 	protected.HandleFunc("GET /admin/threads/{id}", h.threadDetail)
+	protected.HandleFunc("GET /admin/threads/{id}/download", h.downloadThreadJSON)
 	protected.HandleFunc("DELETE /admin/threads/{id}", h.deleteThread)
 	protected.HandleFunc("POST /admin/threads/{id}/similarity", h.threadSimilarity)
 	protected.HandleFunc("GET /admin/sources/{id}", h.sourcePreview)
@@ -566,6 +568,82 @@ func (h *Handler) deleteThread(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/admin/threads", http.StatusSeeOther)
+}
+
+type threadSourceDownload struct {
+	Kind    models.SourceKind        `json:"kind"`
+	Content string                   `json:"content"`
+	Author  *string                  `json:"author"`
+	Facts   []threadSourceFactRecord `json:"facts"`
+}
+
+type threadSourceFactRecord struct {
+	Kind        models.FactKind `json:"kind"`
+	Text        string          `json:"text"`
+	SuppresedBy *string         `json:"suppresed_by"`
+}
+
+type threadDownloadPayload struct {
+	ThreadID string                 `json:"thread_id"`
+	Sources  []threadSourceDownload `json:"sources"`
+}
+
+func (h *Handler) downloadThreadJSON(w http.ResponseWriter, r *http.Request) {
+	threadID := r.PathValue("id")
+
+	evRows, err := h.loadEventRows(r.Context(), threadID)
+	if err != nil {
+		slog.Error("download thread json: load events", "thread_id", threadID, "error", err)
+		http.Error(w, "failed to load events", http.StatusInternalServerError)
+		return
+	}
+
+	facts, err := h.memoryRepo.ListFactsByThreadID(r.Context(), threadID)
+	if err != nil {
+		slog.Error("download thread json: list facts", "thread_id", threadID, "error", err)
+		http.Error(w, "failed to load facts", http.StatusInternalServerError)
+		return
+	}
+
+	factsBySourceID := make(map[string][]threadSourceFactRecord)
+	for _, f := range facts {
+		factsBySourceID[f.SourceID] = append(factsBySourceID[f.SourceID], threadSourceFactRecord{
+			Kind:        f.Kind,
+			Text:        f.Text,
+			SuppresedBy: f.SupersededBy,
+		})
+	}
+
+	sources := make([]threadSourceDownload, 0)
+	for _, row := range evRows {
+		for _, src := range row.Sources {
+			content := ""
+			if src.Content != nil {
+				content = *src.Content
+			}
+			sources = append(sources, threadSourceDownload{
+				Kind:    src.Kind,
+				Content: content,
+				Author:  src.Author,
+				Facts:   factsBySourceID[src.ID],
+			})
+		}
+	}
+
+	payload := threadDownloadPayload{
+		ThreadID: threadID,
+		Sources:  sources,
+	}
+	filename := fmt.Sprintf("thread_%s.json", threadID)
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(payload); err != nil {
+		slog.Error("download thread json: encode", "thread_id", threadID, "error", err)
+		http.Error(w, "failed to render json", http.StatusInternalServerError)
+		return
+	}
 }
 
 type factRow struct {
@@ -1171,13 +1249,13 @@ func (h *Handler) playgroundContextual(w http.ResponseWriter, r *http.Request) {
 	threadID, newThreadID, err := h.resolveThreadID(r.Context(), strings.TrimSpace(r.FormValue("thread_id")), accountID, agentID)
 	if err != nil {
 		slog.Error("playground create thread", "error", err)
-		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Add", Error: fmt.Sprintf("failed to create thread: %v", err)})
+		h.renderPlaygroundResult(r.Context(), w, &PlaygroundResult{Op: "Add", Error: fmt.Sprintf("failed to create thread: %v", err)})
 		return
 	}
 	inputs := parseInputItems(r)
 
 	if accountID == "" || agentID == "" || len(inputs) == 0 {
-		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Add", Error: "account, agent, and at least one input are required"})
+		h.renderPlaygroundResult(r.Context(), w, &PlaygroundResult{Op: "Add", Error: "account, agent, and at least one input are required"})
 		return
 	}
 
@@ -1190,12 +1268,12 @@ func (h *Handler) playgroundContextual(w http.ResponseWriter, r *http.Request) {
 	out, err := h.engine.Add(r.Context(), input)
 	if err != nil {
 		slog.Error("playground add", "error", err)
-		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Add", Error: fmt.Sprintf("engine error: %v", err)})
+		h.renderPlaygroundResult(r.Context(), w, &PlaygroundResult{Op: "Add", Error: fmt.Sprintf("engine error: %v", err)})
 		return
 	}
 	d := out.Duration
 	slog.Info("playground add duration", "db_ms", d.DBMs, "db_calls", d.DBCalls, "llm_ms", d.LLMMs, "llm_calls", d.LLMCalls, "embed_ms", d.EmbedMs, "embed_calls", d.EmbedCalls)
-	h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Add", NewThreadID: newThreadID})
+	h.renderPlaygroundResult(r.Context(), w, &PlaygroundResult{Op: "Add", NewThreadID: newThreadID})
 }
 
 func (h *Handler) playgroundRecallLight(w http.ResponseWriter, r *http.Request) {
@@ -1207,7 +1285,7 @@ func (h *Handler) playgroundRecallLight(w http.ResponseWriter, r *http.Request) 
 	includeSources := r.FormValue("include_sources") == "on"
 
 	if accountID == "" || agentID == "" || query == "" {
-		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "RecallLight", Error: "account, agent, and query are required"})
+		h.renderPlaygroundResult(r.Context(), w, &PlaygroundResult{Op: "RecallLight", Error: "account, agent, and query are required"})
 		return
 	}
 
@@ -1230,12 +1308,12 @@ func (h *Handler) playgroundRecallLight(w http.ResponseWriter, r *http.Request) 
 	out, err := h.engine.RecallLight(r.Context(), input)
 	if err != nil {
 		slog.Error("playground recall-light", "error", err)
-		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "RecallLight", Error: fmt.Sprintf("engine error: %v", err)})
+		h.renderPlaygroundResult(r.Context(), w, &PlaygroundResult{Op: "RecallLight", Error: fmt.Sprintf("engine error: %v", err)})
 		return
 	}
 	d := out.Duration
 	slog.Info("playground recall-light duration", "db_ms", d.DBMs, "db_calls", d.DBCalls, "llm_ms", d.LLMMs, "llm_calls", d.LLMCalls, "embed_ms", d.EmbedMs, "embed_calls", d.EmbedCalls)
-	h.renderPlaygroundResult(w, &PlaygroundResult{Op: "RecallLight", Facts: out.Facts, Debug: out.Debug})
+	h.renderPlaygroundResult(r.Context(), w, &PlaygroundResult{Op: "RecallLight", Facts: out.Facts, Debug: out.Debug})
 }
 
 func (h *Handler) playgroundRecall(w http.ResponseWriter, r *http.Request) {
@@ -1249,13 +1327,13 @@ func (h *Handler) playgroundRecall(w http.ResponseWriter, r *http.Request) {
 	includeSources := r.FormValue("include_sources") == "on"
 
 	if accountID == "" || agentID == "" || query == "" {
-		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Recall", Error: "account, agent, and query are required"})
+		h.renderPlaygroundResult(r.Context(), w, &PlaygroundResult{Op: "Recall", Error: "account, agent, and query are required"})
 		return
 	}
 
 	method, err := parsePlaygroundRecallMethod(methodRaw)
 	if err != nil {
-		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Recall", Error: err.Error()})
+		h.renderPlaygroundResult(r.Context(), w, &PlaygroundResult{Op: "Recall", Error: err.Error()})
 		return
 	}
 
@@ -1270,7 +1348,7 @@ func (h *Handler) playgroundRecall(w http.ResponseWriter, r *http.Request) {
 	if eventDateRaw != "" {
 		parsed, err := time.Parse("2006-01-02", eventDateRaw)
 		if err != nil {
-			h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Recall", Error: "event_date must be in YYYY-MM-DD format"})
+			h.renderPlaygroundResult(r.Context(), w, &PlaygroundResult{Op: "Recall", Error: "event_date must be in YYYY-MM-DD format"})
 			return
 		}
 		utc := parsed.UTC()
@@ -1299,15 +1377,15 @@ func (h *Handler) playgroundRecall(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		slog.Error("playground recall", "error", err)
-		h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Recall", Error: fmt.Sprintf("engine error: %v", err)})
+		h.renderPlaygroundResult(r.Context(), w, &PlaygroundResult{Op: "Recall", Error: fmt.Sprintf("engine error: %v", err)})
 		return
 	}
 	d := out.Duration
 	slog.Info("playground recall duration", "method", method, "db_ms", d.DBMs, "db_calls", d.DBCalls, "llm_ms", d.LLMMs, "llm_calls", d.LLMCalls, "embed_ms", d.EmbedMs, "embed_calls", d.EmbedCalls)
-	h.renderPlaygroundResult(w, &PlaygroundResult{Op: "Recall", Facts: out.Facts, Debug: out.Debug})
+	h.renderPlaygroundResult(r.Context(), w, &PlaygroundResult{Op: "Recall", Facts: out.Facts, Debug: out.Debug})
 }
 
-func (h *Handler) renderPlaygroundResult(w http.ResponseWriter, result *PlaygroundResult) {
+func (h *Handler) renderPlaygroundResult(ctx context.Context, w http.ResponseWriter, result *PlaygroundResult) {
 	sourceDiaByID := make(map[string]string)
 	resolveDia := func(sourceID string) {
 		if sourceID == "" {
@@ -1317,7 +1395,7 @@ func (h *Handler) renderPlaygroundResult(w http.ResponseWriter, result *Playgrou
 			return
 		}
 		sourceDiaByID[sourceID] = ""
-		src, err := h.memoryRepo.GetSourceByID(context.Background(), sourceID)
+		src, err := h.memoryRepo.GetSourceByID(ctx, sourceID)
 		if err != nil || src == nil || src.Content == nil {
 			return
 		}

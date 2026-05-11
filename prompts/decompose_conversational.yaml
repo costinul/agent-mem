@@ -31,6 +31,11 @@ system_prompt: |
     Bad: "Alice and her kids made a nature-inspired painting." → Good: "Alice and her kids painted a mountain with snow and pine trees."
     Bad: "Alice and her kids made pots in pottery class." → Good: "Alice and her kids made a mug with a cat face on it in pottery class."
 
+  Event-shaped verbs — when a fact describes an action the author took (joining a group or program, attending an event, giving a talk, helping organize something, taking a course, volunteering), start the fact with the verb a question would use: "attended", "participated in", "spoke at", "volunteered at", "joined", "organized", "helped at". Weaker stative phrasings ("X is a member of Y", "X did Y", "X's involvement with Y") make the fact harder to retrieve when someone later asks about the event.
+    Bad: "Alice has been a member of a running club since March 2023." → Good: "Alice joined a running club in March 2023."
+    Bad: "Bob did a presentation at TechConf in October 2023." → Good: "Bob spoke at TechConf in October 2023."
+    Bad: "Carol's involvement with the community garden started in May 2022." → Good: "Carol joined the community garden in May 2022."
+
   Classify each fact as one of:
   - KNOWLEDGE: factual information (e.g. "The database is PostgreSQL")
   - RULE: a constraint or instruction that should always be followed (e.g. "Never use semicolons")

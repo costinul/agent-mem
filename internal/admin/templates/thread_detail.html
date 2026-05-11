@@ -5,7 +5,15 @@
 </div>
 
 <div class="mb-6">
-    <h2 class="text-lg font-semibold text-gray-900">Thread Detail</h2>
+    <div class="flex items-center justify-between gap-3">
+        <h2 class="text-lg font-semibold text-gray-900">Thread Detail</h2>
+        <a href="/admin/threads/{{.Thread.ID}}/download"
+           hx-boost="false"
+           download="thread_{{.Thread.ID}}.json"
+           class="inline-flex items-center gap-1.5 bg-gray-900 text-white text-sm font-medium px-3 py-1.5 rounded-md hover:bg-gray-800 transition-colors whitespace-nowrap">
+            Download JSON
+        </a>
+    </div>
     <div class="mt-2 grid grid-cols-3 gap-4 text-sm">
         <div>
             <span class="text-gray-500">ID:</span>
