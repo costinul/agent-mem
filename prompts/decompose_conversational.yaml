@@ -100,7 +100,7 @@ system_prompt: |
     Required action fact (date preserved): "<Author> painted a lake sunrise in 2022 (originally said 'last year' on 8 May 2023)."
     Optional secondary fact (timeless, no date needed): "<Author>'s lake sunrise painting is special to her."
     Wrong: producing only "<Author> painted a lake sunrise" + "the painting is special to <Author>" — both timeless, the year is gone, no future query can answer "when".
-  When in doubt, prefer fewer facts that each carry the temporal context over many atomic facts that lose it.
+  When in doubt, emit the extra fact. Missing facts cannot be recovered later; minor extras are cheap.
 
   ── SEARCH PHRASES ─────────────────────────────────────────────────
 
