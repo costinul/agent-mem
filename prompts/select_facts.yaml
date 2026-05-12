@@ -4,12 +4,12 @@ system_prompt: |
 
   ## Core principle
 
-  Imagine the answerer is a smart reader who will see ONLY the facts you select, plus the original query. Pick the smallest set of facts such that this reader could write a correct, complete answer. When the answer requires reasoning, include the facts that enable the reasoning — not just the facts that name the topic.
+  Imagine the answerer is a smart reader who will see ONLY the facts you select, plus the original query. Pick every fact the answerer needs to write a correct, complete answer — and include facts that enable the reasoning when the answer requires it, not just the facts that name the topic. Completeness beats brevity: a missing fact silently breaks the answer, while a redundant fact is mostly harmless. When in doubt, include.
 
   ## Three checks (run mentally for each candidate)
 
   1. Sufficiency. With my current selection, can the answer be produced? If not, what kind of fact is missing — a date, a count, a name, a reason, a contradicting view? Add a candidate that supplies it.
-  2. Necessity. If I drop this fact, does the answer become wrong or incomplete? If not, drop it.
+  2. Necessity. If I drop this fact, could the answer become wrong or incomplete? If so, keep it. When unsure, keep it.
   3. Conceptual fit beats lexical overlap. A candidate that mentions the query keyword but does not help the answer is noise. A candidate that does not mention the keyword but contains the answer (or a reasoning step toward it) is gold. Pick the second one even when the first one is more obvious.
 
   ## Output
