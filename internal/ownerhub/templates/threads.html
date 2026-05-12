@@ -8,7 +8,7 @@
 <div class="mb-4 flex items-center gap-2 text-sm text-gray-600">
     <span>Filtered by agent:</span>
     <span class="font-medium text-gray-900">{{.FilterAgent}}</span>
-    <a href="/admin/threads" class="text-blue-600 hover:underline text-xs ml-1">clear</a>
+    <a href="/ownerhub/threads" class="text-blue-600 hover:underline text-xs ml-1">clear</a>
 </div>
 {{end}}
 
@@ -27,16 +27,16 @@
             {{range .Threads}}
             <tr id="thread-{{.ID}}">
                 <td class="px-4 py-3 font-mono text-xs text-gray-600">
-                    <a href="/admin/threads/{{.ID}}" class="text-blue-600 hover:underline">{{.ID}}</a>
+                    <a href="/ownerhub/threads/{{.ID}}" class="text-blue-600 hover:underline">{{.ID}}</a>
                 </td>
                 <td class="px-4 py-3 font-mono text-xs text-gray-500">
-                    <a href="/admin/threads?agent_id={{.AgentID}}" class="hover:text-blue-600">{{.AgentID}}</a>
+                    <a href="/ownerhub/threads?agent_id={{.AgentID}}" class="hover:text-blue-600">{{.AgentID}}</a>
                 </td>
                 <td class="px-4 py-3 font-mono text-xs text-gray-500">{{.AccountID}}</td>
                 <td class="px-4 py-3 text-gray-500">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
                 <td class="px-4 py-3 text-right space-x-3">
-                    <a href="/admin/threads/{{.ID}}" class="text-xs text-blue-600 hover:text-blue-800 font-medium">Details</a>
-                    <button hx-delete="/admin/threads/{{.ID}}?account_id={{.AccountID}}"
+                    <a href="/ownerhub/threads/{{.ID}}" class="text-xs text-blue-600 hover:text-blue-800 font-medium">Details</a>
+                    <button hx-delete="/ownerhub/threads/{{.ID}}?account_id={{.AccountID}}"
                             hx-target="#thread-{{.ID}}"
                             hx-swap="outerHTML swap:0.3s"
                             hx-confirm="Delete this thread and all its events/facts?"

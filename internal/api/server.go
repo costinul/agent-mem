@@ -2,10 +2,10 @@ package api
 
 import (
 	"agentmem/internal/account"
-	"agentmem/internal/admin"
 	"agentmem/internal/agent"
 	"agentmem/internal/auth"
 	"agentmem/internal/engine"
+	"agentmem/internal/ownerhub"
 	"agentmem/internal/repository/userrepo"
 	"context"
 	"fmt"
@@ -24,14 +24,14 @@ type Server struct {
 	engine     *engine.MemoryEngine
 }
 
-type AdminDeps struct {
+type OwnerHubDeps struct {
 	GoogleAuth   *auth.GoogleAuth
 	SessionStore auth.SessionStore
 	UserRepo     userrepo.Repository
-	AdminHandler *admin.Handler
+	Handler      *ownerhub.Handler
 }
 
-func NewServer(engine *engine.MemoryEngine, accountSvc *account.Service, agentSvc *agent.Service, adminDeps *AdminDeps) *Server {
+func NewServer(engine *engine.MemoryEngine, accountSvc *account.Service, agentSvc *agent.Service, ownerhubDeps *OwnerHubDeps) *Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler)
 	mux.HandleFunc("POST /memory", requireAPIKey(accountSvc, addHandler(engine, agentSvc)))
@@ -51,15 +51,15 @@ func NewServer(engine *engine.MemoryEngine, accountSvc *account.Service, agentSv
 	mux.HandleFunc("GET /threads/{id}/messages", requireAPIKey(accountSvc, listThreadMessagesHandler(agentSvc, engine)))
 	mux.Handle("GET /swagger/", httpSwagger.Handler(httpSwagger.PersistAuthorization(true)))
 
-	if adminDeps != nil {
-		mux.HandleFunc("GET /auth/google/login", adminDeps.GoogleAuth.LoginHandler)
-		mux.HandleFunc("GET /auth/google/callback", adminDeps.GoogleAuth.CallbackHandler)
-		mux.HandleFunc("GET /auth/logout", adminDeps.GoogleAuth.LogoutHandler)
+	if ownerhubDeps != nil {
+		mux.HandleFunc("GET /auth/google/login", ownerhubDeps.GoogleAuth.LoginHandler)
+		mux.HandleFunc("GET /auth/google/callback", ownerhubDeps.GoogleAuth.CallbackHandler)
+		mux.HandleFunc("GET /auth/logout", ownerhubDeps.GoogleAuth.LogoutHandler)
 
-		adminMw := func(next http.Handler) http.Handler {
-			return auth.RequireAdmin(adminDeps.SessionStore, adminDeps.UserRepo, next)
+		ownerhubMw := func(next http.Handler) http.Handler {
+			return auth.RequireOwnerHub(ownerhubDeps.SessionStore, ownerhubDeps.UserRepo, next)
 		}
-		adminDeps.AdminHandler.RegisterRoutes(mux, adminMw)
+		ownerhubDeps.Handler.RegisterRoutes(mux, ownerhubMw)
 	}
 
 	return &Server{

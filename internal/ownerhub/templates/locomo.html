@@ -19,7 +19,7 @@
         <div>
             <label class="block text-xs font-medium text-gray-600 mb-1">Account</label>
             <select id="ctx-account"
-                    hx-get="/admin/playground/agents"
+                    hx-get="/ownerhub/playground/agents"
                     hx-target="#ctx-agent-select"
                     hx-include="[id='ctx-account']"
                     hx-vals="js:{account_id: document.getElementById('ctx-account').value}"
@@ -43,7 +43,7 @@
                 <div id="ctx-agent-dropdown"
                      class="hidden absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-52 overflow-y-auto">
                     <select id="ctx-agent-select" size="6"
-                            hx-get="/admin/playground/threads"
+                            hx-get="/ownerhub/playground/threads"
                             hx-target="#ctx-thread-select"
                             hx-vals="js:{agent_id: document.getElementById('ctx-agent-select').value}"
                             hx-trigger="change"
@@ -156,7 +156,7 @@ function doSearch() {
     document.getElementById('search-results').innerHTML = '';
     document.getElementById('search-count').classList.add('hidden');
 
-    fetch('/admin/locomo/search?q=' + encodeURIComponent(q))
+    fetch('/ownerhub/locomo/search?q=' + encodeURIComponent(q))
         .then(function(r) {
             return r.json().then(function(data) {
                 if (!r.ok) throw new Error(data.error || r.statusText);
@@ -262,7 +262,7 @@ function recallFacts(idx) {
     factsEl.innerHTML = '<div class="flex items-center gap-2 text-xs text-gray-500"><svg class="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>Recalling…</div>';
     factsEl.classList.remove('hidden');
 
-    fetch('/admin/locomo/recall', {
+    fetch('/ownerhub/locomo/recall', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({account_id: accountID, agent_id: agentID, thread_id: threadID, text: text})
@@ -288,8 +288,8 @@ function recallFacts(idx) {
                     : f.kind === 'RULE'
                     ? 'bg-purple-50 text-purple-700'
                     : 'bg-amber-50 text-amber-700';
-                var factUrl = f.thread_id ? '/admin/threads/' + f.thread_id + '#fact-' + f.id : null;
-                var suppByUrl = (f.superseded_by && f.thread_id) ? '/admin/threads/' + f.thread_id + '#fact-' + f.superseded_by : null;
+                var factUrl = f.thread_id ? '/ownerhub/threads/' + f.thread_id + '#fact-' + f.id : null;
+                var suppByUrl = (f.superseded_by && f.thread_id) ? '/ownerhub/threads/' + f.thread_id + '#fact-' + f.superseded_by : null;
                 var idHtml = factUrl
                     ? '<a href="' + escAttr(factUrl) + '" target="_blank" class="text-blue-600 hover:underline font-mono">' + escHtml(f.id) + '</a>'
                     : '<span class="text-gray-400 font-mono">' + escHtml(f.id) + '</span>';

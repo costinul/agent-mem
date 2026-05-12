@@ -2,7 +2,7 @@
 {{define "content"}}
 <div class="flex items-center justify-between mb-6">
     <h2 class="text-lg font-semibold text-gray-900">Accounts</h2>
-    <form hx-post="/admin/accounts" hx-target="#account-list" hx-swap="beforeend" class="flex gap-2">
+    <form hx-post="/ownerhub/accounts" hx-target="#account-list" hx-swap="beforeend" class="flex gap-2">
         <input type="text" name="name" placeholder="Account name" required
                class="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
         <button type="submit"
@@ -25,14 +25,14 @@
             {{range .Accounts}}
             <tr id="account-{{.ID}}">
                 <td class="px-4 py-3 font-mono text-xs text-gray-600">
-                    <a href="/admin/accounts/{{.ID}}" class="hover:underline text-blue-600">{{.ID}}</a>
+                    <a href="/ownerhub/accounts/{{.ID}}" class="hover:underline text-blue-600">{{.ID}}</a>
                 </td>
                 <td class="px-4 py-3 text-gray-900">
-                    <a href="/admin/accounts/{{.ID}}" class="hover:underline">{{.Name}}</a>
+                    <a href="/ownerhub/accounts/{{.ID}}" class="hover:underline">{{.Name}}</a>
                 </td>
                 <td class="px-4 py-3 text-gray-500">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
                 <td class="px-4 py-3 text-right">
-                    <button hx-delete="/admin/accounts/{{.ID}}"
+                    <button hx-delete="/ownerhub/accounts/{{.ID}}"
                             hx-target="#account-{{.ID}}"
                             hx-swap="outerHTML swap:0.3s"
                             hx-confirm="Delete this account? This will cascade-delete all agents, threads, events, and facts."

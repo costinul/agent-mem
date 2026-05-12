@@ -27,7 +27,7 @@
                 </td>
                 <td class="px-4 py-3 text-gray-600">{{.Email}}</td>
                 <td class="px-4 py-3">
-                    <form hx-put="/admin/users/{{.ID}}/role" hx-target="#user-{{.ID}}" hx-swap="outerHTML">
+                    <form hx-put="/ownerhub/users/{{.ID}}/role" hx-target="#user-{{.ID}}" hx-swap="outerHTML">
                         <select name="role" onchange="this.form.requestSubmit()"
                                 class="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500
                                        {{if eq .Role "admin"}}bg-indigo-50 text-indigo-700{{else}}bg-gray-50 text-gray-700{{end}}">
@@ -38,7 +38,7 @@
                 </td>
                 <td class="px-4 py-3 text-gray-500">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
                 <td class="px-4 py-3 text-right">
-                    <button hx-delete="/admin/users/{{.ID}}"
+                    <button hx-delete="/ownerhub/users/{{.ID}}"
                             hx-target="#user-{{.ID}}"
                             hx-swap="outerHTML swap:0.3s"
                             hx-confirm="Delete this user? They will need to sign in again to be re-created."

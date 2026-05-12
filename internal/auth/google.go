@@ -123,7 +123,7 @@ func (g *GoogleAuth) CallbackHandler(w http.ResponseWriter, r *http.Request) {
 		Secure:   r.TLS != nil,
 	})
 
-	http.Redirect(w, r, "/admin/", http.StatusTemporaryRedirect)
+	http.Redirect(w, r, "/ownerhub/", http.StatusTemporaryRedirect)
 }
 
 func (g *GoogleAuth) LogoutHandler(w http.ResponseWriter, r *http.Request) {
@@ -140,7 +140,7 @@ func (g *GoogleAuth) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 	})
 
-	http.Redirect(w, r, "/admin/login", http.StatusTemporaryRedirect)
+	http.Redirect(w, r, "/ownerhub/login", http.StatusTemporaryRedirect)
 }
 
 type googleUserInfo struct {

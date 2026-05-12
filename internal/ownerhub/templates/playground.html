@@ -13,7 +13,7 @@
         <div>
             <label class="block text-xs font-medium text-gray-600 mb-1">Account</label>
             <select id="ctx-account"
-                    hx-get="/admin/playground/agents"
+                    hx-get="/ownerhub/playground/agents"
                     hx-target="#ctx-agent-select"
                     hx-include="[id='ctx-account']"
                     hx-vals="js:{account_id: document.getElementById('ctx-account').value}"
@@ -37,7 +37,7 @@
                 <div id="ctx-agent-dropdown"
                      class="hidden absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-52 overflow-y-auto">
                     <select id="ctx-agent-select" size="6"
-                            hx-get="/admin/playground/threads"
+                            hx-get="/ownerhub/playground/threads"
                             hx-target="#ctx-thread-select"
                             hx-vals="js:{agent_id: document.getElementById('ctx-agent-select').value}"
                             hx-trigger="change"
@@ -99,7 +99,7 @@
     <!-- Contextual panel -->
     <div id="tab-panel-contextual" class="bg-white rounded-b-lg border border-t-0 border-gray-200 p-5">
         <p class="text-xs text-gray-500 mb-4">Process messages through the full contextual pipeline — extracts facts, deduplicates, and updates memory.</p>
-        <form hx-post="/admin/playground/contextual" hx-target="#playground-result" hx-swap="innerHTML"
+        <form hx-post="/ownerhub/playground/contextual" hx-target="#playground-result" hx-swap="innerHTML"
               hx-indicator="#spinner-contextual" onsubmit="injectContext(this)">
             <input type="hidden" name="account_id">
             <input type="hidden" name="agent_id">
@@ -153,7 +153,7 @@
     <!-- Factual panel -->
     <div id="tab-panel-factual" class="hidden bg-white rounded-b-lg border border-t-0 border-gray-200 p-5">
         <p class="text-xs text-gray-500 mb-4">Directly write facts to memory without conversational context processing.</p>
-        <form hx-post="/admin/playground/factual" hx-target="#playground-result" hx-swap="innerHTML"
+        <form hx-post="/ownerhub/playground/factual" hx-target="#playground-result" hx-swap="innerHTML"
               hx-indicator="#spinner-factual" onsubmit="injectContext(this)">
             <input type="hidden" name="account_id">
             <input type="hidden" name="agent_id">
@@ -206,7 +206,7 @@
     <!-- Decompose panel -->
     <div id="tab-panel-decompose" class="hidden bg-white rounded-b-lg border border-t-0 border-gray-200 p-5">
         <p class="text-xs text-gray-500 mb-4">Decompose text using one of the three extraction strategies. No context required — pure LLM operation.</p>
-        <form hx-post="/admin/playground/decompose" hx-target="#playground-result" hx-swap="innerHTML"
+        <form hx-post="/ownerhub/playground/decompose" hx-target="#playground-result" hx-swap="innerHTML"
               hx-indicator="#spinner-decompose">
             <div class="mb-4">
                 <label class="block text-xs font-medium text-gray-600 mb-1">Mode</label>
@@ -239,7 +239,7 @@
     <!-- Recall panel -->
     <div id="tab-panel-recall" class="hidden bg-white rounded-b-lg border border-t-0 border-gray-200 p-5">
         <p class="text-xs text-gray-500 mb-4">Query memory for relevant facts using semantic search. Read-only.</p>
-        <form hx-post="/admin/playground/recall" hx-target="#playground-result" hx-swap="innerHTML"
+        <form hx-post="/ownerhub/playground/recall" hx-target="#playground-result" hx-swap="innerHTML"
               hx-indicator="#spinner-recall" onsubmit="injectContext(this)">
             <input type="hidden" name="account_id">
             <input type="hidden" name="agent_id">

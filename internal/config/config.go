@@ -14,12 +14,12 @@ type Config struct {
 	LogLevel  string
 	Database  DatabaseConfig
 	AI        AIConfig
-	Admin     AdminConfig
+	OwnerHub  OwnerHubConfig
 	Ingestion IngestionConfig
 	Recall    RecallConfig
 }
 
-type AdminConfig struct {
+type OwnerHubConfig struct {
 	GoogleClientID     string
 	GoogleClientSecret string
 	BaseURL            string
@@ -68,7 +68,7 @@ type RecallConfig struct {
 func Load() (*Config, error) {
 	googleClientID := strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_ID"))
 	googleClientSecret := strings.TrimSpace(os.Getenv("GOOGLE_CLIENT_SECRET"))
-	adminEnabled := googleClientID != "" && googleClientSecret != ""
+	ownerhubEnabled := googleClientID != "" && googleClientSecret != ""
 
 	cfg := &Config{
 		Port:     getEnvOrDefault("PORT", "8080"),
@@ -95,13 +95,13 @@ func Load() (*Config, error) {
 			FirstStepK:     getEnvIntOrDefault("RECALL_FIRST_STEP_K", 50),
 			SecondStepK:    getEnvIntOrDefault("RECALL_SECOND_STEP_K", 150),
 		},
-		Admin: AdminConfig{
+		OwnerHub: OwnerHubConfig{
 			GoogleClientID:     googleClientID,
 			GoogleClientSecret: googleClientSecret,
 			BaseURL:            getEnvOrDefault("BASE_URL", "http://localhost:8080"),
 			SessionTTL:         getEnvDurationOrDefault("SESSION_TTL", 24*time.Hour),
 			SessionCacheTTL:    getEnvDurationOrDefault("SESSION_CACHE_TTL", 60*time.Second),
-			Enabled:            adminEnabled,
+			Enabled:            ownerhubEnabled,
 		},
 	}
 

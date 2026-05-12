@@ -15,13 +15,13 @@ import (
 	"time"
 
 	"agentmem/internal/account"
-	"agentmem/internal/admin"
 	agentsvc "agentmem/internal/agent"
 	"agentmem/internal/api"
 	"agentmem/internal/auth"
 	"agentmem/internal/config"
 	"agentmem/internal/database"
 	"agentmem/internal/engine"
+	"agentmem/internal/ownerhub"
 	"agentmem/internal/repository/accountrepo"
 	"agentmem/internal/repository/agentrepo"
 	"agentmem/internal/repository/memoryrepo"
@@ -140,31 +140,31 @@ func main() {
 	}
 	engine := engine.NewMemoryEngine(bwaiClient, memoryRepo, llmModels, cfg.AI.EmbeddingModel, cfg.Ingestion, cfg.Recall, trackerReg)
 
-	var adminDeps *api.AdminDeps
-	if cfg.Admin.Enabled {
-		log.Println("Initializing admin UI with Google OAuth...")
+	var ownerhubDeps *api.OwnerHubDeps
+	if cfg.OwnerHub.Enabled {
+		log.Println("Initializing OwnerHub UI with Google OAuth...")
 		userRepo := userrepo.NewPostgres(db)
 		pgSessions := auth.NewPgSessionStore(db)
-		sessionStore := auth.NewCachedSessionStore(pgSessions, cfg.Admin.SessionCacheTTL, 1000)
+		sessionStore := auth.NewCachedSessionStore(pgSessions, cfg.OwnerHub.SessionCacheTTL, 1000)
 		googleAuth := auth.NewGoogleAuth(
-			cfg.Admin.GoogleClientID,
-			cfg.Admin.GoogleClientSecret,
-			cfg.Admin.BaseURL,
+			cfg.OwnerHub.GoogleClientID,
+			cfg.OwnerHub.GoogleClientSecret,
+			cfg.OwnerHub.BaseURL,
 			userRepo,
 			sessionStore,
-			cfg.Admin.SessionTTL,
+			cfg.OwnerHub.SessionTTL,
 		)
-		adminHandler := admin.NewHandler(accountRepo, accountSvc, agentRepo, memoryRepo, userRepo, engine)
-		adminDeps = &api.AdminDeps{
+		hubHandler := ownerhub.NewHandler(accountRepo, accountSvc, agentRepo, memoryRepo, userRepo, engine)
+		ownerhubDeps = &api.OwnerHubDeps{
 			GoogleAuth:   googleAuth,
 			SessionStore: sessionStore,
 			UserRepo:     userRepo,
-			AdminHandler: adminHandler,
+			Handler:      hubHandler,
 		}
 	}
 
 	log.Println("Initializing API server...")
-	server := api.NewServer(engine, accountSvc, agentService, adminDeps)
+	server := api.NewServer(engine, accountSvc, agentService, ownerhubDeps)
 	go func() {
 		log.Printf("Starting HTTP server on port %s", cfg.Port)
 		if err := server.Start(cfg.Port); err != nil && !errors.Is(err, http.ErrServerClosed) {

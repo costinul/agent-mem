@@ -1,4 +1,4 @@
-package admin
+package ownerhub
 
 import (
 	"encoding/json"

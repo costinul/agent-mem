@@ -1,13 +1,13 @@
 {{template "layout.html" .}}
 {{define "content"}}
 <div class="mb-6">
-    <a href="/admin/threads" class="text-sm text-blue-600 hover:underline">&larr; Back to threads</a>
+    <a href="/ownerhub/threads" class="text-sm text-blue-600 hover:underline">&larr; Back to threads</a>
 </div>
 
 <div class="mb-6">
     <div class="flex items-center justify-between gap-3">
         <h2 class="text-lg font-semibold text-gray-900">Thread Detail</h2>
-        <a href="/admin/threads/{{.Thread.ID}}/download"
+        <a href="/ownerhub/threads/{{.Thread.ID}}/download"
            hx-boost="false"
            download="thread_{{.Thread.ID}}.json"
            class="inline-flex items-center gap-1.5 bg-gray-900 text-white text-sm font-medium px-3 py-1.5 rounded-md hover:bg-gray-800 transition-colors whitespace-nowrap">
@@ -71,7 +71,7 @@
                         <td class="px-4 py-2 text-xs text-gray-500 max-w-sm truncate">{{.SourceText}}</td>
                         <td class="px-4 py-2 text-right">
                             <button onclick="event.stopPropagation()"
-                                    hx-post="/admin/threads/{{$.Thread.ID}}/similarity"
+                                    hx-post="/ownerhub/threads/{{$.Thread.ID}}/similarity"
                                     hx-target="#facts-section"
                                     hx-swap="outerHTML"
                                     hx-vals='{"event_id": "{{.ID}}"}'
@@ -123,7 +123,7 @@
 <div id="facts-section">
     <div class="flex items-center justify-between mb-3">
         <h3 class="text-md font-semibold text-gray-800">Facts ({{len .FactRows}})</h3>
-        <form hx-post="/admin/threads/{{.Thread.ID}}/similarity"
+        <form hx-post="/ownerhub/threads/{{.Thread.ID}}/similarity"
               hx-target="#facts-section"
               hx-swap="outerHTML"
               hx-indicator="#spinner-sim"

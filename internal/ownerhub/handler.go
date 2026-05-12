@@ -1,4 +1,4 @@
-package admin
+package ownerhub
 
 import (
 	"context"
@@ -66,43 +66,43 @@ func tmpl(page string) *template.Template {
 	}).ParseFS(templateFS, "templates/layout.html", "templates/"+page))
 }
 
-func (h *Handler) RegisterRoutes(mux *http.ServeMux, adminMw func(http.Handler) http.Handler) {
-	mux.HandleFunc("GET /admin/login", h.loginPage)
+func (h *Handler) RegisterRoutes(mux *http.ServeMux, ownerhubMw func(http.Handler) http.Handler) {
+	mux.HandleFunc("GET /ownerhub/login", h.loginPage)
 
 	protected := http.NewServeMux()
-	protected.HandleFunc("GET /admin/", h.dashboard)
-	protected.HandleFunc("GET /admin/accounts", h.listAccounts)
-	protected.HandleFunc("POST /admin/accounts", h.createAccount)
-	protected.HandleFunc("DELETE /admin/accounts/{id}", h.deleteAccount)
-	protected.HandleFunc("GET /admin/accounts/{id}", h.accountDetail)
-	protected.HandleFunc("POST /admin/accounts/{id}/api-keys", h.createAPIKey)
-	protected.HandleFunc("DELETE /admin/accounts/{id}/api-keys/{key_id}", h.revokeAPIKey)
-	protected.HandleFunc("GET /admin/agents", h.listAgents)
-	protected.HandleFunc("POST /admin/agents", h.createAgent)
-	protected.HandleFunc("PUT /admin/agents/{id}", h.updateAgent)
-	protected.HandleFunc("DELETE /admin/agents/{id}", h.deleteAgent)
-	protected.HandleFunc("GET /admin/threads", h.listThreads)
-	protected.HandleFunc("GET /admin/threads/{id}", h.threadDetail)
-	protected.HandleFunc("GET /admin/threads/{id}/download", h.downloadThreadJSON)
-	protected.HandleFunc("DELETE /admin/threads/{id}", h.deleteThread)
-	protected.HandleFunc("POST /admin/threads/{id}/similarity", h.threadSimilarity)
-	protected.HandleFunc("GET /admin/sources/{id}", h.sourcePreview)
-	protected.HandleFunc("GET /admin/users", h.listUsers)
-	protected.HandleFunc("PUT /admin/users/{id}/role", h.updateUserRole)
-	protected.HandleFunc("DELETE /admin/users/{id}", h.deleteUser)
-	protected.HandleFunc("GET /admin/playground", h.playgroundPage)
-	protected.HandleFunc("GET /admin/playground/agents", h.playgroundAgents)
-	protected.HandleFunc("GET /admin/playground/threads", h.playgroundThreads)
-	protected.HandleFunc("POST /admin/playground/add", h.playgroundContextual)
-	protected.HandleFunc("POST /admin/playground/recall", h.playgroundRecall)
-	protected.HandleFunc("POST /admin/playground/recall-light", h.playgroundRecallLight)
-	protected.HandleFunc("POST /admin/playground/decompose", h.playgroundDecompose)
-	protected.HandleFunc("POST /admin/playground/decompose-facts", h.playgroundDecomposeFacts)
-	protected.HandleFunc("GET /admin/locomo", h.locomoPage)
-	protected.HandleFunc("GET /admin/locomo/search", h.locomoSearch)
-	protected.HandleFunc("POST /admin/locomo/recall", h.locomoRecall)
+	protected.HandleFunc("GET /ownerhub/", h.dashboard)
+	protected.HandleFunc("GET /ownerhub/accounts", h.listAccounts)
+	protected.HandleFunc("POST /ownerhub/accounts", h.createAccount)
+	protected.HandleFunc("DELETE /ownerhub/accounts/{id}", h.deleteAccount)
+	protected.HandleFunc("GET /ownerhub/accounts/{id}", h.accountDetail)
+	protected.HandleFunc("POST /ownerhub/accounts/{id}/api-keys", h.createAPIKey)
+	protected.HandleFunc("DELETE /ownerhub/accounts/{id}/api-keys/{key_id}", h.revokeAPIKey)
+	protected.HandleFunc("GET /ownerhub/agents", h.listAgents)
+	protected.HandleFunc("POST /ownerhub/agents", h.createAgent)
+	protected.HandleFunc("PUT /ownerhub/agents/{id}", h.updateAgent)
+	protected.HandleFunc("DELETE /ownerhub/agents/{id}", h.deleteAgent)
+	protected.HandleFunc("GET /ownerhub/threads", h.listThreads)
+	protected.HandleFunc("GET /ownerhub/threads/{id}", h.threadDetail)
+	protected.HandleFunc("GET /ownerhub/threads/{id}/download", h.downloadThreadJSON)
+	protected.HandleFunc("DELETE /ownerhub/threads/{id}", h.deleteThread)
+	protected.HandleFunc("POST /ownerhub/threads/{id}/similarity", h.threadSimilarity)
+	protected.HandleFunc("GET /ownerhub/sources/{id}", h.sourcePreview)
+	protected.HandleFunc("GET /ownerhub/users", h.listUsers)
+	protected.HandleFunc("PUT /ownerhub/users/{id}/role", h.updateUserRole)
+	protected.HandleFunc("DELETE /ownerhub/users/{id}", h.deleteUser)
+	protected.HandleFunc("GET /ownerhub/playground", h.playgroundPage)
+	protected.HandleFunc("GET /ownerhub/playground/agents", h.playgroundAgents)
+	protected.HandleFunc("GET /ownerhub/playground/threads", h.playgroundThreads)
+	protected.HandleFunc("POST /ownerhub/playground/add", h.playgroundContextual)
+	protected.HandleFunc("POST /ownerhub/playground/recall", h.playgroundRecall)
+	protected.HandleFunc("POST /ownerhub/playground/recall-light", h.playgroundRecallLight)
+	protected.HandleFunc("POST /ownerhub/playground/decompose", h.playgroundDecompose)
+	protected.HandleFunc("POST /ownerhub/playground/decompose-facts", h.playgroundDecomposeFacts)
+	protected.HandleFunc("GET /ownerhub/locomo", h.locomoPage)
+	protected.HandleFunc("GET /ownerhub/locomo/search", h.locomoSearch)
+	protected.HandleFunc("POST /ownerhub/locomo/recall", h.locomoRecall)
 
-	mux.Handle("/admin/", adminMw(protected))
+	mux.Handle("/ownerhub/", ownerhubMw(protected))
 }
 
 // eventRow aggregates an Event with its Sources for display in the thread detail page.
@@ -182,11 +182,11 @@ func (h *Handler) loginPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) dashboard(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/admin/" {
+	if r.URL.Path != "/ownerhub/" {
 		http.NotFound(w, r)
 		return
 	}
-	http.Redirect(w, r, "/admin/threads", http.StatusTemporaryRedirect)
+	http.Redirect(w, r, "/ownerhub/threads", http.StatusTemporaryRedirect)
 }
 
 func (h *Handler) listAccounts(w http.ResponseWriter, r *http.Request) {
@@ -218,7 +218,7 @@ func (h *Handler) createAccount(w http.ResponseWriter, r *http.Request) {
 		h.renderAccountRow(w, acct)
 		return
 	}
-	http.Redirect(w, r, "/admin/accounts", http.StatusSeeOther)
+	http.Redirect(w, r, "/ownerhub/accounts", http.StatusSeeOther)
 }
 
 func (h *Handler) deleteAccount(w http.ResponseWriter, r *http.Request) {
@@ -232,7 +232,7 @@ func (h *Handler) deleteAccount(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	http.Redirect(w, r, "/admin/accounts", http.StatusSeeOther)
+	http.Redirect(w, r, "/ownerhub/accounts", http.StatusSeeOther)
 }
 
 func (h *Handler) accountDetail(w http.ResponseWriter, r *http.Request) {
@@ -297,7 +297,7 @@ func (h *Handler) createAPIKey(w http.ResponseWriter, r *http.Request) {
 		h.renderAPIKeysSection(w, data)
 		return
 	}
-	http.Redirect(w, r, "/admin/accounts/"+id, http.StatusSeeOther)
+	http.Redirect(w, r, "/ownerhub/accounts/"+id, http.StatusSeeOther)
 }
 
 func (h *Handler) revokeAPIKey(w http.ResponseWriter, r *http.Request) {
@@ -325,7 +325,7 @@ func (h *Handler) revokeAPIKey(w http.ResponseWriter, r *http.Request) {
 		h.renderAPIKeysSection(w, data)
 		return
 	}
-	http.Redirect(w, r, "/admin/accounts/"+id, http.StatusSeeOther)
+	http.Redirect(w, r, "/ownerhub/accounts/"+id, http.StatusSeeOther)
 }
 
 type apiKeysSectionData struct {
@@ -360,7 +360,7 @@ func (h *Handler) renderAPIKeysSection(w http.ResponseWriter, data apiKeysSectio
     </script>
   </div>
   {{end}}
-  <form hx-post="/admin/accounts/{{.AccountID}}/api-keys"
+  <form hx-post="/ownerhub/accounts/{{.AccountID}}/api-keys"
         hx-target="#api-keys-section"
         hx-swap="outerHTML"
         class="flex gap-2 mb-4">
@@ -400,7 +400,7 @@ func (h *Handler) renderAPIKeysSection(w http.ResponseWriter, data apiKeysSectio
           <td class="px-4 py-3 text-xs text-gray-500">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
           <td class="px-4 py-3 text-right">
             {{if .Valid}}
-            <button hx-delete="/admin/accounts/{{$.AccountID}}/api-keys/{{.ID}}"
+            <button hx-delete="/ownerhub/accounts/{{$.AccountID}}/api-keys/{{.ID}}"
                     hx-target="#api-keys-section"
                     hx-swap="outerHTML"
                     hx-confirm="Revoke this API key? It will stop working immediately."
@@ -458,7 +458,7 @@ func (h *Handler) createAgent(w http.ResponseWriter, r *http.Request) {
 		h.renderAgentRow(w, agent)
 		return
 	}
-	http.Redirect(w, r, "/admin/agents", http.StatusSeeOther)
+	http.Redirect(w, r, "/ownerhub/agents", http.StatusSeeOther)
 }
 
 func (h *Handler) updateAgent(w http.ResponseWriter, r *http.Request) {
@@ -474,7 +474,7 @@ func (h *Handler) updateAgent(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to update agent", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/admin/agents", http.StatusSeeOther)
+	http.Redirect(w, r, "/ownerhub/agents", http.StatusSeeOther)
 }
 
 func (h *Handler) deleteAgent(w http.ResponseWriter, r *http.Request) {
@@ -489,7 +489,7 @@ func (h *Handler) deleteAgent(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	http.Redirect(w, r, "/admin/agents", http.StatusSeeOther)
+	http.Redirect(w, r, "/ownerhub/agents", http.StatusSeeOther)
 }
 
 func (h *Handler) listThreads(w http.ResponseWriter, r *http.Request) {
@@ -567,7 +567,7 @@ func (h *Handler) deleteThread(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	http.Redirect(w, r, "/admin/threads", http.StatusSeeOther)
+	http.Redirect(w, r, "/ownerhub/threads", http.StatusSeeOther)
 }
 
 type threadSourceDownload struct {
@@ -847,7 +847,7 @@ func (h *Handler) renderFactsSection(w http.ResponseWriter, thread *models.Threa
       {{if .EventID}}
       <span class="inline-flex items-center gap-2 text-xs bg-amber-50 border border-amber-200 text-amber-700 rounded-full px-2.5 py-0.5">
         Event filter active
-        <button hx-post="/admin/threads/{{.ThreadID}}/similarity"
+        <button hx-post="/ownerhub/threads/{{.ThreadID}}/similarity"
                 hx-target="#facts-section"
                 hx-swap="outerHTML"
                 hx-include="#sim-query,#source-filter"
@@ -856,7 +856,7 @@ func (h *Handler) renderFactsSection(w http.ResponseWriter, thread *models.Threa
       </span>
       {{end}}
     </div>
-    <form hx-post="/admin/threads/{{.ThreadID}}/similarity"
+    <form hx-post="/ownerhub/threads/{{.ThreadID}}/similarity"
           hx-target="#facts-section"
           hx-swap="outerHTML"
           hx-indicator="#spinner-sim"
@@ -972,7 +972,7 @@ func (h *Handler) sourcePreview(w http.ResponseWriter, r *http.Request) {
 	if threadID != "" {
 		locomoParams.Set("thread_id", threadID)
 	}
-	locomoURL := "/admin/locomo?" + locomoParams.Encode()
+	locomoURL := "/ownerhub/locomo?" + locomoParams.Encode()
 
 	var diaID string
 	if source.Content != nil {
@@ -1059,7 +1059,7 @@ func (h *Handler) updateUserRole(w http.ResponseWriter, r *http.Request) {
 		h.renderUserRow(w, user)
 		return
 	}
-	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+	http.Redirect(w, r, "/ownerhub/users", http.StatusSeeOther)
 }
 
 func (h *Handler) deleteUser(w http.ResponseWriter, r *http.Request) {
@@ -1073,7 +1073,7 @@ func (h *Handler) deleteUser(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+	http.Redirect(w, r, "/ownerhub/users", http.StatusSeeOther)
 }
 
 // --- HTMX partial renderers ---
@@ -1081,11 +1081,11 @@ func (h *Handler) deleteUser(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) renderAccountRow(w http.ResponseWriter, acct *models.Account) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	tmpl := `<tr id="account-{{.ID}}">
-	<td class="px-4 py-3 font-mono text-xs text-gray-600"><a href="/admin/accounts/{{.ID}}" class="hover:underline text-blue-600">{{.ID}}</a></td>
-	<td class="px-4 py-3 text-gray-900"><a href="/admin/accounts/{{.ID}}" class="hover:underline">{{.Name}}</a></td>
+	<td class="px-4 py-3 font-mono text-xs text-gray-600"><a href="/ownerhub/accounts/{{.ID}}" class="hover:underline text-blue-600">{{.ID}}</a></td>
+	<td class="px-4 py-3 text-gray-900"><a href="/ownerhub/accounts/{{.ID}}" class="hover:underline">{{.Name}}</a></td>
 	<td class="px-4 py-3 text-gray-500">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
 	<td class="px-4 py-3 text-right">
-		<button hx-delete="/admin/accounts/{{.ID}}" hx-target="#account-{{.ID}}" hx-swap="outerHTML swap:0.3s"
+		<button hx-delete="/ownerhub/accounts/{{.ID}}" hx-target="#account-{{.ID}}" hx-swap="outerHTML swap:0.3s"
 				hx-confirm="Delete this account?" class="text-xs text-red-600 hover:text-red-800 font-medium">Delete</button>
 	</td>
 </tr>`
@@ -1101,8 +1101,8 @@ func (h *Handler) renderAgentRow(w http.ResponseWriter, agent *models.Agent) {
 	<td class="px-4 py-3 font-mono text-xs text-gray-500">{{.AccountID}}</td>
 	<td class="px-4 py-3 text-gray-500">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
 	<td class="px-4 py-3 text-right space-x-3">
-		<a href="/admin/threads?agent_id={{.ID}}" class="text-xs text-blue-600 hover:text-blue-800 font-medium">Threads</a>
-		<button hx-delete="/admin/agents/{{.ID}}?account_id={{.AccountID}}" hx-target="#agent-{{.ID}}" hx-swap="outerHTML swap:0.3s"
+		<a href="/ownerhub/threads?agent_id={{.ID}}" class="text-xs text-blue-600 hover:text-blue-800 font-medium">Threads</a>
+		<button hx-delete="/ownerhub/agents/{{.ID}}?account_id={{.AccountID}}" hx-target="#agent-{{.ID}}" hx-swap="outerHTML swap:0.3s"
 				hx-confirm="Delete this agent?" class="text-xs text-red-600 hover:text-red-800 font-medium">Delete</button>
 	</td>
 </tr>`
@@ -1121,7 +1121,7 @@ func (h *Handler) renderUserRow(w http.ResponseWriter, user *models.User) {
 	</td>
 	<td class="px-4 py-3 text-gray-600">{{.Email}}</td>
 	<td class="px-4 py-3">
-		<form hx-put="/admin/users/{{.ID}}/role" hx-target="#user-{{.ID}}" hx-swap="outerHTML">
+		<form hx-put="/ownerhub/users/{{.ID}}/role" hx-target="#user-{{.ID}}" hx-swap="outerHTML">
 			<select name="role" onchange="this.form.requestSubmit()"
 					class="text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500
 						   {{if eq .Role "admin"}}bg-indigo-50 text-indigo-700{{else}}bg-gray-50 text-gray-700{{end}}">
@@ -1132,7 +1132,7 @@ func (h *Handler) renderUserRow(w http.ResponseWriter, user *models.User) {
 	</td>
 	<td class="px-4 py-3 text-gray-500">{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
 	<td class="px-4 py-3 text-right">
-		<button hx-delete="/admin/users/{{.ID}}" hx-target="#user-{{.ID}}" hx-swap="outerHTML swap:0.3s"
+		<button hx-delete="/ownerhub/users/{{.ID}}" hx-target="#user-{{.ID}}" hx-swap="outerHTML swap:0.3s"
 				hx-confirm="Delete this user?" class="text-xs text-red-600 hover:text-red-800 font-medium">Delete</button>
 	</td>
 </tr>`
@@ -1682,7 +1682,7 @@ func (h *Handler) renderDecomposeResult(w http.ResponseWriter, result *Decompose
     {{end}}
     {{if .Queries}}
     <div class="px-4 py-3">
-      <form hx-post="/admin/playground/decompose-facts"
+      <form hx-post="/ownerhub/playground/decompose-facts"
             hx-target="#decompose-facts-result"
             hx-swap="innerHTML"
             hx-indicator="#spinner-get-facts"
@@ -1880,7 +1880,7 @@ func (h *Handler) renderDecomposeFactsResult(w http.ResponseWriter, result *Deco
         <span class="block text-sm text-gray-900 leading-snug">{{.Text}}</span>
         <span class="flex flex-wrap items-center gap-1.5 mt-1">
           {{if .ThreadID}}
-          <a href="/admin/threads/{{derefString .ThreadID}}#fact-{{.ID}}"
+          <a href="/ownerhub/threads/{{derefString .ThreadID}}#fact-{{.ID}}"
              target="_blank" class="text-xs text-blue-600 hover:underline font-mono">{{.ID}}</a>
           {{else}}
           <span class="text-xs text-gray-400 font-mono">{{.ID}}</span>
@@ -1890,7 +1890,7 @@ func (h *Handler) renderDecomposeFactsResult(w http.ResponseWriter, result *Deco
           {{end}}
           {{if .SupersededBy}}
             {{if .ThreadID}}
-            <a href="/admin/threads/{{derefString .ThreadID}}#fact-{{derefString .SupersededBy}}"
+            <a href="/ownerhub/threads/{{derefString .ThreadID}}#fact-{{derefString .SupersededBy}}"
                target="_blank" class="text-xs text-blue-600 hover:underline">&rarr; successor</a>
             {{else}}
             <span class="text-xs text-gray-400">&rarr; {{derefString .SupersededBy}}</span>
