@@ -1,0 +1,211 @@
+{
+  "sample_id": "contextual_files",
+  "description": "10 synthetic Meridian Systems company documents. Tracked entities: 4 employees, 2 projects, 2 policies. Operations across files: updates, deletions, additions, conflicts.",
+  "qa": [
+    {
+      "question": "What is the annual leave entitlement for employees at Meridian Systems?",
+      "answer": "25 days of paid annual leave per year, increasing to 27 days after 5 years of service.",
+      "category": "retrieval",
+      "source_files": [
+        "file_01.txt"
+      ]
+    },
+    {
+      "question": "Who was the original lead for Project Atlas?",
+      "answer": "Alice Chen",
+      "category": "retrieval",
+      "source_files": [
+        "file_01.txt"
+      ]
+    },
+    {
+      "question": "What was Project Atlas about?",
+      "answer": "Project Atlas was an API migration project, migrating from legacy REST to gRPC.",
+      "category": "retrieval",
+      "source_files": [
+        "file_01.txt"
+      ]
+    },
+    {
+      "question": "What was Bob Hartley's original job title?",
+      "answer": "Senior Developer",
+      "category": "retrieval",
+      "source_files": [
+        "file_01.txt"
+      ]
+    },
+    {
+      "question": "What was the original deadline for Project Atlas?",
+      "answer": "Q3 2025",
+      "category": "retrieval",
+      "source_files": [
+        "file_01.txt"
+      ]
+    },
+    {
+      "question": "When was Project Nova announced?",
+      "answer": "Q2 2025 (April 2025)",
+      "category": "retrieval",
+      "source_files": [
+        "file_05.txt"
+      ]
+    },
+    {
+      "question": "What was the original budget for Project Nova when it was first announced?",
+      "answer": "£180,000",
+      "category": "retrieval",
+      "source_files": [
+        "file_05.txt"
+      ]
+    },
+    {
+      "question": "What was the original target launch date for Project Nova?",
+      "answer": "Q1 2026",
+      "category": "retrieval",
+      "source_files": [
+        "file_05.txt"
+      ]
+    },
+    {
+      "question": "What is Bob Hartley's current job title?",
+      "answer": "Engineering Manager",
+      "category": "update",
+      "source_files": [
+        "file_10.txt"
+      ]
+    },
+    {
+      "question": "What is the current minimum office attendance under the remote work policy?",
+      "answer": "3 days per week",
+      "category": "update",
+      "source_files": [
+        "file_06.txt"
+      ]
+    },
+    {
+      "question": "What is Diana Ross's current job title?",
+      "answer": "VP of Product",
+      "category": "update",
+      "source_files": [
+        "file_09.txt"
+      ]
+    },
+    {
+      "question": "What is the current budget for Project Nova?",
+      "answer": "£250,000",
+      "category": "update",
+      "source_files": [
+        "file_09.txt"
+      ]
+    },
+    {
+      "question": "When is Project Nova now expected to launch?",
+      "answer": "Q3 2026",
+      "category": "update",
+      "source_files": [
+        "file_10.txt"
+      ]
+    },
+    {
+      "question": "What title was Bob Hartley promoted to in the Q1 2025 performance review?",
+      "answer": "Lead Engineer",
+      "category": "update",
+      "source_files": [
+        "file_04.txt"
+      ]
+    },
+    {
+      "question": "Does Alice Chen still work at Meridian Systems?",
+      "answer": "No, Alice Chen left Meridian Systems in July 2025.",
+      "category": "deletion",
+      "source_files": [
+        "file_07.txt"
+      ]
+    },
+    {
+      "question": "Is Project Atlas still active?",
+      "answer": "No, Project Atlas was cancelled in August 2025.",
+      "category": "deletion",
+      "source_files": [
+        "file_08.txt"
+      ]
+    },
+    {
+      "question": "What happened to Project Atlas?",
+      "answer": "Project Atlas was cancelled and its budget was reallocated to Project Nova.",
+      "category": "deletion",
+      "source_files": [
+        "file_08.txt"
+      ]
+    },
+    {
+      "question": "Who is Sarah Kim and what is her role?",
+      "answer": "Sarah Kim is a Senior Product Designer who joined Meridian Systems in October 2025, working on Project Nova.",
+      "category": "addition",
+      "source_files": [
+        "file_10.txt"
+      ]
+    },
+    {
+      "question": "What type of product is Project Nova?",
+      "answer": "A native mobile application for iOS and Android.",
+      "category": "addition",
+      "source_files": [
+        "file_05.txt"
+      ]
+    },
+    {
+      "question": "Who is currently managing the engineering team at Meridian Systems?",
+      "answer": "Bob Hartley, confirmed as Engineering Manager in October 2025.",
+      "category": "multi_hop",
+      "source_files": [
+        "file_07.txt",
+        "file_10.txt"
+      ]
+    },
+    {
+      "question": "How did the remote work policy change between March 2025 and June 2025?",
+      "answer": "The minimum office attendance increased from 2 days per week (Policy v1.0, March 2025) to 3 days per week (Policy v2.0, June 2025).",
+      "category": "multi_hop",
+      "source_files": [
+        "file_03.txt",
+        "file_06.txt"
+      ]
+    },
+    {
+      "question": "Which projects is Meridian Systems currently working on?",
+      "answer": "Project Nova. Project Atlas was cancelled.",
+      "category": "multi_hop",
+      "source_files": [
+        "file_05.txt",
+        "file_08.txt"
+      ]
+    },
+    {
+      "question": "What role did Diana Ross hold before becoming VP of Product?",
+      "answer": "Product Manager",
+      "category": "multi_hop",
+      "source_files": [
+        "file_01.txt",
+        "file_09.txt"
+      ]
+    },
+    {
+      "question": "Is Bob Hartley currently in an acting or permanent Engineering Manager role?",
+      "answer": "Permanent. His appointment was confirmed on 1 October 2025; he is no longer acting.",
+      "category": "conflict",
+      "source_files": [
+        "file_07.txt",
+        "file_10.txt"
+      ]
+    },
+    {
+      "question": "Who does Sarah Kim report to?",
+      "answer": "Diana Ross (VP of Product)",
+      "category": "conflict",
+      "source_files": [
+        "file_10.txt"
+      ]
+    }
+  ]
+}

@@ -334,7 +334,7 @@ func (r *PostgresRepository) InsertFact(ctx context.Context, fact models.Fact) (
 		fact.Text,
 		vectorParam(fact.Embedding),
 		fact.ReferencedAt,
-		pq.Array(fact.Entities),
+		pq.Array(coalesceStringSlice(fact.Entities)),
 	).Scan(
 		&stored.ID,
 		&stored.AccountID,
@@ -627,7 +627,7 @@ func (r *PostgresRepository) UpdateFact(ctx context.Context, fact models.Fact) e
 		fact.Text,
 		fact.Kind,
 		vectorParam(fact.Embedding),
-		pq.Array(fact.Entities),
+		pq.Array(coalesceStringSlice(fact.Entities)),
 	)
 	return err
 }
@@ -1003,6 +1003,13 @@ func vectorLiteral(values []float64) string {
 		parts = append(parts, fmt.Sprintf("%g", value))
 	}
 	return "[" + strings.Join(parts, ",") + "]"
+}
+
+func coalesceStringSlice(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
 }
 
 func vectorParam(values []float64) any {
