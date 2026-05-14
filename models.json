@@ -93,5 +93,55 @@
   "extra_headers": {},
   "enable_caching": true,
   "max_output_tokens": 32768
+},
+{
+  "id": "openrouter-gemma-4-31b-it",
+  "name": "OpenRouter Gemma 4 31B IT",
+  "provider": "openai",
+  "model": "google/gemma-4-31b-it",
+  "endpoint": "https://openrouter.ai/api/v1",
+  "api_key": "OPENROUTER_API_KEY",
+  "context_window_size": 128000,
+  "embedding_size": 0,
+  "function_calls": true,
+  "streaming_support": true,
+  "specializations": ["text", "coding", "reasoning"],
+  "extra_headers": {},
+  "enable_caching": true,
+  "max_output_tokens": 32768,
+  "metadata": {
+    "supports_json_schema": false
+  }
+},
+{
+  "id": "openrouter-granite-4.1-8b",
+  "name": "OpenRouter IBM Granite 4.1 8B",
+  "provider": "openai",
+  "model": "ibm-granite/granite-4.1-8b",
+  "endpoint": "https://openrouter.ai/api/v1",
+  "api_key": "OPENROUTER_API_KEY",
+  "context_window_size": 131000,
+  "embedding_size": 0,
+  "function_calls": true,
+  "streaming_support": true,
+  "specializations": ["text", "coding"],
+  "extra_headers": {},
+  "enable_caching": false,
+  "max_output_tokens": 32768
+},
+{
+  "id": "cerebras-llama3.1-8b",
+  "name": "Cerebras Llama 3.1 8B",
+  "provider": "cerebras",
+  "model": "llama3.1-8b",
+  "api_key": "CEREBRAS_API_KEY",
+  "context_window_size": 32768,
+  "embedding_size": 0,
+  "function_calls": true,
+  "streaming_support": true,
+  "specializations": ["text", "coding"],
+  "extra_headers": {},
+  "enable_caching": false,
+  "max_output_tokens": 8192
 }
 ]
