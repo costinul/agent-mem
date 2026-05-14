@@ -203,54 +203,140 @@ async def run_eval(
 
 # ── summary ────────────────────────────────────────────────────────────────
 
-def _compute_summary(results: list[dict]) -> dict:
-    def _empty():
-        return {"count": 0, "recall_pass": 0, "recall_partial": 0, "recall_fail": 0, "skipped": 0}
+def _empty_bucket() -> dict:
+    return {
+        "count": 0, "skipped": 0,
+        "recall": {"pass": 0, "partial": 0, "fail": 0},
+        "answer": {"pass": 0, "partial": 0, "fail": 0},
+        "precision_sum": 0.0, "precision_count": 0,
+        "f1_sum": 0.0, "f1_count": 0,
+        "rank_sum": 0, "rank_count": 0, "rrank_sum": 0.0,
+        "facts_sum": 0, "facts_min": None, "facts_max": 0,
+    }
 
-    total = _empty()
-    by_cat: dict[str, dict] = defaultdict(_empty)
+
+def _accumulate(b: dict, j: dict | None, facts_count: int) -> None:
+    b["count"] += 1
+    b["facts_sum"] += facts_count
+    if b["facts_min"] is None or facts_count < b["facts_min"]:
+        b["facts_min"] = facts_count
+    if facts_count > b["facts_max"]:
+        b["facts_max"] = facts_count
+    if j is None:
+        b["skipped"] += 1
+        return
+    for key in ("pass", "partial", "fail"):
+        if j.get("recall_score") == key:
+            b["recall"][key] += 1
+        if j.get("answer_score") == key:
+            b["answer"][key] += 1
+    p = j.get("precision")
+    if p is not None:
+        b["precision_sum"] += p
+        b["precision_count"] += 1
+    f = j.get("f1")
+    if f is not None:
+        b["f1_sum"] += f
+        b["f1_count"] += 1
+    rank = j.get("first_relevant_rank")
+    if rank is not None and rank > 0:
+        b["rank_sum"] += rank
+        b["rank_count"] += 1
+        b["rrank_sum"] += 1.0 / rank
+
+
+def _finalize(b: dict) -> dict:
+    n = b["count"] - b["skipped"]
+
+    def _score(counts: dict):
+        if n == 0:
+            return None
+        return round((counts["pass"] + 0.5 * counts["partial"]) / n, 4)
+
+    return {
+        "count": b["count"],
+        "skipped": b["skipped"],
+        "recall": {**b["recall"], "score": _score(b["recall"])},
+        "answer": {**b["answer"], "score": _score(b["answer"])},
+        "precision": {"mean": round(b["precision_sum"] / b["precision_count"], 4) if b["precision_count"] else None},
+        "f1": {"mean": round(b["f1_sum"] / b["f1_count"], 4) if b["f1_count"] else None},
+        "first_relevant_rank": {
+            "mean": round(b["rank_sum"] / b["rank_count"], 2) if b["rank_count"] else None,
+            "mrr": round(b["rrank_sum"] / b["rank_count"], 4) if b["rank_count"] else None,
+        },
+        "facts_returned": {
+            "mean": round(b["facts_sum"] / b["count"], 2) if b["count"] else 0,
+            "min": b["facts_min"] if b["facts_min"] is not None else 0,
+            "max": b["facts_max"],
+        },
+    }
+
+
+def _compute_summary(results: list[dict]) -> dict:
+    total = _empty_bucket()
+    by_cat: dict[str, dict] = defaultdict(_empty_bucket)
+    failed_or_partial: list[dict] = []
 
     for sample in results:
         for qa in sample["qa"]:
             j = qa.get("judge")
             cat = qa.get("category", "unknown")
-            for d in (total, by_cat[cat]):
-                d["count"] += 1
-                if j is None:
-                    d["skipped"] += 1
-                else:
-                    score = j.get("recall_score", "fail")
-                    d[f"recall_{score}"] = d.get(f"recall_{score}", 0) + 1
-
-    def _score(d: dict):
-        n = d["count"] - d["skipped"]
-        if n == 0:
-            return None
-        return round((d["recall_pass"] + 0.5 * d["recall_partial"]) / n, 3)
+            facts_count = len(qa.get("facts_returned", []))
+            _accumulate(total, j, facts_count)
+            _accumulate(by_cat[cat], j, facts_count)
+            if j and (j.get("recall_score") in ("partial", "fail") or j.get("answer_score") in ("partial", "fail")):
+                failed_or_partial.append({
+                    "category": cat,
+                    "question": qa["question"],
+                    "ground_truth": qa["ground_truth"],
+                    "recall_score": j.get("recall_score"),
+                    "answer_score": j.get("answer_score"),
+                    "precision": j.get("precision"),
+                    "facts_count": facts_count,
+                    "reason": j.get("reason", ""),
+                    "source_files": qa.get("source_files", []),
+                })
 
     return {
-        "total": {**total, "score": _score(total)},
-        "by_category": {cat: {**b, "score": _score(b)} for cat, b in sorted(by_cat.items())},
+        "total_questions": total["count"],
+        "metrics": _finalize(total),
+        "by_category": {cat: _finalize(b) for cat, b in sorted(by_cat.items())},
+        "failed_or_partial": failed_or_partial,
     }
+
+
+def _fmt(v) -> str:
+    if v is None:
+        return "n/a"
+    if isinstance(v, float):
+        return f"{v:.3f}"
+    return str(v)
 
 
 def _print_summary(results: list[dict]) -> None:
     s = _compute_summary(results)
-    t = s["total"]
+    m = s["metrics"]
+    rec = m["recall"]
+    ans = m["answer"]
     print("\n" + "=" * 60)
     print("CONTEXTUAL FILE EVAL SUMMARY")
     print("=" * 60)
-    print(f"  Questions : {t['count']}  (skipped: {t['skipped']})")
-    print(
-        f"  Recall    : pass={t['recall_pass']}  partial={t['recall_partial']}  "
-        f"fail={t['recall_fail']}  score={t['score']}"
-    )
+    print(f"  Questions : {s['total_questions']}  (skipped: {m['skipped']})")
+    print(f"  Recall    : pass={rec['pass']}  partial={rec['partial']}  fail={rec['fail']}  score={_fmt(rec['score'])}")
+    print(f"  Answer    : pass={ans['pass']}  partial={ans['partial']}  fail={ans['fail']}  score={_fmt(ans['score'])}")
+    print(f"  Precision : {_fmt(m['precision']['mean'])}   F1: {_fmt(m['f1']['mean'])}   MRR: {_fmt(m['first_relevant_rank']['mrr'])}")
+    print(f"  Facts ret : mean={_fmt(m['facts_returned']['mean'])}  min={m['facts_returned']['min']}  max={m['facts_returned']['max']}")
     print("\n  By category:")
     for cat, b in s["by_category"].items():
-        print(
-            f"    {cat:<12} count={b['count']}  pass={b['recall_pass']}  "
-            f"partial={b['recall_partial']}  fail={b['recall_fail']}  score={b['score']}"
-        )
+        r = b["recall"]
+        print(f"    {cat:<12} count={b['count']}  pass={r['pass']}  partial={r['partial']}  fail={r['fail']}  score={_fmt(r['score'])}")
+    if s["failed_or_partial"]:
+        print(f"\n  Failed/partial ({len(s['failed_or_partial'])}):")
+        for item in s["failed_or_partial"]:
+            p = item.get("precision")
+            p_str = f"{p:.2f}" if isinstance(p, float) else "n/a"
+            print(f"    [{item['category']}] r={item['recall_score']:<7} a={item['answer_score']:<7} p={p_str} :: {item['question']}")
+            print(f"      → {item['reason']}")
     print("=" * 60 + "\n")
 
 
@@ -297,10 +383,16 @@ async def main() -> None:
     elapsed = time.time() - t0
 
     results = [result]
+    models = {k: os.environ.get(k, "") for k in (
+        "AI_MODEL_DECOMPOSE", "AI_MODEL_EVALUATE", "AI_MODEL_SELECT_FACTS",
+        "AI_MODEL_DECOMPOSE_QUERIES", "AI_MODEL_DECOMPOSE_RECALL",
+        "AI_EMBEDDING_MODEL", "AI_MODEL_JUDGE",
+    )}
     output = {
         "dataset": "contextual_files",
         "elapsed_seconds": round(elapsed, 1),
         "recall_mode": recall_mode,
+        "models": {k: v for k, v in models.items() if v},
         "summary": _compute_summary(results),
         "conversations": results,
     }

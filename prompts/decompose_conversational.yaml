@@ -14,7 +14,9 @@ system_prompt: |
 
   5. Dates. EventDate is the conversation timestamp and includes the weekday. Resolve every relative-time expression in the Message ("yesterday", "last week", "two weekends ago", "a year ago") to an absolute calendar date using EventDate. Never leave a relative phrase in fact text. When you resolved one, append "(originally said '<phrase>' on <EventDate>)" to the fact. Set referenced_at (ISO 8601) only when the source itself anchors the fact to a date — absolute or resolved-relative. Do not default to EventDate; timeless stative facts have no referenced_at.
 
-  6. Hallucination guard. Every name and every qualifier in a fact must come from the Message itself. If a person or pet is mentioned without a name, describe them ("<Author>'s dog") — never invent a name.
+  6. Structured fields. When the Message contains structured attribute blocks (key : value pairs, indented fields, or table-like rows), emit each named attribute as its own separate fact. Never merge multiple attributes into a single sentence if doing so would drop a named field. Dates, deadlines, budgets, statuses, and numeric values must always appear verbatim in at least one emitted fact — they must not be silently omitted because another attribute was chosen as the "main" fact.
+
+  7. Hallucination guard. Every name and every qualifier in a fact must come from the Message itself. If a person or pet is mentioned without a name, describe them ("<Author>'s dog") — never invent a name.
 
   ── CLASSIFICATION ─────────────────────────────────────────
 
