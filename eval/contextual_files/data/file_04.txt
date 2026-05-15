@@ -1,0 +1,64 @@
+======================================================================
+  Quarterly Performance Review Summary — Q1 2025
+  Date: 2025-04-02
+======================================================================
+
+People & Culture Note
+----------------------
+The next company-wide all-hands meeting is scheduled for the last Friday of the
+month at 14:00 in the main auditorium and via the Zoom webinar link. Agenda items
+should be submitted to the EA team by Wednesday. The mentoring programme intake
+for H2 is now open — both mentors and mentees can register via the HR portal.
+The Culture Committee is organising a charity fundraising day next quarter; details
+will follow once venue logistics are confirmed. The Employee Assistance Programme
+is available 24/7 for confidential support — details are on the intranet. The new
+flexible bank holiday scheme takes effect from next month, allowing employees to
+swap fixed bank holidays for alternative dates.
+
+IT Helpdesk Statistics — Monthly Summary
+-----------------------------------------
+The IT Helpdesk handled 312 tickets this month, a 7% decrease compared to the
+prior month. Password reset requests continue to account for the largest single
+category at 28% of total volume. Average resolution time across all priority levels
+was 4.2 hours, within the agreed SLA targets. Six tickets escalated to third-party
+vendor support; of these, four have been resolved and two remain open. A new
+self-service knowledge base article covering the most common VPN connection issues
+has been published and is expected to reduce that ticket category by approximately
+30% next month. Helpdesk hours are 08:00 to 19:00 Monday to Friday.
+
+PROMOTIONS & ROLE CHANGES — EFFECTIVE 1 APRIL 2025
+===================================================
+Following the Q1 performance review cycle, the following role changes have been
+approved by the Compensation Committee:
+
+  Bob Hartley
+    Previous title : Senior Developer
+    New title      : Lead Engineer
+    Effective date : 1 April 2025
+    Notes          : Recognised for sustained technical leadership on Project Atlas
+                     and mentoring contributions within the engineering chapter.
+
+Finance & Procurement Reminder
+--------------------------------
+All purchase orders above £2,500 require two levels of approval before submission
+to the finance system. Please ensure line managers are copied on all requests to
+avoid delays. The Q2 budget review cycle opens on the fifteenth; cost-centre owners
+should prepare actuals vs. forecast reports using the updated template available
+on the intranet. Expense claims for the previous quarter must be submitted by the
+last working day of this month. Outstanding receipts from the Amsterdam offsite
+should be sent directly to accounts-payable@meridian.internal. Finance will not
+reprocess claims submitted after the deadline without written approval from the
+CFO. Currency conversion for non-GBP expenses uses the mid-market rate on the
+date of the transaction.
+
+Product Design Team Update
+---------------------------
+The design system update (version 3.1) has been published to Storybook. It includes
+revised spacing tokens, an updated icon set with 40 new icons, and improved
+accessibility annotations for all interactive components. Designers are asked to
+migrate their Figma files to the new library before the end of the sprint. The
+user research team completed six moderated usability sessions this fortnight; a
+synthesis readout is scheduled for next Tuesday at 10:00. Prototype feedback from
+the sessions has been incorporated into the revised onboarding flow, which is now
+ready for developer handoff. All design files must be version-controlled in the
+shared Figma workspace, not in personal drafts.

@@ -1,0 +1,68 @@
+======================================================================
+  Product Roadmap Announcement — Q2 2025
+  Date: 2025-04-28
+======================================================================
+
+Marketing & Brand Update
+-------------------------
+The refreshed brand guidelines have been published on the company intranet under
+Brand > Assets. All external communications and new slide decks should use the
+updated colour palette and typography from this point forward. The demand generation
+team launched two new paid campaigns targeting the DACH region last week. Early
+performance data shows a 22% higher click-through rate compared to the previous
+quarter. The new case study featuring our partnership with FinVault is live on the
+website and has already been shared by several industry analysts. The PR agency
+will pitch a long-read feature to two national tech publications next month.
+
+Security & Compliance Update
+-----------------------------
+All staff are reminded to complete the annual information security awareness
+training module on the Learning Portal. Completion is mandatory and must be
+finished by the end of the quarter. The IT Security team will begin quarterly
+phishing simulations next month; these are sanctioned exercises and any clicks on
+simulated phishing links will be recorded for training purposes only. Endpoint
+agents have been updated to version 4.3.1 across all managed devices. If unusual
+system behaviour is observed, raise a ticket with the Helpdesk immediately and do
+not attempt to remediate the issue yourself. USB storage devices remain prohibited
+on company hardware. All new joiners must complete the security induction within
+their first two weeks.
+
+NEW PROJECT ANNOUNCEMENT — PROJECT NOVA
+========================================
+The CPO has approved the initiation of Project Nova, Meridian's mobile application
+programme, with the following parameters:
+
+  Project    : Nova
+  Type       : New product — native mobile application (iOS and Android)
+  Lead       : Diana Ross
+  Budget     : £180,000
+  Target     : Launch in Q1 2026
+  Team size  : 6 (to be recruited over Q2–Q3)
+
+Project Nova will deliver a companion mobile experience for Meridian's existing
+platform customers. Diana Ross will act as product lead and will report progress
+directly to the CPO on a fortnightly basis.
+
+Operational Risk Register — Quarterly Review
+---------------------------------------------
+The risk register was reviewed by the senior leadership team on Wednesday. Two new
+operational risks were added: dependency on a single cloud availability zone for
+the batch processing workloads, and an elevated key-person dependency in the data
+platform team. Mitigations for both have been assigned and are expected to be in
+place by end of quarter. Three previously logged risks have been downgraded
+following the completion of their respective remediation plans. The next review is
+scheduled for Q3 and will include an external facilitation session with the
+company's risk advisory partner. The risk register is maintained on Confluence and
+accessible to all senior managers.
+
+Customer Success Weekly Digest
+-------------------------------
+The customer success team closed 14 support tickets this week, with an average
+first-response time of 2.1 hours, below the 3-hour SLA target. Two enterprise
+accounts have requested early access to the upcoming reporting module; these have
+been flagged to the product team for prioritisation. A root-cause analysis for
+last week's authentication outage has been completed and shared with affected
+customers. NPS surveys for the Q1 cohort went out on Monday — response rate is
+currently at 34%, above the industry average of 28%. The renewal pipeline for Q3
+stands at £1.2 M across 18 accounts. Three accounts are flagged as at-risk and
+have been assigned dedicated success managers.

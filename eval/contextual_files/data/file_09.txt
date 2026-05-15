@@ -1,0 +1,71 @@
+======================================================================
+  Leadership Promotions — September 2025
+  Date: 2025-09-08
+======================================================================
+
+People & Culture Note
+----------------------
+The next company-wide all-hands meeting is scheduled for the last Friday of the
+month at 14:00 in the main auditorium and via the Zoom webinar link. Agenda items
+should be submitted to the EA team by Wednesday. The mentoring programme intake
+for H2 is now open — both mentors and mentees can register via the HR portal.
+The Culture Committee is organising a charity fundraising day next quarter; details
+will follow once venue logistics are confirmed. The Employee Assistance Programme
+is available 24/7 for confidential support — details are on the intranet. The new
+flexible bank holiday scheme takes effect from next month, allowing employees to
+swap fixed bank holidays for alternative dates.
+
+Product Design Team Update
+---------------------------
+The design system update (version 3.1) has been published to Storybook. It includes
+revised spacing tokens, an updated icon set with 40 new icons, and improved
+accessibility annotations for all interactive components. Designers are asked to
+migrate their Figma files to the new library before the end of the sprint. The
+user research team completed six moderated usability sessions this fortnight; a
+synthesis readout is scheduled for next Tuesday at 10:00. Prototype feedback from
+the sessions has been incorporated into the revised onboarding flow, which is now
+ready for developer handoff. All design files must be version-controlled in the
+shared Figma workspace, not in personal drafts.
+
+LEADERSHIP PROMOTIONS — EFFECTIVE 1 SEPTEMBER 2025
+===================================================
+The following senior promotions have been approved:
+
+  Diana Ross
+    Previous title : Product Manager
+    New title      : VP of Product
+    Effective date : 1 September 2025
+    Notes          : In recognition of her leadership in establishing the Project Nova
+                     programme and consistent delivery of product strategy.
+
+PROJECT NOVA — BUDGET REVISION
+================================
+Following the acceleration of Project Nova (see August project review), the Board
+has approved an increased budget:
+
+  Previous budget : £180,000  (approved April 2025)
+  Revised budget  : £250,000
+  Effective date  : 1 September 2025
+
+Facilities & Office Notice
+---------------------------
+The third-floor meeting rooms (Meridian A through D) will be unavailable on the
+first Tuesday of each month between 08:00 and 10:00 for fire safety inspections.
+Please plan bookings accordingly. The new ergonomic chair rollout for Floor 2 is
+progressing — approximately 60% of desks have been upgraded. Facilities will
+contact teams individually to schedule the remaining installations. The car park
+barrier system has been upgraded; existing access fobs continue to work but staff
+are asked to re-register them by end of month to receive the updated firmware.
+The rooftop terrace will be closed for maintenance through to the end of the
+month. Coffee machine servicing is scheduled every other Wednesday morning.
+
+Marketing & Brand Update
+-------------------------
+The refreshed brand guidelines have been published on the company intranet under
+Brand > Assets. All external communications and new slide decks should use the
+updated colour palette and typography from this point forward. The demand generation
+team launched two new paid campaigns targeting the DACH region last week. Early
+performance data shows a 22% higher click-through rate compared to the previous
+quarter. The new case study featuring our partnership with FinVault is live on the
+website and has already been shared by several industry analysts. The PR agency
+will pitch a long-read feature to two national tech publications next month.

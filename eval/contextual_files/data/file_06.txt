@@ -1,0 +1,65 @@
+======================================================================
+  HR Policy Update — Remote Work Guidelines v2.0
+  Date: 2025-06-01
+======================================================================
+
+Legal & Contracts Review
+-------------------------
+The updated master services agreement template is now available on the Legal
+SharePoint site. Sales engineers are asked to use the new template for all new
+commercial engagements and to flag any customer requests for non-standard clauses
+to the legal team before agreeing to changes. Three NDAs are currently pending
+countersignature; legal will follow up directly with the relevant account executives.
+All software licence renewals above £10,000 must go through the procurement
+approval workflow — direct purchases that bypass this process will be reversed.
+GDPR data processing addenda must be in place before any customer data is
+transferred to third-party processors.
+
+Facilities & Office Notice
+---------------------------
+The third-floor meeting rooms (Meridian A through D) will be unavailable on the
+first Tuesday of each month between 08:00 and 10:00 for fire safety inspections.
+Please plan bookings accordingly. The new ergonomic chair rollout for Floor 2 is
+progressing — approximately 60% of desks have been upgraded. Facilities will
+contact teams individually to schedule the remaining installations. The car park
+barrier system has been upgraded; existing access fobs continue to work but staff
+are asked to re-register them by end of month to receive the updated firmware.
+The rooftop terrace will be closed for maintenance through to the end of the
+month. Coffee machine servicing is scheduled every other Wednesday morning.
+
+REMOTE WORK POLICY v2.0 — EFFECTIVE 1 JUNE 2025
+================================================
+Following a review of the hybrid working policy introduced in March 2025, and in
+response to employee feedback gathered in the Q1 engagement survey, the minimum
+office attendance requirement has been revised as follows:
+
+  Previous minimum : 2 days per week  (Policy v1.0, effective March 2025)
+  New minimum      : 3 days per week  (Policy v2.0, effective 1 June 2025)
+
+Core office days are now Tuesday, Wednesday, and Thursday. Employees who were
+previously attending exactly 2 days per week should update their schedules
+accordingly. Line managers should confirm updated arrangements with their teams
+by 15 June 2025.
+
+Data & Analytics Platform
+--------------------------
+The analytics warehouse migration to BigQuery is progressing to plan. Three of the
+five legacy Redshift clusters have been decommissioned. Data freshness for the main
+reporting layer has improved from T+1 to a T+4-hour cadence following the Airflow
+DAG optimisations deployed last sprint. The data governance working group met on
+Wednesday and agreed a new data classification policy — a draft will be circulated
+for comment next week. All new datasets must include an owner field and a retention
+tag before being promoted to the production catalogue. The self-service analytics
+portal saw 312 unique users last month, a 40% increase quarter on quarter.
+
+Investor Relations & Communications Note
+-----------------------------------------
+The Q1 earnings summary has been approved by the board and will be published on the
+investor portal on the fifteenth. Analysts who have registered for the earnings
+call will receive dial-in details by email 48 hours in advance. The updated company
+fact sheet, including revised ARR and customer count figures, is available to
+internal stakeholders on the Finance SharePoint. All external commentary on company
+performance must be cleared by the Communications team before publication — do not
+discuss specific financial metrics with external parties without prior approval.
+The board pack for Q2 is due from cost-centre owners by the last Friday of the
+month.

@@ -1,0 +1,68 @@
+======================================================================
+  HR Policy Update — Remote Work Guidelines v1.0
+  Date: 2025-03-01
+======================================================================
+
+Facilities & Office Notice
+---------------------------
+The third-floor meeting rooms (Meridian A through D) will be unavailable on the
+first Tuesday of each month between 08:00 and 10:00 for fire safety inspections.
+Please plan bookings accordingly. The new ergonomic chair rollout for Floor 2 is
+progressing — approximately 60% of desks have been upgraded. Facilities will
+contact teams individually to schedule the remaining installations. The car park
+barrier system has been upgraded; existing access fobs continue to work but staff
+are asked to re-register them by end of month to receive the updated firmware.
+The rooftop terrace will be closed for maintenance through to the end of the
+month. Coffee machine servicing is scheduled every other Wednesday morning.
+
+People & Culture Note
+----------------------
+The next company-wide all-hands meeting is scheduled for the last Friday of the
+month at 14:00 in the main auditorium and via the Zoom webinar link. Agenda items
+should be submitted to the EA team by Wednesday. The mentoring programme intake
+for H2 is now open — both mentors and mentees can register via the HR portal.
+The Culture Committee is organising a charity fundraising day next quarter; details
+will follow once venue logistics are confirmed. The Employee Assistance Programme
+is available 24/7 for confidential support — details are on the intranet. The new
+flexible bank holiday scheme takes effect from next month, allowing employees to
+swap fixed bank holidays for alternative dates.
+
+REMOTE WORK POLICY v1.0 — EFFECTIVE 1 MARCH 2025
+=================================================
+Following the conclusion of the hybrid working trial period, the following policy
+applies to all permanent employees effective immediately:
+
+  Minimum office attendance : 2 days per week
+  Core in-office days       : Tuesday and Thursday (standard; teams may agree
+                              alternatives with their manager)
+  Flexible remote days      : Remaining working days may be worked from an approved
+                              remote location
+
+Employees are expected to be reachable during core hours (09:00–17:00) regardless
+of location. Equipment and expenses for home office setup are covered under the
+existing remote working allowance policy.
+
+Security & Compliance Update
+-----------------------------
+All staff are reminded to complete the annual information security awareness
+training module on the Learning Portal. Completion is mandatory and must be
+finished by the end of the quarter. The IT Security team will begin quarterly
+phishing simulations next month; these are sanctioned exercises and any clicks on
+simulated phishing links will be recorded for training purposes only. Endpoint
+agents have been updated to version 4.3.1 across all managed devices. If unusual
+system behaviour is observed, raise a ticket with the Helpdesk immediately and do
+not attempt to remediate the issue yourself. USB storage devices remain prohibited
+on company hardware. All new joiners must complete the security induction within
+their first two weeks.
+
+Legal & Contracts Review
+-------------------------
+The updated master services agreement template is now available on the Legal
+SharePoint site. Sales engineers are asked to use the new template for all new
+commercial engagements and to flag any customer requests for non-standard clauses
+to the legal team before agreeing to changes. Three NDAs are currently pending
+countersignature; legal will follow up directly with the relevant account executives.
+All software licence renewals above £10,000 must go through the procurement
+approval workflow — direct purchases that bypass this process will be reversed.
+GDPR data processing addenda must be in place before any customer data is
+transferred to third-party processors.

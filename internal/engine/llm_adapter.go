@@ -155,15 +155,11 @@ func (a *LLMAdapter) Embed(ctx context.Context, texts []string) ([][]float64, er
 // not have to share attention with query planning.
 func (a *LLMAdapter) Decompose(ctx context.Context, req DecomposeRequest) (models.Decomposition, error) {
 	defer observeLLM(ctx, "decompose", time.Now())
-	promptName := "decompose_content"
-	if req.SourceKind == models.SOURCE_USER || req.SourceKind == models.SOURCE_AGENT {
-		promptName = "decompose_conversational"
-	}
 
 	refID, done := a.bind(ctx)
 	defer done()
-	out := &factsOnlyOutput{}
-	err := a.client.ExecuteAs(ctx, refID, promptName, a.models.Decompose, &bwai.PromptData{
+	out := &decompositionOutput{}
+	err := a.client.ExecuteAs(ctx, refID, "decompose", a.models.Decompose, &bwai.PromptData{
 		Data: req,
 	}, out)
 	if err != nil {
@@ -174,19 +170,23 @@ func (a *LLMAdapter) Decompose(ctx context.Context, req DecomposeRequest) (model
 	for i, f := range out.Facts {
 		facts[i] = f.toModel()
 	}
-	return models.Decomposition{Facts: facts}, nil
+	return models.Decomposition{
+		Facts:    facts,
+		Queries:  out.Queries,
+		Entities: normalizeEntities(out.Entities),
+	}, nil
 }
 
 // DecomposeWithQueries extracts facts AND search queries from a conversational source
 // in a single LLM call. Used for unchunked conversational sources to save one round-trip.
-// The prompt is decompose_conversational (extended to produce both outputs); the output
+// The prompt is decompose (extended to produce both outputs); the output
 // schema includes both facts and queries.
 func (a *LLMAdapter) DecomposeWithQueries(ctx context.Context, req DecomposeRequest) (models.Decomposition, error) {
 	defer observeLLM(ctx, "decompose_with_queries", time.Now())
 	refID, done := a.bind(ctx)
 	defer done()
 	out := &decompositionOutput{}
-	err := a.client.ExecuteAs(ctx, refID, "decompose_conversational", a.models.Decompose, &bwai.PromptData{
+	err := a.client.ExecuteAs(ctx, refID, "decompose", a.models.Decompose, &bwai.PromptData{
 		Data: req,
 	}, out)
 	if err != nil {

@@ -43,8 +43,7 @@ func validateChunkConfig(registry *bwai.ModelRegistry, cfg *config.Config) error
 		model  string
 	}
 	checks := []check{
-		{"decompose_content", cfg.AI.ModelDecompose},
-		{"decompose_conversational", cfg.AI.ModelDecompose},
+		{"decompose", cfg.AI.ModelDecompose},
 	}
 	for _, c := range checks {
 		pd := registry.GetPromptDefinition(c.prompt)

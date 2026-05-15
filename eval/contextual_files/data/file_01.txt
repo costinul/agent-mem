@@ -1,0 +1,88 @@
+======================================================================
+  Meridian Systems — Company Overview & Team Directory
+  Date: 2025-01-15
+======================================================================
+
+People & Culture Note
+----------------------
+The next company-wide all-hands meeting is scheduled for the last Friday of the
+month at 14:00 in the main auditorium and via the Zoom webinar link. Agenda items
+should be submitted to the EA team by Wednesday. The mentoring programme intake
+for H2 is now open — both mentors and mentees can register via the HR portal.
+The Culture Committee is organising a charity fundraising day next quarter; details
+will follow once venue logistics are confirmed. The Employee Assistance Programme
+is available 24/7 for confidential support — details are on the intranet. The new
+flexible bank holiday scheme takes effect from next month, allowing employees to
+swap fixed bank holidays for alternative dates.
+
+Infrastructure & DevOps Update
+-------------------------------
+The platform engineering team completed the scheduled maintenance window last
+Thursday without incident. Database replication lag has been reduced from an
+average of 340 ms to under 80 ms following the index rebuild on the primary
+cluster. Monitoring dashboards in Grafana have been updated to reflect the new
+alerting thresholds agreed upon in the last SRE sync. All on-call rotations for
+next month have been confirmed and shared via the internal calendar. The team
+resolved three open P3 tickets related to stale cache entries in the CDN layer.
+Engineers are reminded to keep incident post-mortems up to date in the wiki within
+48 hours of resolution. The next scheduled maintenance window is the first Sunday
+of next month between 02:00 and 05:00 UTC.
+
+TEAM DIRECTORY — CURRENT AS OF JANUARY 2025
+============================================
+
+Engineering Department
+  Alice Chen         — Engineering Manager
+                       Joined: March 2021 | Reports to: CTO
+                       Responsible for all backend and platform engineering squads.
+
+  Bob Hartley        — Senior Developer
+                       Joined: July 2019 | Reports to: Alice Chen
+                       Primary focus: backend services and API layer.
+
+Product Department
+  Diana Ross         — Product Manager
+                       Joined: November 2020 | Reports to: CPO
+                       Responsible for the core product roadmap.
+
+ACTIVE PROJECTS
+===============
+Project Atlas
+  Type     : Internal — API Migration (legacy REST to gRPC)
+  Status   : In Progress
+  Lead     : Alice Chen
+  Deadline : Q3 2025
+  Budget   : £120,000
+
+HR POLICIES (SUMMARY)
+======================
+Annual Leave
+  All permanent employees are entitled to 25 days of paid annual leave per year,
+  increasing to 27 days after 5 years of service. Leave must be approved by the
+  direct line manager at least two weeks in advance for periods of three or more
+  consecutive days.
+
+Finance & Procurement Reminder
+--------------------------------
+All purchase orders above £2,500 require two levels of approval before submission
+to the finance system. Please ensure line managers are copied on all requests to
+avoid delays. The Q2 budget review cycle opens on the fifteenth; cost-centre owners
+should prepare actuals vs. forecast reports using the updated template available
+on the intranet. Expense claims for the previous quarter must be submitted by the
+last working day of this month. Outstanding receipts from the Amsterdam offsite
+should be sent directly to accounts-payable@meridian.internal. Finance will not
+reprocess claims submitted after the deadline without written approval from the
+CFO. Currency conversion for non-GBP expenses uses the mid-market rate on the
+date of the transaction.
+
+Operational Risk Register — Quarterly Review
+---------------------------------------------
+The risk register was reviewed by the senior leadership team on Wednesday. Two new
+operational risks were added: dependency on a single cloud availability zone for
+the batch processing workloads, and an elevated key-person dependency in the data
+platform team. Mitigations for both have been assigned and are expected to be in
+place by end of quarter. Three previously logged risks have been downgraded
+following the completion of their respective remediation plans. The next review is
+scheduled for Q3 and will include an external facilitation session with the
+company's risk advisory partner. The risk register is maintained on Confluence and
+accessible to all senior managers.

@@ -1,0 +1,66 @@
+======================================================================
+  Project Status Review — August 2025
+  Date: 2025-08-20
+======================================================================
+
+Data & Analytics Platform
+--------------------------
+The analytics warehouse migration to BigQuery is progressing to plan. Three of the
+five legacy Redshift clusters have been decommissioned. Data freshness for the main
+reporting layer has improved from T+1 to a T+4-hour cadence following the Airflow
+DAG optimisations deployed last sprint. The data governance working group met on
+Wednesday and agreed a new data classification policy — a draft will be circulated
+for comment next week. All new datasets must include an owner field and a retention
+tag before being promoted to the production catalogue. The self-service analytics
+portal saw 312 unique users last month, a 40% increase quarter on quarter.
+
+Finance & Procurement Reminder
+--------------------------------
+All purchase orders above £2,500 require two levels of approval before submission
+to the finance system. Please ensure line managers are copied on all requests to
+avoid delays. The Q2 budget review cycle opens on the fifteenth; cost-centre owners
+should prepare actuals vs. forecast reports using the updated template available
+on the intranet. Expense claims for the previous quarter must be submitted by the
+last working day of this month. Outstanding receipts from the Amsterdam offsite
+should be sent directly to accounts-payable@meridian.internal. Finance will not
+reprocess claims submitted after the deadline without written approval from the
+CFO. Currency conversion for non-GBP expenses uses the mid-market rate on the
+date of the transaction.
+
+PROJECT ATLAS — CANCELLATION NOTICE
+=====================================
+Following the budget reallocation approved by the Board in July 2025, Project Atlas
+has been officially cancelled, effective immediately.
+
+  Project  : Atlas
+  Status   : Cancelled
+  Reason   : Budget resources have been reallocated to accelerate Project Nova
+             following stronger-than-expected market demand signals.
+
+All Atlas team members are being reassigned. Engineers currently on Atlas have been
+offered positions on the Project Nova team. Outstanding Atlas deliverables will not
+be completed; the legacy REST endpoints will remain in service until further notice.
+
+Security & Compliance Update
+-----------------------------
+All staff are reminded to complete the annual information security awareness
+training module on the Learning Portal. Completion is mandatory and must be
+finished by the end of the quarter. The IT Security team will begin quarterly
+phishing simulations next month; these are sanctioned exercises and any clicks on
+simulated phishing links will be recorded for training purposes only. Endpoint
+agents have been updated to version 4.3.1 across all managed devices. If unusual
+system behaviour is observed, raise a ticket with the Helpdesk immediately and do
+not attempt to remediate the issue yourself. USB storage devices remain prohibited
+on company hardware. All new joiners must complete the security induction within
+their first two weeks.
+
+Engineering Chapter Meeting — Notes Summary
+--------------------------------------------
+The engineering chapter met last Thursday. Key topics included: (1) adopting
+conventional commits as the standard for all repositories, with automated
+enforcement via pre-commit hooks; (2) a proposal to standardise on Go 1.22 across
+all backend services by end of Q2; (3) a discussion on improving PR review quality
+through a lightweight RFC process for significant architectural changes. Action items
+have been logged in Jira and assigned to respective owners. The next chapter meeting
+will include a demo slot — engineers are encouraged to sign up to present work in
+progress. All chapter notes are archived on Confluence under Engineering > Chapter.

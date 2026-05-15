@@ -1,0 +1,64 @@
+======================================================================
+  Team Announcement — Engineering Department
+  Date: 2025-07-14
+======================================================================
+
+People & Culture Note
+----------------------
+The next company-wide all-hands meeting is scheduled for the last Friday of the
+month at 14:00 in the main auditorium and via the Zoom webinar link. Agenda items
+should be submitted to the EA team by Wednesday. The mentoring programme intake
+for H2 is now open — both mentors and mentees can register via the HR portal.
+The Culture Committee is organising a charity fundraising day next quarter; details
+will follow once venue logistics are confirmed. The Employee Assistance Programme
+is available 24/7 for confidential support — details are on the intranet. The new
+flexible bank holiday scheme takes effect from next month, allowing employees to
+swap fixed bank holidays for alternative dates.
+
+Engineering Tooling Notes
+--------------------------
+The migration from the legacy CI pipeline to the new GitHub Actions workflows is
+now 85% complete. Remaining repositories are scheduled for migration in the next
+two sprints. Engineers are encouraged to review the updated branching strategy
+document on Confluence before starting new feature branches. The internal npm
+registry has been upgraded to Verdaccio v5; package publishing keys need to be
+rotated — see the onboarding wiki for instructions. Code review turnaround SLA
+remains at 24 hours for normal PRs and 4 hours for hotfix branches. Test coverage
+gates have been raised from 70% to 80% on all new services; existing services are
+expected to reach the new threshold by end of Q3.
+
+DEPARTURE NOTICE — ALICE CHEN
+==============================
+We would like to announce that Alice Chen, Engineering Manager, has left Meridian
+Systems as of 11 July 2025. Alice joined in March 2021 and made significant
+contributions to the platform engineering function during her tenure.
+
+During the search for a permanent replacement, Bob Hartley will serve as acting
+Engineering Manager, taking on responsibility for team oversight and line management
+in addition to his existing technical duties.
+
+We wish Alice the very best in her future endeavours.
+
+Infrastructure & DevOps Update
+-------------------------------
+The platform engineering team completed the scheduled maintenance window last
+Thursday without incident. Database replication lag has been reduced from an
+average of 340 ms to under 80 ms following the index rebuild on the primary
+cluster. Monitoring dashboards in Grafana have been updated to reflect the new
+alerting thresholds agreed upon in the last SRE sync. All on-call rotations for
+next month have been confirmed and shared via the internal calendar. The team
+resolved three open P3 tickets related to stale cache entries in the CDN layer.
+Engineers are reminded to keep incident post-mortems up to date in the wiki within
+48 hours of resolution. The next scheduled maintenance window is the first Sunday
+of next month between 02:00 and 05:00 UTC.
+
+IT Helpdesk Statistics — Monthly Summary
+-----------------------------------------
+The IT Helpdesk handled 312 tickets this month, a 7% decrease compared to the
+prior month. Password reset requests continue to account for the largest single
+category at 28% of total volume. Average resolution time across all priority levels
+was 4.2 hours, within the agreed SLA targets. Six tickets escalated to third-party
+vendor support; of these, four have been resolved and two remain open. A new
+self-service knowledge base article covering the most common VPN connection issues
+has been published and is expected to reduce that ticket category by approximately
+30% next month. Helpdesk hours are 08:00 to 19:00 Monday to Friday.

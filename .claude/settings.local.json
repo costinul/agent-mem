@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python eval/contextual_files/run.py --out eval/contextual_files/results_fix1.json)",
+      "Bash(python -c ' *)"
+    ]
+  }
+}

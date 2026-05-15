@@ -1,0 +1,62 @@
+======================================================================
+  Engineering Weekly Digest — Week 8, February 2025
+  Date: 2025-02-21
+======================================================================
+
+Engineering Tooling Notes
+--------------------------
+The migration from the legacy CI pipeline to the new GitHub Actions workflows is
+now 85% complete. Remaining repositories are scheduled for migration in the next
+two sprints. Engineers are encouraged to review the updated branching strategy
+document on Confluence before starting new feature branches. The internal npm
+registry has been upgraded to Verdaccio v5; package publishing keys need to be
+rotated — see the onboarding wiki for instructions. Code review turnaround SLA
+remains at 24 hours for normal PRs and 4 hours for hotfix branches. Test coverage
+gates have been raised from 70% to 80% on all new services; existing services are
+expected to reach the new threshold by end of Q3.
+
+Data & Analytics Platform
+--------------------------
+The analytics warehouse migration to BigQuery is progressing to plan. Three of the
+five legacy Redshift clusters have been decommissioned. Data freshness for the main
+reporting layer has improved from T+1 to a T+4-hour cadence following the Airflow
+DAG optimisations deployed last sprint. The data governance working group met on
+Wednesday and agreed a new data classification policy — a draft will be circulated
+for comment next week. All new datasets must include an owner field and a retention
+tag before being promoted to the production catalogue. The self-service analytics
+portal saw 312 unique users last month, a 40% increase quarter on quarter.
+
+PROJECT ATLAS — STATUS UPDATE
+==============================
+Milestone 1 (service discovery layer) was completed on schedule and deployed to
+staging on Monday without issues. The team is on track to meet the Q3 2025
+deadline. Velocity over the last two sprints has averaged 48 story points, above
+the target of 40.
+
+Bob Hartley has been assigned as technical lead for the Atlas backend module,
+taking ownership of the gRPC schema definitions and the migration tooling.
+He will coordinate directly with the external API consumers on breaking-change
+communication.
+
+Marketing & Brand Update
+-------------------------
+The refreshed brand guidelines have been published on the company intranet under
+Brand > Assets. All external communications and new slide decks should use the
+updated colour palette and typography from this point forward. The demand generation
+team launched two new paid campaigns targeting the DACH region last week. Early
+performance data shows a 22% higher click-through rate compared to the previous
+quarter. The new case study featuring our partnership with FinVault is live on the
+website and has already been shared by several industry analysts. The PR agency
+will pitch a long-read feature to two national tech publications next month.
+
+Investor Relations & Communications Note
+-----------------------------------------
+The Q1 earnings summary has been approved by the board and will be published on the
+investor portal on the fifteenth. Analysts who have registered for the earnings
+call will receive dial-in details by email 48 hours in advance. The updated company
+fact sheet, including revised ARR and customer count figures, is available to
+internal stakeholders on the Finance SharePoint. All external commentary on company
+performance must be cleared by the Communications team before publication — do not
+discuss specific financial metrics with external parties without prior approval.
+The board pack for Q2 is due from cost-centre owners by the last Friday of the
+month.
