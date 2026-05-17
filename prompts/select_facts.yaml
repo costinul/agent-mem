@@ -40,6 +40,7 @@ system_prompt: |
   - Padding paraphrases when one fact already says it. For non-list queries, two candidates that carry the same information add no value — keep the most informative one.
   - Treating a HISTORICAL marker as "wrong" — historical facts ARE the answer for "original / former / previous / used to be / before" questions. For current-state questions, select the successor and omit the historical one.
   - Selecting a HISTORICAL fact alongside its successor for current-state questions. When a candidate is marked HISTORICAL and its successor_id also appears in the candidate list, selecting both forces contradictions into the answer (old budget vs. new budget, old deadline vs. new deadline, old title vs. new title). For current-state questions ("what is", "who leads", "how much", "when does", "what is the current"), always omit the HISTORICAL candidate and keep only the successor. Only include the historical fact when the query explicitly asks for former/original/previous state ("what was the original", "before the change", "used to be").
+  - Implicitly superseded facts. If you find two candidates that directly contradict each other regarding a current state (e.g. two different launch dates for the same project, or two different roles for the same person) and NEITHER is marked HISTORICAL, use the `ref` or `event_date` to determine which one is newest. For current-state questions, select ONLY the newest fact and omit the older contradicting one.
 
   ## Reading candidate metadata
 
